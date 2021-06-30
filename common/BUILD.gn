@@ -1,0 +1,37 @@
+group("common") {
+  deps = [
+    ":foundation",
+    ":test_handler",
+  ]
+}
+
+static_library("foundation") {
+  sources = [
+    "handler.cpp",
+    "handler.h",
+    "handler_roster.cpp",
+    "handler_roster.h",
+    "looper.cpp",
+    "looper.h",
+    "media_buffer.cpp",
+    "media_buffer.h",
+    "message.cpp",
+    "message.h",
+  ]
+
+  deps = [
+    "../base:avp_base",
+    "../base:count_down_latch",
+  ]
+}
+
+executable("test_handler") {
+  sources = [ "handler_test.cpp" ]
+
+  deps = [
+    ":foundation",
+    "//base:avp_base",
+  ]
+
+  ldflags = [ "-pthread" ]
+}

@@ -1,0 +1,36 @@
+group("base") {
+  visibility = [ "*" ]
+  public_deps = [
+    ":avp_base",
+    ":utils",
+  ]
+}
+
+static_library("avp_base") {
+  visibility = [ "*" ]
+  sources = [ "null.cpp" ]
+  deps = []
+  public_deps = []
+
+  public_deps += [ ":macromagic" ]
+}
+
+source_set("macromagic") {
+  visibility = [ "*" ]
+  sources = [
+    "constructor_magic.h",
+    "thread_annotation.h",
+  ]
+}
+
+static_library("utils") {
+  sources = [ "error.h" ]
+}
+
+static_library("count_down_latch") {
+  visibility = [ "*" ]
+  sources = [
+    "count_down_latch.cpp",
+    "count_down_latch.h",
+  ]
+}
