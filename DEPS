@@ -54,6 +54,10 @@ deps = {
     'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libcxxabi.git@196ba1aaa8ac285d94f4ea8d9836390a45360533',
   'src/buildtools/third_party/libunwind/trunk':
     'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libunwind.git@d999d54f4bca789543a2eb6c995af2d9b5a1f3ed',
+  'src/testing':
+    'https://chromium.googlesource.com/chromium/src/testing@112ad8ea2684f8ffe734ef80acfc8874364ea680',
+  'src/third_party/googletest/src':
+    'https://chromium.googlesource.com/external/github.com/google/googletest.git@4fe018038f87675c083d0cfb6a6b57c274fb1753',
   'src/third_party/depot_tools':
     'https://chromium.googlesource.com/chromium/tools/depot_tools.git@dc7b108da629de39f923d510fc76ea2f58efa521',
   'src/tools/clang/dsymutil': {

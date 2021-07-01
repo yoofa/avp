@@ -16,9 +16,9 @@
 #include <string>
 #include <thread>
 
-#include "../base/constructor_magic.h"
-#include "../base/count_down_latch.h"
-#include "../base/error.h"
+#include "base/constructor_magic.h"
+#include "base/count_down_latch.h"
+#include "base/error.h"
 
 namespace avp {
 

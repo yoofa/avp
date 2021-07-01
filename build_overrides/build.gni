@@ -50,5 +50,5 @@ declare_args() {
 
   # If true, it assumes that //third_party/abseil-cpp is an available
   # dependency for googletest.
-  gtest_enable_absl_printers = true
+  gtest_enable_absl_printers = false
 }

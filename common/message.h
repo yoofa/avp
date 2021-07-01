@@ -14,8 +14,8 @@
 #include <unordered_map>
 #include <variant>
 
-#include "../base/constructor_magic.h"
-#include "../base/error.h"
+#include "base/constructor_magic.h"
+#include "base/error.h"
 #include "looper.h"
 
 namespace avp {

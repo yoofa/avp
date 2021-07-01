@@ -1,8 +1,10 @@
 group("default") {
+  testonly = true
   deps = []
   public_deps = []
   public_deps += [
     "base",
     "common",
+    "test",
   ]
 }

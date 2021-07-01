@@ -43,4 +43,7 @@
 /xcodebuild
 /.vscode
 /build
+/buildtools
+/testing
 /thirdparty
+/tools

@@ -1,3 +1,5 @@
+import("//avp.gni")
+
 group("common") {
   deps = [
     ":foundation",

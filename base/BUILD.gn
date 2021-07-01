@@ -34,3 +34,7 @@ static_library("count_down_latch") {
     "count_down_latch.h",
   ]
 }
+
+source_set("ignore_wundef") {
+  sources = [ "ignore_wundef.h" ]
+}
