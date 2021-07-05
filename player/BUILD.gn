@@ -1,0 +1,33 @@
+group("player") {
+  deps = [
+    ":avplay",
+    ":avplayer",
+  ]
+}
+
+static_library("avplayer") {
+  sources = [
+    "avp_decoder.cpp",
+    "avp_decoder.h",
+    "avp_render.cpp",
+    "avp_render.h",
+    "avplayer.cpp",
+    "avplayer.h",
+    "generic_source.cpp",
+    "generic_source.h",
+    "player_interface.h",
+  ]
+
+  deps = [ "../common:foundation" ]
+
+  cflags = [ "-Wno-multichar" ]
+}
+
+executable("avplay") {
+  sources = [
+    "av_play.cpp",
+    "av_play.h",
+  ]
+
+  deps = [ ":avplayer" ]
+}
