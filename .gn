@@ -21,4 +21,5 @@ exec_script_whitelist = build_dotfile_settings.exec_script_whitelist +
                         [ "//build_overrides/build.gni" ]
 
 default_args = {
+  clang_use_chrome_plugins = false
 }
