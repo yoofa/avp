@@ -2,6 +2,8 @@ group("base") {
   visibility = [ "*" ]
   public_deps = [
     ":avp_base",
+    ":logging",
+    ":logging_test",
     ":utils",
   ]
 }
@@ -37,4 +39,18 @@ static_library("count_down_latch") {
 
 source_set("ignore_wundef") {
   sources = [ "ignore_wundef.h" ]
+}
+
+static_library("logging") {
+  sources = [
+    "logging.cc",
+    "logging.h",
+  ]
+}
+
+executable("logging_test") {
+  visibility = [ "*" ]
+  sources = [ "logging_test.cc" ]
+
+  deps = [ ":logging" ]
 }
