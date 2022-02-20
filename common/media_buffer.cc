@@ -1,16 +1,15 @@
 /*
- * avp_decoder.cpp
+ * media_buffer.cc
  * Copyright (C) 2021 youfa.song <vsyfar@gmail.com>
  *
  * Distributed under terms of the GPLv2 license.
  */
 
-#include "avp_decoder.h"
+#include "media_buffer.h"
 
 namespace avp {
 
-AvpDecoder::AvpDecoder() {}
-
-AvpDecoder::~AvpDecoder() {}
+MediaBuffer::MediaBuffer() {}
+MediaBuffer::~MediaBuffer() {}
 
 }  // namespace avp

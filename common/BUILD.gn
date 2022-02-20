@@ -9,15 +9,15 @@ group("common") {
 
 static_library("foundation") {
   sources = [
-    "handler.cpp",
+    "handler.cc",
     "handler.h",
-    "handler_roster.cpp",
+    "handler_roster.cc",
     "handler_roster.h",
-    "looper.cpp",
+    "looper.cc",
     "looper.h",
-    "media_buffer.cpp",
+    "media_buffer.cc",
     "media_buffer.h",
-    "message.cpp",
+    "message.cc",
     "message.h",
   ]
 
@@ -28,7 +28,7 @@ static_library("foundation") {
 }
 
 executable("test_handler") {
-  sources = [ "handler_test.cpp" ]
+  sources = [ "handler_test.cc" ]
 
   deps = [
     ":foundation",

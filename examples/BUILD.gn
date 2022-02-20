@@ -1,0 +1,11 @@
+group("examples") {
+  public_deps = [ ":avplay" ]
+}
+
+executable("avplay") {
+  sources = [
+    "avplay/av_play.cc",
+    "avplay/av_play.h",
+  ]
+  deps = [ "../player:avplayer" ]
+}

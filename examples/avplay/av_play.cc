@@ -1,5 +1,5 @@
 /*
- * av_play.cpp
+ * av_play.cc
  * Copyright (C) 2021 youfa.song <vsyfar@gmail.com>
  *
  * Distributed under terms of the GPLv2 license.
@@ -9,8 +9,7 @@
 
 #include <memory>
 
-#include "avplayer.h"
-#include "player_interface.h"
+#include "player/avplayer.h"
 
 using avp::AvPlayer;
 

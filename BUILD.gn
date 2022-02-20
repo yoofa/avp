@@ -5,6 +5,7 @@ group("default") {
   public_deps += [
     "base",
     "common",
+    "examples",
     "player",
     "test",
   ]

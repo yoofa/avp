@@ -10,7 +10,7 @@ group("base") {
 
 static_library("avp_base") {
   visibility = [ "*" ]
-  sources = [ "null.cpp" ]
+  sources = [ "null.cc" ]
   deps = []
   public_deps = []
 
@@ -32,7 +32,7 @@ static_library("utils") {
 static_library("count_down_latch") {
   visibility = [ "*" ]
   sources = [
-    "count_down_latch.cpp",
+    "count_down_latch.cc",
     "count_down_latch.h",
   ]
 }

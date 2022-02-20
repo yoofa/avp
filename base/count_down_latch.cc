@@ -1,5 +1,5 @@
 /*
- * count_down_latch.cpp
+ * count_down_latch.cc
  * Copyright (C) 2021 youfa.song <vsyfar@gmail.com>
  *
  * Distributed under terms of the GPLv2 license.
