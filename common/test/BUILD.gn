@@ -1,0 +1,16 @@
+import("//avp.gni")
+group("test") {
+  testonly = true
+  deps = [ ":looper_test" ]
+}
+
+executable("looper_test") {
+  visibility = [ "*" ]
+  testonly = true
+  sources = [ "looper_test.cpp" ]
+
+  deps = [
+    "../../common:foundation",
+    "../../test:test_support",
+  ]
+}

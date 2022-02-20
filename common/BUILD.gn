@@ -1,9 +1,11 @@
 import("//avp.gni")
 
 group("common") {
+  testonly = true
   deps = [
     ":foundation",
     ":test_handler",
+    "test",
   ]
 }
 
