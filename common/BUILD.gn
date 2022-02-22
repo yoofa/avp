@@ -1,15 +1,13 @@
 import("//avp.gni")
 
 group("common") {
-  testonly = true
   deps = [
     ":foundation",
     ":test_handler",
-    "test",
   ]
 }
 
-static_library("foundation") {
+avp_library("foundation") {
   sources = [
     "handler.cc",
     "handler.h",
@@ -27,9 +25,13 @@ static_library("foundation") {
     "../base:avp_base",
     "../base:count_down_latch",
   ]
+  configs += [
+    "..:no_exit_time_destructors",
+    "..:no_global_constructors",
+  ]
 }
 
-executable("test_handler") {
+avp_executable("test_handler") {
   sources = [ "handler_test.cc" ]
 
   deps = [

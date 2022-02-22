@@ -5,6 +5,7 @@
  * Distributed under terms of the GPLv2 license.
  */
 
+#include <assert.h>
 #include <chrono>
 #include <iostream>
 #include <memory>
@@ -24,6 +25,18 @@ class TestHandler : public avp::Handler {
   void onMessageReceived(const std::shared_ptr<avp::Message>& message) override;
 
  private:
+};
+
+class TestObject : public avp::MessageObject {
+ public:
+  TestObject() = default;
+
+  void printHello() { std::cout << "i: " << i_ << std::endl; }
+
+  void setI(int i) { i_ = i; }
+
+ private:
+  int i_;
 };
 
 void avp::TestHandler::onMessageReceived(
@@ -54,6 +67,21 @@ void avp::TestHandler::onMessageReceived(
     }
     case 13: {
       std::cout << "case 13 start" << std::endl;
+
+      std::shared_ptr<MessageObject> obj;
+      message->findObject("testObject", obj);
+
+      assert(obj != nullptr);
+
+      std::cout << "obj: " << obj << std::endl;
+
+      std::shared_ptr<TestObject> test(
+          std::dynamic_pointer_cast<TestObject>(obj));
+
+      assert(test != nullptr);
+
+      test->printHello();
+
       std::shared_ptr<avp::ReplyToken> reply;
       message->senderAwaitsResponse(reply);
       std::shared_ptr<Message> response = std::make_shared<Message>();
@@ -111,6 +139,18 @@ int main() {
     std::cout << "post 13" << std::endl;
     auto msg4 = message->dup();
     msg4->setWhat(13);
+
+    std::shared_ptr<avp::TestObject> testObject(
+        std::make_shared<avp::TestObject>());
+
+    testObject->setI(100);
+
+    std::shared_ptr<avp::MessageObject> base;
+    base = std::static_pointer_cast<avp::MessageObject>(testObject);
+
+    msg4->setObject("testObject",
+                    std::static_pointer_cast<avp::MessageObject>(testObject));
+
     std::shared_ptr<avp::Message> response;
     msg4->postAndWaitResponse(response);
 

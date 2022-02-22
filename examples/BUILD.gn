@@ -1,8 +1,10 @@
+import("//avp.gni")
+
 group("examples") {
   public_deps = [ ":avplay" ]
 }
 
-executable("avplay") {
+avp_executable("avplay") {
   sources = [
     "avplay/av_play.cc",
     "avplay/av_play.h",

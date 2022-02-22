@@ -1,0 +1,6 @@
+source_set("avp_export") {
+  sources = [
+    "avp_export.h",
+    "avp_export_template.h",
+  ]
+}

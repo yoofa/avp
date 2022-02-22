@@ -15,7 +15,7 @@
 #include <variant>
 
 #include "base/constructor_magic.h"
-#include "base/error.h"
+#include "base/errors.h"
 #include "looper.h"
 
 namespace avp {
@@ -23,9 +23,13 @@ namespace avp {
 class Handler;
 class MediaBuffer;
 
-struct MessageObject {};
+class MessageObject {
+ public:
+  MessageObject() = default;
+  virtual ~MessageObject() = default;
+};
 
-class ReplyToken : MessageObject {
+class ReplyToken : public MessageObject {
  public:
   explicit ReplyToken(const std::shared_ptr<Looper>& looper)
       : mLooper(looper), mReplied(false) {}

@@ -1,3 +1,5 @@
+import("//avp.gni")
+
 group("base") {
   visibility = [ "*" ]
   public_deps = [
@@ -8,16 +10,14 @@ group("base") {
   ]
 }
 
-static_library("avp_base") {
+avp_library("avp_base") {
   visibility = [ "*" ]
   sources = [ "null.cc" ]
-  deps = []
-  public_deps = []
 
-  public_deps += [ ":macromagic" ]
+  deps = [ ":macromagic" ]
 }
 
-source_set("macromagic") {
+avp_source_set("macromagic") {
   visibility = [ "*" ]
   sources = [
     "constructor_magic.h",
@@ -25,11 +25,20 @@ source_set("macromagic") {
   ]
 }
 
-static_library("utils") {
-  sources = [ "error.h" ]
+avp_library("utils") {
+  sources = [
+    "byte_utils.cc",
+    "byte_utils.h",
+    "errors.cc",
+    "errors.h",
+    "types.h",
+    "unique_fd.h",
+    "utils.cc",
+    "utils.h",
+  ]
 }
 
-static_library("count_down_latch") {
+avp_library("count_down_latch") {
   visibility = [ "*" ]
   sources = [
     "count_down_latch.cc",
@@ -41,7 +50,7 @@ source_set("ignore_wundef") {
   sources = [ "ignore_wundef.h" ]
 }
 
-static_library("logging") {
+avp_library("logging") {
   sources = [
     "logging.cc",
     "logging.h",

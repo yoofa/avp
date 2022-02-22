@@ -1,21 +1,51 @@
+import("//avp.gni")
+
 group("player") {
-  deps = [ ":avplayer" ]
+  deps = [
+    ":avplayer",
+    ":avplayer_so",
+  ]
 }
 
-static_library("avplayer") {
+avp_library("player_interface") {
   sources = [
-    "avp_decoder.cc",
-    "avp_decoder.h",
-    "avp_render.cc",
-    "avp_render.h",
+    "audio_decoder.h",
+    "audio_decoder_factory.h",
+    "data_source.h",
+    "media_source.h",
+    "player_interface.h",
+    "video_decoder.h",
+    "video_decoder_factory.h",
+  ]
+  deps = [ "../base:utils" ]
+}
+
+avp_library("avplayer") {
+  sources = [
     "avplayer.cc",
     "avplayer.h",
+    "default_Audio_decoder_factory.cc",
+    "default_Audio_decoder_factory.h",
+    "default_video_decoder_factory.cc",
+    "default_video_decoder_factory.h",
+    "file_source.cc",
+    "file_source.h",
     "generic_source.cc",
     "generic_source.h",
-    "player_interface.h",
   ]
 
-  deps = [ "../common:foundation" ]
+  deps = [
+    ":player_interface",
+    "../base:logging",
+    "../base:utils",
+    "../base/system:avp_export",
+    "../common:foundation",
+  ]
 
   cflags = [ "-Wno-multichar" ]
+}
+
+avp_shared_library("avplayer_so") {
+  deps = [ ":avplayer" ]
+  output_extension = "so"
 }

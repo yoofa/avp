@@ -9,8 +9,9 @@
 #define AVP_TYPES_H
 
 #include <stdint.h>
+#include <sys/types.h>
 
-typedef int32_t status_t;
+#include "base/errors.h"
 
 typedef int64_t nsecs_t;
 

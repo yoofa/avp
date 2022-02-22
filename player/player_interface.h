@@ -11,7 +11,7 @@
 #include <memory>
 
 #include "base/constructor_magic.h"
-#include "base/error.h"
+#include "base/errors.h"
 #include "common/handler.h"
 #include "common/message.h"
 
@@ -19,7 +19,25 @@ namespace avp {
 
 class PlayerBase {
  public:
-  class ContentSource : public Handler {
+  enum media_track_type {
+    MEDIA_TRACK_TYPE_UNKNOWN = 0,
+    MEDIA_TRACK_TYPE_VIDEO = 1,
+    MEDIA_TRACK_TYPE_AUDIO = 2,
+    MEDIA_TRACK_TYPE_TIMEDTEXT = 3,
+    MEDIA_TRACK_TYPE_SUBTITLE = 4,
+    MEDIA_TRACK_TYPE_METADATA = 5,
+  };
+
+  class Listener {
+   protected:
+    Listener() = default;
+    virtual ~Listener() = default;
+
+   public:
+    virtual void notify(int what, std::shared_ptr<Message> info) = 0;
+  };
+
+  class ContentSource : public Handler, public MessageObject {
    public:
     enum class Flags {
       FLAG_CAN_PAUSE = 1,
@@ -50,10 +68,9 @@ class PlayerBase {
       // Modular DRM
       kWhatDrmInfo,
     };
+    ContentSource() {}
 
-    explicit ContentSource(std::shared_ptr<Message> notify) : mNotify(notify) {}
-    virtual ~ContentSource() = default;
-
+    virtual void prepare() = 0;
     virtual void start() = 0;
     virtual void stop() = 0;
     virtual void pause() = 0;
@@ -69,19 +86,41 @@ class PlayerBase {
       return 0;
     }
 
-   protected:
-    virtual void onMessageReceived(
-        const std::shared_ptr<Message>& message) override;
     std::shared_ptr<Message> dupNotify() const { return mNotify->dup(); }
 
+   protected:
+    virtual ~ContentSource() {}
+    virtual void onMessageReceived(const std::shared_ptr<Message>& message) = 0;
+
    private:
+    friend class AvPlayer;
+    void setNotifier(std::shared_ptr<Message> notify) {
+      mNotify = std::move(notify);
+    }
     std::shared_ptr<Message> mNotify;
 
     AVP_DISALLOW_COPY_AND_ASSIGN(ContentSource);
   };
+  class AudioDecoder {
+   protected:
+    AudioDecoder() = default;
+    virtual ~AudioDecoder() = default;
+
+   private:
+    /* data */
+  };
+
+  class VideoDecoder {
+   protected:
+    VideoDecoder() = default;
+    virtual ~VideoDecoder() = default;
+
+   private:
+    /* data */
+  };
 
   class AudioSink {
-   public:
+   protected:
     AudioSink() = default;
     virtual ~AudioSink() = default;
 
@@ -90,7 +129,7 @@ class PlayerBase {
   };
 
   class VideoSink {
-   public:
+   protected:
     VideoSink() = default;
     virtual ~VideoSink() = default;
 
@@ -104,12 +143,25 @@ class PlayerBase {
     SEEK_CLOSET,
   };
 
+  // Notify Event
+  enum {
+    kWhatSetDataSourceCompleted,
+    kWhatPrepared,
+  };
+
   PlayerBase() = default;
   ~PlayerBase() = default;
 
+  virtual status_t setListener(const std::shared_ptr<Listener>& listener) = 0;
   virtual status_t init() = 0;
 
+  virtual status_t setDataSource(const char* url) = 0;
   virtual status_t setDataSource(int fd, int64_t offset, int64_t length) = 0;
+  virtual status_t setDataSource(
+      const std::shared_ptr<ContentSource>& source) = 0;
+
+  virtual status_t setAudioRender(std::shared_ptr<AudioSink> render) = 0;
+  virtual status_t setVideoRender(std::shared_ptr<VideoSink> render) = 0;
 
   virtual status_t prepare() = 0;
 
@@ -123,8 +175,16 @@ class PlayerBase {
 
   virtual status_t reset() = 0;
 
- private:
-  /* data */
+  void notifyListner(int what, std::shared_ptr<Message> msg) {
+    std::shared_ptr<Listener> listener = mListener.lock();
+
+    if (listener != nullptr) {
+      listener->notify(what, msg);
+    }
+  }
+
+ protected:
+  std::weak_ptr<Listener> mListener;
 };
 
 }  // namespace avp

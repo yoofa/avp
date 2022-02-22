@@ -5,3 +5,250 @@ import("//build/config/sanitizers/sanitizers.gni")
 import("//build/config/sysroot.gni")
 import("//build/config/ui.gni")
 import("//build_overrides/build.gni")
+
+declare_args() {
+}
+
+avp_root = get_path_info(".", "abspath")
+
+avp_common_configs = [ avp_root + ":common_config" ]
+
+# Global public configuration that should be applied to all WebRTC targets. You
+# normally shouldn't need to include this in your target as it's automatically
+# included when using the avp_* templates. It set the defines, include paths and
+# compilation warnings that should be propagated to dependents of the targets
+# depending on the target having this config.
+avp_common_inherited_config = avp_root + ":common_inherited_config"
+
+# Common configs to remove or add in all avp targets.
+avp_remove_configs = []
+
+if (is_clang) {
+  avp_remove_configs += [ "//build/config/clang:find_bad_constructs" ]
+}
+avp_add_configs = avp_common_configs
+avp_add_configs += [ "//build/config/compiler:rtti" ]
+
+avp_prod_configs = [ avp_root + ":avp_prod_config" ]
+
+avp_library_impl_config = [ avp_root + ":library_impl_config" ]
+
+set_defaults("avp_test") {
+  configs = avp_add_configs
+  suppressed_configs = []
+}
+
+set_defaults("avp_library") {
+  configs = avp_add_configs
+  suppressed_configs = []
+}
+
+set_defaults("avp_source_set") {
+  configs = avp_add_configs
+  suppressed_configs = []
+}
+
+set_defaults("avp_static_library") {
+  configs = avp_add_configs
+  suppressed_configs = []
+}
+
+set_defaults("avp_executable") {
+  configs = avp_add_configs
+  suppressed_configs = []
+}
+
+set_defaults("avp_shared_library") {
+  configs = avp_add_configs
+  suppressed_configs = []
+}
+
+avp_default_visibility = [ avp_root + "/*" ]
+
+template("avp_test") {
+  test(target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "configs",
+                             "is_xctest",
+                             "public_configs",
+                             "suppressed_configs",
+                             "visibility",
+                           ])
+
+    # Always override to public because when target_os is Android the `test`
+    # template can override it to [ "*" ] and we want to avoid conditional
+    # visibility.
+    visibility = [ "*" ]
+    configs += invoker.configs
+    configs -= avp_remove_configs
+    configs -= invoker.suppressed_configs
+    public_configs = [
+      avp_common_inherited_config,
+      absl_include_config,
+      absl_define_config,
+      absl_flags_config,
+    ]
+    if (defined(invoker.public_configs)) {
+      public_configs += invoker.public_configs
+    }
+
+    if (using_sanitizer) {
+      if (is_linux) {
+        if (!defined(invoker.data)) {
+          data = []
+        }
+        data +=
+            [ "//third_party/llvm-build/Release+Asserts/lib/libstdc++.so.6" ]
+      }
+    }
+  }
+}
+
+template("avp_source_set") {
+  source_set(target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "configs",
+                             "public_configs",
+                             "suppressed_configs",
+                             "visibility",
+                           ])
+    forward_variables_from(invoker, [ "visibility" ])
+    if (!defined(visibility)) {
+      visibility = avp_default_visibility
+    }
+
+    if (!defined(testonly) || !testonly) {
+      configs += avp_prod_configs
+    }
+
+    configs += invoker.configs
+    configs += avp_library_impl_config
+    configs -= avp_remove_configs
+    configs -= invoker.suppressed_configs
+    public_configs = [ avp_common_inherited_config ]
+    if (defined(invoker.public_configs)) {
+      public_configs += invoker.public_configs
+    }
+  }
+}
+
+template("avp_static_library") {
+  static_library(target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "configs",
+                             "public_configs",
+                             "suppressed_configs",
+                             "visibility",
+                           ])
+    forward_variables_from(invoker, [ "visibility" ])
+    if (!defined(visibility)) {
+      visibility = avp_default_visibility
+    }
+
+    if (!defined(testonly) || !testonly) {
+      configs += avp_prod_configs
+    }
+
+    configs += invoker.configs
+    configs += avp_library_impl_config
+    configs -= avp_remove_configs
+    configs -= invoker.suppressed_configs
+    public_configs = [ avp_common_inherited_config ]
+    if (defined(invoker.public_configs)) {
+      public_configs += invoker.public_configs
+    }
+  }
+}
+
+template("avp_library") {
+  if (is_component_build || (defined(invoker.testonly) && invoker.testonly)) {
+    target_type = "source_set"
+  } else {
+    target_type = "static_library"
+  }
+  target(target_type, target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "configs",
+                             "public_configs",
+                             "suppressed_configs",
+                             "visibility",
+                           ])
+    forward_variables_from(invoker, [ "visibility" ])
+    if (!defined(visibility)) {
+      visibility = avp_default_visibility
+    }
+
+    if (!defined(testonly) || !testonly) {
+      configs += avp_prod_configs
+    }
+
+    configs += invoker.configs
+    configs += avp_library_impl_config
+    configs -= avp_remove_configs
+    configs -= invoker.suppressed_configs
+    public_configs = [ avp_common_inherited_config ]
+    if (defined(invoker.public_configs)) {
+      public_configs += invoker.public_configs
+    }
+  }
+}
+
+template("avp_executable") {
+  executable(target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "deps",
+                             "configs",
+                             "public_configs",
+                             "suppressed_configs",
+                             "visibility",
+                           ])
+    forward_variables_from(invoker, [ "visibility" ])
+    if (!defined(visibility)) {
+      visibility = avp_default_visibility
+    }
+    configs += invoker.configs
+    configs -= avp_remove_configs
+    configs -= invoker.suppressed_configs
+    deps = invoker.deps
+
+    public_configs = [ avp_common_inherited_config ]
+    if (defined(invoker.public_configs)) {
+      public_configs += invoker.public_configs
+    }
+  }
+}
+
+template("avp_shared_library") {
+  shared_library(target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "configs",
+                             "public_configs",
+                             "suppressed_configs",
+                             "visibility",
+                           ])
+    forward_variables_from(invoker, [ "visibility" ])
+    if (!defined(visibility)) {
+      visibility = avp_default_visibility
+    }
+
+    configs += invoker.configs
+    configs -= avp_remove_configs
+    configs -= invoker.suppressed_configs
+    public_configs = [ avp_common_inherited_config ]
+    if (defined(invoker.public_configs)) {
+      public_configs += invoker.public_configs
+    }
+  }
+}
