@@ -11,7 +11,7 @@
 namespace avp {
 
 class Demuxer {
- protected:
+ public:
   Demuxer() = default;
   virtual ~Demuxer() = default;
 };

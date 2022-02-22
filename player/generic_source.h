@@ -15,6 +15,7 @@
 #include "common/looper.h"
 #include "common/message.h"
 #include "player/data_source.h"
+#include "player/demuxer_factory.h"
 #include "player/media_source.h"
 #include "player_interface.h"
 
@@ -73,7 +74,8 @@ class GenericSource : public PlayerBase::ContentSource {
   unique_fd mFd;
   int64_t mOffset;
   int64_t mLength;
-  std::unique_ptr<DataSource> mDataSource;
+  std::shared_ptr<DataSource> mDataSource;
+  std::unique_ptr<DemuxerFactory> mDemuxerFactory;
 
   mutable std::mutex mLock;
   std::shared_ptr<Looper> mLooper;

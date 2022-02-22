@@ -15,13 +15,25 @@
 #include "base/unique_fd.h"
 #include "common/looper.h"
 #include "common/message.h"
+#ifdef AVP_FFMPEG_DEMUXER
+#include "demuxer/ffmpeg_demuxer_factory.h"
+#endif
+#include "player/default_demuxer_factory.h"
 #include "player/file_source.h"
 
 namespace avp {
 
-GenericSource::GenericSource() : mLooper(std::make_shared<Looper>()) {
+GenericSource::GenericSource()
+    :
+#ifdef AVP_FFMPEG_DEMUXER
+      mDemuxerFactory(std::make_unique<FFmpegDemuxerFactory>()),
+#else
+      mDemuxerFactory(std::make_unique<DefaultDemuxerFactory>()),
+#endif
+      mLooper(std::make_shared<Looper>()) {
   mLooper->setName("generic source");
 }
+
 GenericSource::~GenericSource() {}
 
 void GenericSource::resetDataSource() {}
@@ -89,11 +101,11 @@ void GenericSource::onPrepare() {
     if (!mUri.empty()) {
       const char* uri = mUri.c_str();
       if (!strncasecmp("file://", uri, 7)) {
-        mDataSource = std::make_unique<FileSource>(mUri.substr(7).c_str());
+        mDataSource = std::make_shared<FileSource>(mUri.substr(7).c_str());
       }
     } else {
       mDataSource =
-          std::make_unique<FileSource>(dup(mFd.get()), mOffset, mLength);
+          std::make_shared<FileSource>(dup(mFd.get()), mOffset, mLength);
     }
   }
 

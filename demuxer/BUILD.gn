@@ -1,0 +1,17 @@
+import("//avp.gni")
+
+group("demuxer") {
+}
+
+avp_library("ffmpeg_demuxer") {
+  sources = [
+    "ffmpeg_demuxer.cc",
+    "ffmpeg_demuxer.h",
+    "ffmpeg_demuxer_factory.cc",
+    "ffmpeg_demuxer_factory.h",
+  ]
+  deps = [
+    "../player:player_interface",
+    "//third_party/ffmpeg",
+  ]
+}

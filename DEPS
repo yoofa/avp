@@ -74,6 +74,14 @@ deps = {
     'https://chromium.googlesource.com/chromium/src/tools@2a1184f6a084142fedae1f0b9e44ae1ec4431fc3',
   'src/tools/swarming_client':
     'https://chromium.googlesource.com/infra/luci/client-py.git@d46ea7635f2911208268170512cb611412488fd8',
+
+  # used by ffmpeg
+  'src/third_party/nasm': {
+      'url': 'https://chromium.googlesource.com/chromium/deps/nasm.git@e9be5fd6d723a435ca2da162f9e0ffcb688747c1'
+  },
+
+  'src/third_party/ffmpeg':
+    'https://chromium.googlesource.com/chromium/third_party/ffmpeg.git@14e1145ddd3d5f3ba478a19b4ae8822679d83a6c',
 }
 
 hooks = [

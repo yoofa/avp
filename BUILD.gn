@@ -15,6 +15,14 @@ config("common_inherited_config") {
   defines = []
   configs = []
   ldflags = []
+
+  if (avp_enable_ffmpeg) {
+    defines += [ "AVP_FFMPEG" ]
+  }
+
+  if (avp_enable_ffmpeg_demuxer) {
+    defines += [ "AVP_FFMPEG_DEMUXER" ]
+  }
 }
 
 config("no_exit_time_destructors") {
@@ -59,4 +67,6 @@ avp_static_library("avp") {
     "common",
     "player",
   ]
+
+  deps += [ "demuxer" ]
 }

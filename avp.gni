@@ -7,6 +7,13 @@ import("//build/config/ui.gni")
 import("//build_overrides/build.gni")
 
 declare_args() {
+  enable_ffmpeg = true
+  enable_ffmpeg_demuxer = true
+}
+
+declare_args() {
+  avp_enable_ffmpeg = enable_ffmpeg
+  avp_enable_ffmpeg_demuxer = enable_ffmpeg && enable_ffmpeg_demuxer
 }
 
 avp_root = get_path_info(".", "abspath")

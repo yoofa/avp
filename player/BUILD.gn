@@ -12,6 +12,8 @@ avp_library("player_interface") {
     "audio_decoder.h",
     "audio_decoder_factory.h",
     "data_source.h",
+    "demuxer.h",
+    "demuxer_factory.h",
     "media_source.h",
     "player_interface.h",
     "video_decoder.h",
@@ -26,6 +28,8 @@ avp_library("avplayer") {
     "avplayer.h",
     "default_Audio_decoder_factory.cc",
     "default_Audio_decoder_factory.h",
+    "default_demuxer_factory.cc",
+    "default_demuxer_factory.h",
     "default_video_decoder_factory.cc",
     "default_video_decoder_factory.h",
     "file_source.cc",
@@ -41,6 +45,8 @@ avp_library("avplayer") {
     "../base/system:avp_export",
     "../common:foundation",
   ]
+
+  deps += [ "../demuxer:ffmpeg_demuxer" ]
 
   cflags = [ "-Wno-multichar" ]
 }
