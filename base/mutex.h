@@ -27,20 +27,20 @@ class CAPABILITY("mutex") Mutex {
 
   status_t tryLock() TRY_ACQUIRE(0) { return -pthread_mutex_trylock(&mMutex); }
 
-  class SCOPED_CAPABILITY Autolock {
+  class SCOPED_CAPABILITY LockGuard {
    public:
-    inline explicit Autolock(Mutex& mutex) ACQUIRE(mutex) : mLock(mutex) {
+    inline explicit LockGuard(Mutex& mutex) ACQUIRE(mutex) : mLock(mutex) {
       mLock.lock();
     }
-    inline explicit Autolock(Mutex* mutex) ACQUIRE(mutex) : mLock(*mutex) {
+    inline explicit LockGuard(Mutex* mutex) ACQUIRE(mutex) : mLock(*mutex) {
       mLock.lock();
     }
-    inline ~Autolock() RELEASE() { mLock.unlock(); }
+    inline ~LockGuard() RELEASE() { mLock.unlock(); }
 
    private:
     Mutex& mLock;
-    Autolock(const Autolock&);
-    Autolock& operator=(const Autolock&);
+    LockGuard(const LockGuard&);
+    LockGuard& operator=(const LockGuard&);
   };
 
  private:
@@ -52,7 +52,7 @@ class CAPABILITY("mutex") Mutex {
   pthread_mutex_t mMutex;
 };
 
-typedef Mutex::Autolock AutoMutex;
+using lock_guard = Mutex::LockGuard;
 
 }  // namespace avp
 

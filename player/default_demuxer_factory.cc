@@ -10,8 +10,8 @@
 namespace avp {
 DefaultDemuxerFactory::DefaultDemuxerFactory() {}
 DefaultDemuxerFactory::~DefaultDemuxerFactory() {}
-Demuxer* DefaultDemuxerFactory::createDemuxer(
-    std::shared_ptr<DataSource>& dataSource) {
+std::shared_ptr<Demuxer> DefaultDemuxerFactory::createDemuxer(
+    std::shared_ptr<DataSource> dataSource) {
   return nullptr;
 }
 } /* namespace avp */

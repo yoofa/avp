@@ -29,6 +29,7 @@ avp_library("utils") {
   sources = [
     "byte_utils.cc",
     "byte_utils.h",
+    "checks.h",
     "errors.cc",
     "errors.h",
     "types.h",

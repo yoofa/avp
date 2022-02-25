@@ -8,6 +8,8 @@
 #ifndef DATA_SOURCE_H
 #define DATA_SOURCE_H
 
+#include <fcntl.h>
+
 #include "base/byte_utils.h"
 #include "base/types.h"
 
@@ -21,14 +23,24 @@ class DataSource {
     kIsCachingDataSource = 4,
     kIsHTTPBasedSource = 8,
     kIsLocalFileSource = 16,
+
+    kSeekable = 32,
   };
 
-  DataSource() = default;
+  DataSource() {}
   virtual ~DataSource() = default;
 
   virtual status_t initCheck() const = 0;
 
+  // read from current offset
+  virtual ssize_t read(void* data, size_t size) = 0;
+
+  // read from start offset
   virtual ssize_t readAt(off64_t offset, void* data, size_t size) = 0;
+
+  virtual status_t getPosition(off64_t* position) = 0;
+
+  virtual ssize_t seek(off64_t position, int whence) = 0;
 
   // Convenience methods:
   bool getUInt16(off64_t offset, uint16_t* x) {

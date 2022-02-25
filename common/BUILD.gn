@@ -9,6 +9,8 @@ group("common") {
 
 avp_library("foundation") {
   sources = [
+    "buffer.cc",
+    "buffer.h",
     "handler.cc",
     "handler.h",
     "handler_roster.cc",

@@ -11,6 +11,7 @@ avp_library("ffmpeg_demuxer") {
     "ffmpeg_demuxer_factory.h",
   ]
   deps = [
+    "../base:logging",
     "../player:player_interface",
     "//third_party/ffmpeg",
   ]

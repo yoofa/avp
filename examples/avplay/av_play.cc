@@ -16,6 +16,7 @@
 #include <iostream>
 #include <memory>
 
+#include "base/logging.h"
 #include "player/avplayer.h"
 
 using avp::AvPlayer;
@@ -41,24 +42,6 @@ class ExListener : public AvPlayer::Listener {
     std::cout << "ExListener, what: " << what << ", info: " << info
               << std::endl;
   }
-};
-
-class ExSource : public AvPlayer::ContentSource {
- public:
-  virtual ~ExSource() = default;
-
-  void prepare() override {}
-  void start() override {}
-  void stop() override {}
-  void pause() override {}
-  void resume() override {}
-  status_t dequeueAccussUnit(bool audio) override { return 0; }
-  size_t getTrackCount() const override { return 0; }
-  status_t selectTrack(size_t trackIndex, bool select) const override {
-    return 0;
-  }
-  void onMessageReceived(
-      const std::shared_ptr<avp::Message>& message) override {}
 };
 
 int main(int argc, char* argv[]) {
@@ -89,6 +72,7 @@ int main(int argc, char* argv[]) {
         break;
     }
   }
+  // avp::LogMessage::LogToDebug(avp::LogSeverity::LS_VERBOSE);
 
   std::cout << "play file: " << filename << std::endl;
   url = std::string("file://") + filename;

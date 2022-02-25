@@ -13,9 +13,12 @@ namespace avp {
 FFmpegDemuxerFactory::FFmpegDemuxerFactory() {}
 FFmpegDemuxerFactory::~FFmpegDemuxerFactory() {}
 
-Demuxer* FFmpegDemuxerFactory::createDemuxer(
-    std::shared_ptr<DataSource>& dataSource) {
-  return new FFmpegDemuxer();
+std::shared_ptr<Demuxer> FFmpegDemuxerFactory::createDemuxer(
+    std::shared_ptr<DataSource> dataSource) {
+  std::shared_ptr<FFmpegDemuxer> ffmpegDemuxer(
+      std::make_shared<FFmpegDemuxer>(dataSource));
+  ffmpegDemuxer->init();
+  return ffmpegDemuxer;
 }
 
 } /* namespace avp */

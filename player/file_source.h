@@ -23,20 +23,29 @@ class FileSource : public DataSource {
 
   virtual status_t initCheck() const override;
 
+  virtual ssize_t read(void* data, size_t size) override;
+
   virtual ssize_t readAt(off64_t offset, void* data, size_t size) override;
+
+  virtual status_t getPosition(off64_t* position) override;
+
+  virtual ssize_t seek(off64_t position, int whence) override;
 
   virtual status_t getSize(off64_t* size) override;
 
-  virtual uint32_t flags() override { return kIsLocalFileSource; }
+  virtual uint32_t flags() override { return kIsLocalFileSource | kSeekable; }
 
   virtual std::string toString() { return mName; }
 
  protected:
-  virtual ssize_t readAt_l(off64_t offset, void* data, size_t size);
+  ssize_t read_l(void* data, size_t size);
+  ssize_t seek_l(off64_t position, int whence);
+  ssize_t readAt_l(off64_t offset, void* data, size_t size);
 
   int mFd;
-  int64_t mOffset;
+  int64_t mStartOffset;
   int64_t mLength;
+  int64_t mOffset;
   std::mutex mLock;
 
  private:

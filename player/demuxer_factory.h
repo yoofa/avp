@@ -19,7 +19,8 @@ class DemuxerFactory {
   DemuxerFactory() = default;
   virtual ~DemuxerFactory() = default;
 
-  virtual Demuxer* createDemuxer(std::shared_ptr<DataSource>& dataSource) = 0;
+  virtual std::shared_ptr<Demuxer> createDemuxer(
+      std::shared_ptr<DataSource> dataSource) = 0;
 };
 } /* namespace avp */
 

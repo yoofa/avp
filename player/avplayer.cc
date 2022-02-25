@@ -4,11 +4,11 @@
  *
  * Distributed under terms of the GPLv2 license.
  */
-
 #include "avplayer.h"
 
 #include <iostream>
 
+#include "base/checks.h"
 #include "base/errors.h"
 #include "base/logging.h"
 #include "common/message.h"
@@ -126,7 +126,9 @@ void AvPlayer::performReset() {
 
 /************* from content source  *************************/
 void AvPlayer::onSourceNotify(const std::shared_ptr<Message>& msg) {
-  switch (msg->what()) {
+  int32_t what;
+  CHECK(msg->findInt32("what", &what));
+  switch (what) {
     case ContentSource::kWhatPrepared: {
       LOG(LS_INFO) << "source prepared";
       break;
@@ -159,10 +161,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
 
       /************* from contentsource ***************/
     case kWhatSourceNotify: {
-      std::shared_ptr<Message> notify;
-      message->findMessage("notify", notify);
-
-      onSourceNotify(notify);
+      onSourceNotify(message);
       break;
     }
     default:

@@ -9,5 +9,8 @@ avp_executable("avplay") {
     "avplay/av_play.cc",
     "avplay/av_play.h",
   ]
-  deps = [ "../player:avplayer" ]
+  deps = [
+    "../base:logging",
+    "../player:avplayer",
+  ]
 }

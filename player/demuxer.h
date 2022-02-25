@@ -8,12 +8,26 @@
 #ifndef DEMUXER_H
 #define DEMUXER_H
 
+#include <memory>
+
+#include "base/types.h"
+#include "player/media_source.h"
+#include "player/meta_data.h"
+
 namespace avp {
 
 class Demuxer {
  public:
   Demuxer() = default;
   virtual ~Demuxer() = default;
+
+  virtual size_t getTrackCount() = 0;
+  virtual std::shared_ptr<MediaSource> getTrack(size_t trackIndex) = 0;
+  virtual status_t getDemuxerMeta(std::shared_ptr<MetaData>& metaData) = 0;
+  virtual status_t getTrackMeta(std::shared_ptr<MetaData>& metaData,
+                                size_t trackIndex) = 0;
+
+  virtual const char* name() = 0;
 };
 } /* namespace avp */
 

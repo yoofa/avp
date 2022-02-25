@@ -19,11 +19,11 @@ class FFmpegDemuxerFactory : public DemuxerFactory {
  public:
   FFmpegDemuxerFactory();
   virtual ~FFmpegDemuxerFactory() override;
-  virtual Demuxer* createDemuxer(
-      std::shared_ptr<DataSource>& dataSource) override;
+  virtual std::shared_ptr<Demuxer> createDemuxer(
+      std::shared_ptr<DataSource> dataSource) override;
 
  private:
-  void probe(std::shared_ptr<DataSource>& dataSource, int& score);
+  std::shared_ptr<Demuxer> mFFmpegDemuxer;
 };
 } /* namespace avp */
 

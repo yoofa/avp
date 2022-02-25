@@ -14,7 +14,13 @@ avp_library("player_interface") {
     "data_source.h",
     "demuxer.h",
     "demuxer_factory.h",
+    "media_defs.cc",
+    "media_defs.h",
+    "media_source.cc",
     "media_source.h",
+    "meta_data.cc",
+    "meta_data.h",
+    "player_base.cc",
     "player_interface.h",
     "video_decoder.h",
     "video_decoder_factory.h",
@@ -36,6 +42,8 @@ avp_library("avplayer") {
     "file_source.h",
     "generic_source.cc",
     "generic_source.h",
+    "packet_source.cc",
+    "packet_source.h",
   ]
 
   deps = [
