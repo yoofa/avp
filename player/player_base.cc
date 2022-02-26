@@ -6,9 +6,24 @@
  */
 
 #include "base/logging.h"
+#include "common/utils.h"
 #include "player/player_interface.h"
 
 namespace avp {
+
+std::shared_ptr<Message> PlayerBase::ContentSource::getFormat(bool audio) {
+  std::shared_ptr<MetaData> meta = getMeta(audio);
+  if (meta.get() == nullptr) {
+    return nullptr;
+  }
+  std::shared_ptr<Message> msg = std::make_shared<Message>();
+
+  if (convertMetaDataToMessage(meta, msg) == OK) {
+    return msg;
+  }
+
+  return nullptr;
+}
 
 void PlayerBase::ContentSource::notifyFlagsChanged(uint32_t flags) {
   std::shared_ptr<Message> notify = dupNotify();

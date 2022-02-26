@@ -14,7 +14,7 @@
 #include "player/data_source.h"
 #include "player/media_source.h"
 
-#include "demuxer/ffmpeg_helper.h"
+#include "modules/ffmpeg/ffmpeg_helper.h"
 
 namespace avp {
 
@@ -53,21 +53,27 @@ static int64_t AVIOSeekOperation(void* opaque, int64_t offset, int whence) {
 ////////////////////////////////////
 
 struct FFmpegSource : public MediaSource {
-  FFmpegSource(FFmpegDemuxer* demuxer, size_t index);
+  FFmpegSource(FFmpegDemuxer* demuxer,
+               size_t index,
+               std::shared_ptr<MetaData> meta);
   virtual ~FFmpegSource() override;
 
   virtual status_t start() override;
   virtual status_t stop() override;
   virtual status_t read(std::shared_ptr<Buffer>& buffer,
                         const ReadOptions* options) override;
+  virtual std::shared_ptr<MetaData> getMeta() override;
 
  private:
   FFmpegDemuxer* mDemuxer;
   size_t mTrackIndex;
+  std::shared_ptr<MetaData> mMeta;
 };
 
-FFmpegSource::FFmpegSource(FFmpegDemuxer* demuxer, size_t index)
-    : mDemuxer(demuxer), mTrackIndex(index) {}
+FFmpegSource::FFmpegSource(FFmpegDemuxer* demuxer,
+                           size_t index,
+                           std::shared_ptr<MetaData> meta)
+    : mDemuxer(demuxer), mTrackIndex(index), mMeta(std::move(meta)) {}
 
 FFmpegSource::~FFmpegSource() {}
 
@@ -82,6 +88,11 @@ status_t FFmpegSource::stop() {
 status_t FFmpegSource::read(std::shared_ptr<Buffer>& buffer,
                             const ReadOptions* options) {
   return mDemuxer->readAvFrame(buffer, mTrackIndex, options);
+}
+
+std::shared_ptr<MetaData> FFmpegSource::getMeta() {
+  LOG(LS_INFO) << "getMeta:" << mMeta->toString();
+  return mMeta;
 }
 
 ////////////////////////////////////
@@ -197,9 +208,9 @@ std::shared_ptr<MetaData> createMetaFromAVStream(const AVStream* avStream) {
 }
 
 status_t FFmpegDemuxer::addTrack(const AVStream* avStream, size_t index) {
-  std::shared_ptr<FFmpegSource> source(
-      std::make_shared<FFmpegSource>(this, index));
   std::shared_ptr<MetaData> meta = createMetaFromAVStream(avStream);
+  std::shared_ptr<FFmpegSource> source(
+      std::make_shared<FFmpegSource>(this, index, meta));
   mTracks.emplace_back(index, meta, source);
 
   return OK;

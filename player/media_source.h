@@ -75,6 +75,7 @@ class MediaSource {
                                 const ReadOptions* options = nullptr) {
     return OK;
   }
+  virtual std::shared_ptr<MetaData> getMeta() = 0;
 
  private:
   PlayerBase::media_track_type mTrackType;

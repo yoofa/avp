@@ -33,6 +33,10 @@ Message::Message(uint32_t what, const std::shared_ptr<Handler> handler)
   setHandler(handler);
 }
 
+Message::~Message() {
+  clear();
+}
+
 void Message::setWhat(uint32_t what) {
   mWhat = what;
 }
@@ -99,6 +103,10 @@ status_t Message::postReply(const std::shared_ptr<ReplyToken>& replyId) {
   return looper->postReply(replyId, shared_from_this());
 }
 
+void Message::clear() {
+  mItems.clear();
+}
+
 // void Message::setObject(const char* name, std::shared_ptr<MessageObject>&
 // obj) {
 //  mObject = obj;
@@ -115,6 +123,10 @@ status_t Message::postReply(const std::shared_ptr<ReplyToken>& replyId) {
 //
 
 std::shared_ptr<Message::Item> Message::allocateItem(const char* name) {
+  auto search = mItems.find(name);
+  if (search != mItems.end()) {
+    mItems.erase(search);
+  }
   auto result = mItems.emplace(name, std::make_shared<Message::Item>());
   return result.first->second;
 }
@@ -129,6 +141,11 @@ std::shared_ptr<Message::Item> Message::findItem(const char* name,
     }
   }
   return nullptr;
+}
+
+bool Message::contains(const char* name) const {
+  auto search = mItems.find(name);
+  return search != mItems.end();
 }
 
 #define BASIC_TYPE(NAME, TYPENAME)                                    \
@@ -191,6 +208,12 @@ void Message::setString(const char* name, const std::string& s) {
   item->value = s;
 }
 
+void Message::setString(const char* name, const char* s, ssize_t len) {
+  std::shared_ptr<Message::Item> item = allocateItem(name);
+  item->mType = Message::kTypeString;
+  item->value = std::string(s, len > 0 ? len : strlen(s));
+}
+
 bool Message::findString(const char* name, std::string& value) const {
   std::shared_ptr<Message::Item> item;
   item = findItem(name, kTypeString);
@@ -240,18 +263,18 @@ bool Message::findReplyToken(const char* name,
 }
 
 void Message::setBuffer(const char* name,
-                        const std::shared_ptr<avp::MediaBuffer> buffer) {
+                        const std::shared_ptr<avp::Buffer> buffer) {
   std::shared_ptr<Message::Item> item = allocateItem(name);
   item->mType = kTypeBuffer;
   item->value = std::move(buffer);
 }
 
 bool Message::findBuffer(const char* name,
-                         std::shared_ptr<avp::MediaBuffer>& buffer) const {
+                         std::shared_ptr<avp::Buffer>& buffer) const {
   std::shared_ptr<Message::Item> item;
   item = findItem(name, kTypeBuffer);
   if (item) {
-    auto result = std::get<std::shared_ptr<avp::MediaBuffer>>(item->value);
+    auto result = std::get<std::shared_ptr<avp::Buffer>>(item->value);
     buffer = std::move(result);
     return true;
   }

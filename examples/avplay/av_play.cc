@@ -16,11 +16,11 @@
 #include <iostream>
 #include <memory>
 
+#include "base/checks.h"
 #include "base/logging.h"
 #include "player/avplayer.h"
 
-using avp::AvPlayer;
-using avp::status_t;
+using namespace avp;
 
 void printHelp() {
   std::cout << "help:\n"
@@ -34,6 +34,9 @@ void event_loop() {
   }
 }
 
+std::mutex mMutex;
+std::condition_variable mCondition;
+
 class ExListener : public AvPlayer::Listener {
  public:
   ExListener() = default;
@@ -41,6 +44,19 @@ class ExListener : public AvPlayer::Listener {
   void notify(int what, std::shared_ptr<avp::Message> info) {
     std::cout << "ExListener, what: " << what << ", info: " << info
               << std::endl;
+    switch (what) {
+      case avp::PlayerBase::kWhatSetDataSourceCompleted: {
+        LOG(avp::LS_INFO) << "kWhatSetDataSourceCompleted";
+        break;
+      }
+      case avp::PlayerBase::kWhatPrepared: {
+        LOG(avp::LS_INFO) << "avplayer prepared";
+        mCondition.notify_all();
+        break;
+      }
+      default:
+        break;
+    }
   }
 };
 
@@ -73,6 +89,7 @@ int main(int argc, char* argv[]) {
     }
   }
   // avp::LogMessage::LogToDebug(avp::LogSeverity::LS_VERBOSE);
+  std::unique_lock<std::mutex> lock(mMutex);
 
   std::cout << "play file: " << filename << std::endl;
   url = std::string("file://") + filename;
@@ -86,6 +103,9 @@ int main(int argc, char* argv[]) {
   mPlayer->setDataSource(url.c_str());
 
   mPlayer->prepare();
+  mPlayer->start();
+
+  mCondition.wait(lock);
 
   mPlayer->start();
 

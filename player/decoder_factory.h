@@ -10,16 +10,16 @@
 
 #include <memory>
 
-#include "avp_decoder.h"
+#include "decoder.h"
 
 namespace avp {
 
 class DecoderFactory {
  public:
-  DecoderFactory();
-  virtual ~DecoderFactory();
+  DecoderFactory() = default;
+  virtual ~DecoderFactory() = default;
 
-  virtual std::shared_ptr<AvpDecoder> createDecoder();
+  virtual std::shared_ptr<Decoder> createDecoder(const char* mime) = 0;
 };
 
 } /* namespace avp */

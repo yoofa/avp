@@ -1,0 +1,20 @@
+import("//avp.gni")
+
+group("video_decoder") {
+}
+
+avp_library("ffmpeg_decoder") {
+  sources = [
+    "ffmpeg_decoder.cc",
+    "ffmpeg_decoder.h",
+    "ffmpeg_decoder_factory.cc",
+    "ffmpeg_decoder_factory.h",
+  ]
+
+  deps = [
+    "//base:utils",
+    "//modules/ffmpeg:ffmpeg_helper",
+    "//player:player_interface",
+    "//third_party/ffmpeg",
+  ]
+}

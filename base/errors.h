@@ -8,6 +8,8 @@
 #ifndef AVP_ERROR_H
 #define AVP_ERROR_H
 
+#include <string>
+
 #include <errno.h>
 #include <stdint.h>
 
@@ -48,6 +50,8 @@ enum {
   FDS_NOT_ALLOWED = (UNKNOWN_ERROR + 7),
   UNEXPECTED_NULL = (UNKNOWN_ERROR + 8),
 };
+
+std::string statusToString(status_t status);
 
 } /* namespace avp */
 

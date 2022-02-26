@@ -15,10 +15,10 @@
 #include "base/unique_fd.h"
 #include "common/looper.h"
 #include "common/message.h"
+#include "common/meta_data.h"
 #include "player/data_source.h"
 #include "player/demuxer_factory.h"
 #include "player/media_source.h"
-#include "player/meta_data.h"
 #include "player/packet_source.h"
 #include "player_interface.h"
 
@@ -43,6 +43,9 @@ class GenericSource : public PlayerBase::ContentSource {
   virtual status_t seekTo(
       int64_t seekTimeUs,
       SeekMode mode = SeekMode ::SEEK_PREVIOUS_SYNC) override;
+
+  std::shared_ptr<MetaData> getSourceMeta() override;
+  std::shared_ptr<MetaData> getMeta(bool audio) override;
 
   status_t dequeueAccussUnit(bool audio,
                              std::shared_ptr<Buffer>& accessUnit) override;

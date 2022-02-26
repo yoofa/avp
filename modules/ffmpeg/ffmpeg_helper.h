@@ -11,8 +11,8 @@
 #include <memory>
 
 #include "common/buffer.h"
-#include "player/media_defs.h"
-#include "player/meta_data.h"
+#include "common/media_defs.h"
+#include "common/meta_data.h"
 
 extern "C" {
 #include "third_party/ffmpeg/libavformat/avformat.h"

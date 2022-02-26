@@ -60,8 +60,8 @@ FileSource::FileSource(int fd, int64_t offset, int64_t length)
     }
   }
   if (mStartOffset != offset || mLength != length) {
-    LOG(LS_WARING) << "offset/length adjusted from" << offset << "/" << length
-                   << " to " << mStartOffset << "/" << mLength;
+    LOG(LS_WARNING) << "offset/length adjusted from" << offset << "/" << length
+                    << " to " << mStartOffset << "/" << mLength;
   }
 
   mName = std::string("FileSource(fd(") + nameForFd(fd).c_str() + "), " +

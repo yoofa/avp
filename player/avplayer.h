@@ -17,18 +17,20 @@
 #include "base/system/avp_export.h"
 #include "player/audio_decoder.h"
 #include "player/audio_decoder_factory.h"
+#include "player/audio_sink.h"
+#include "player/avp_decoder.h"
+#include "player/avp_render_synchronizer.h"
 #include "player/default_Audio_decoder_factory.h"
 #include "player/default_video_decoder_factory.h"
 #include "player/player_interface.h"
 #include "player/video_decoder.h"
 #include "player/video_decoder_factory.h"
+#include "player/video_sink.h"
 
 namespace avp {
 AVP_EXPORT class AvPlayer : public PlayerBase, public Handler {
  public:
   AvPlayer();
-  AvPlayer(std::shared_ptr<AudioDecoderFactory> audioDecoderFactory,
-           std::shared_ptr<VideoDecoderFactory> videoDecoderFactory);
   virtual ~AvPlayer() override;
 
   virtual status_t setListener(
@@ -41,10 +43,8 @@ AVP_EXPORT class AvPlayer : public PlayerBase, public Handler {
   virtual status_t setDataSource(
       const std::shared_ptr<ContentSource>& source) override;
 
-  virtual status_t setAudioRender(
-      std::shared_ptr<AudioSink> audioRender) override;
-  virtual status_t setVideoRender(
-      std::shared_ptr<VideoSink> videorender) override;
+  virtual status_t setAudioSink(std::shared_ptr<AudioSink> sink) override;
+  virtual status_t setVideoSink(std::shared_ptr<VideoSink> sink) override;
 
   virtual status_t prepare() override;
   virtual status_t start() override;
@@ -56,35 +56,46 @@ AVP_EXPORT class AvPlayer : public PlayerBase, public Handler {
       SeekMode mode = SeekMode::SEEK_PREVIOUS_SYNC) override;
   virtual status_t reset() override;
 
-  void onSourceNotify(const std::shared_ptr<Message>& msg);
-
- protected:
-  void onMessageReceived(const std::shared_ptr<Message>& message) override;
-
  private:
+  void postScanSources();
+  status_t instantiateDecoder(bool audio, std::shared_ptr<AvpDecoder>& decoder);
   void performReset();
+
+  void onStart(int64_t startUs = -1,
+               SeekMode seekMode = SeekMode::SEEK_PREVIOUS_SYNC);
+  void onStop();
+  void onPause();
+  void onResume();
+  void onSeek();
+
+  void onSourceNotify(const std::shared_ptr<Message>& msg);
+  void onDecoderNotify(const std::shared_ptr<Message>& msg);
+  void onRenderNotify(const std::shared_ptr<Message>& msg);
+
+  void onMessageReceived(const std::shared_ptr<Message>& message) override;
 
   enum {
     kWhatSetDataSource = '=DaS',
     kWhatPrepare = 'prep',
-    kWhatSetVideoSurface = '=VSu',
-    kWhatSetAudioSink = '=AuS',
+    kWhatSetVideoSink = '=sVS',
+    kWhatSetAudioSink = '=sAS',
+    kWhatStart = 'strt',
+    kWhatSeek = 'seek',
+    kWhatPause = 'paus',
+    kWhatResume = 'rsme',
+    kWhatReset = 'rset',
+
     kWhatMoreDataQueued = 'more',
     kWhatConfigPlayback = 'cfPB',
     kWhatConfigSync = 'cfSy',
     kWhatGetPlaybackSettings = 'gPbS',
     kWhatGetSyncSettings = 'gSyS',
-    kWhatStart = 'strt',
     kWhatScanSources = 'scan',
     kWhatVideoNotify = 'vidN',
     kWhatAudioNotify = 'audN',
     kWhatClosedCaptionNotify = 'capN',
     kWhatRendererNotify = 'renN',
-    kWhatReset = 'rset',
     kWhatNotifyTime = 'nfyT',
-    kWhatSeek = 'seek',
-    kWhatPause = 'paus',
-    kWhatResume = 'rsme',
     kWhatPollDuration = 'polD',
     kWhatSourceNotify = 'srcN',
     kWhatGetTrackInfo = 'gTrI',
@@ -97,11 +108,20 @@ AVP_EXPORT class AvPlayer : public PlayerBase, public Handler {
     kWhatMediaClockNotify = 'mckN',
   };
 
-  std::shared_ptr<AudioDecoderFactory> mAudioDecoderFactory;
-  std::shared_ptr<VideoDecoderFactory> mVideoDecoderFactory;
+  std::shared_ptr<AvpDecoder> mAudioDecoder;
+  std::shared_ptr<AvpDecoder> mVideoDecoder;
   std::shared_ptr<Looper> mPlayerLooper;
 
+  std::shared_ptr<AudioSink> mAudioSink;
+  std::shared_ptr<VideoSink> mVideoSink;
   std::shared_ptr<ContentSource> mSource;
+  std::shared_ptr<AvpRenderSynchronizer> mRender;
+
+  bool mStarted;
+  bool mPrepared;
+  bool mPaused;
+  bool mSourceStarted;
+  bool mScanSourcesPendding;
 };
 
 }  // namespace avp

@@ -1,0 +1,7 @@
+import("//avp.gni")
+
+avp_library("ffmpeg_helper") {
+  sources = [ "ffmpeg_helper.h" ]
+
+  deps = [ "//player:player_interface" ]
+}

@@ -23,6 +23,10 @@ config("common_inherited_config") {
   if (avp_enable_ffmpeg_demuxer) {
     defines += [ "AVP_FFMPEG_DEMUXER" ]
   }
+
+  if (avp_enable_ffmpeg_decoder) {
+    defines += [ "AVP_FFMPEG_DECODER" ]
+  }
 }
 
 config("no_exit_time_destructors") {

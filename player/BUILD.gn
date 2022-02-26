@@ -9,35 +9,38 @@ group("player") {
 
 avp_library("player_interface") {
   sources = [
-    "audio_decoder.h",
-    "audio_decoder_factory.h",
+    "audio_frame.cc",
+    "audio_frame.h",
+    "audio_sink.h",
     "data_source.h",
+    "decoder.h",
+    "decoder.h",
+    "decoder_factory.h",
     "demuxer.h",
     "demuxer_factory.h",
-    "media_defs.cc",
-    "media_defs.h",
     "media_source.cc",
     "media_source.h",
-    "meta_data.cc",
-    "meta_data.h",
     "player_base.cc",
     "player_interface.h",
-    "video_decoder.h",
-    "video_decoder_factory.h",
+    "video_frame.cc",
+    "video_frame.h",
+    "video_sink.h",
   ]
   deps = [ "../base:utils" ]
 }
 
 avp_library("avplayer") {
   sources = [
+    "avp_decoder.cc",
+    "avp_decoder.h",
+    "avp_render_synchronizer.cc",
+    "avp_render_synchronizer.h",
     "avplayer.cc",
     "avplayer.h",
-    "default_Audio_decoder_factory.cc",
-    "default_Audio_decoder_factory.h",
+    "default_decoder_factory.cc",
+    "default_decoder_factory.h",
     "default_demuxer_factory.cc",
     "default_demuxer_factory.h",
-    "default_video_decoder_factory.cc",
-    "default_video_decoder_factory.h",
     "file_source.cc",
     "file_source.h",
     "generic_source.cc",
@@ -52,9 +55,11 @@ avp_library("avplayer") {
     "../base:utils",
     "../base/system:avp_export",
     "../common:foundation",
+    "../video/decoder:ffmpeg_decoder",
   ]
 
   deps += [ "../demuxer:ffmpeg_demuxer" ]
+  deps += [ "../video/decoder:ffmpeg_decoder" ]
 
   cflags = [ "-Wno-multichar" ]
 }

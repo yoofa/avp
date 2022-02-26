@@ -21,7 +21,7 @@
 namespace avp {
 
 class Handler;
-class MediaBuffer;
+class Buffer;
 
 class MessageObject {
  public:
@@ -87,7 +87,7 @@ class Message : public std::enable_shared_from_this<Message> {
                  std::string,
                  std::shared_ptr<Message>,
                  std::shared_ptr<ReplyToken>,
-                 std::shared_ptr<MediaBuffer>,
+                 std::shared_ptr<Buffer>,
                  std::shared_ptr<MessageObject>>
         value;
     Type mType;
@@ -95,11 +95,13 @@ class Message : public std::enable_shared_from_this<Message> {
 
   Message();
   explicit Message(uint32_t what, const std::shared_ptr<Handler> handler);
-  virtual ~Message() = default;
+  virtual ~Message();
 
   void setWhat(uint32_t what);
   uint32_t what() const;
   void setHandler(const std::shared_ptr<Handler> handler);
+
+  void clear();
 
   void setInt32(const char* name, int32_t value);
   void setInt64(const char* name, int64_t value);
@@ -107,11 +109,11 @@ class Message : public std::enable_shared_from_this<Message> {
   void setFloat(const char* name, float value);
   void setDouble(const char* name, double value);
   void setPointer(const char* name, void* value);
-  //  void setString(const char* name, const char* s, ssize_t len = -1);
+  void setString(const char* name, const char* s, ssize_t len = -1);
   void setString(const char* name, const std::string& s);
   void setMessage(const char* name, const std::shared_ptr<Message> msg);
   void setReplyToken(const char* name, const std::shared_ptr<ReplyToken> token);
-  void setBuffer(const char* name, const std::shared_ptr<MediaBuffer> buffer);
+  void setBuffer(const char* name, const std::shared_ptr<Buffer> buffer);
   void setObject(const char* name, const std::shared_ptr<MessageObject> obj);
   void setRect(const char* name,
                int32_t left,
@@ -119,7 +121,7 @@ class Message : public std::enable_shared_from_this<Message> {
                int32_t right,
                int32_t bottom);
 
-  //  bool contains(const char* name) const;
+  bool contains(const char* name) const;
 
   bool findInt32(const char* name, int32_t* value) const;
   bool findInt64(const char* name, int64_t* value) const;
@@ -131,7 +133,7 @@ class Message : public std::enable_shared_from_this<Message> {
   bool findMessage(const char* name, std::shared_ptr<Message>& msg) const;
   bool findReplyToken(const char* name,
                       std::shared_ptr<ReplyToken>& token) const;
-  bool findBuffer(const char* name, std::shared_ptr<MediaBuffer>& buffer) const;
+  bool findBuffer(const char* name, std::shared_ptr<Buffer>& buffer) const;
   bool findObject(const char* name, std::shared_ptr<MessageObject>& obj) const;
   bool findRect(const char* name,
                 int32_t* left,
@@ -139,7 +141,7 @@ class Message : public std::enable_shared_from_this<Message> {
                 int32_t* right,
                 int32_t* bottom) const;
 
-  status_t post(int64_t delayUs);
+  status_t post(int64_t delayUs = 0LL);
 
   status_t postAndWaitResponse(std::shared_ptr<Message>& response);
 

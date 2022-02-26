@@ -15,6 +15,9 @@
 #include "common/buffer.h"
 #include "common/handler.h"
 #include "common/message.h"
+#include "common/meta_data.h"
+#include "player/audio_sink.h"
+#include "player/video_sink.h"
 
 namespace avp {
 
@@ -87,8 +90,12 @@ class PlayerBase {
     virtual void pause() = 0;
     virtual void resume() = 0;
 
+    virtual std::shared_ptr<MetaData> getSourceMeta() = 0;
+    virtual std::shared_ptr<MetaData> getMeta(bool audio) = 0;
+
     virtual status_t dequeueAccussUnit(bool audio,
                                        std::shared_ptr<Buffer>& accessUnit) = 0;
+    virtual std::shared_ptr<Message> getFormat(bool audio);
     virtual status_t getDuration(int64_t* /* durationUs */) {
       return INVALID_OPERATION;
     }
@@ -145,24 +152,6 @@ class PlayerBase {
     /* data */
   };
 
-  class AudioSink {
-   protected:
-    AudioSink() = default;
-    virtual ~AudioSink() = default;
-
-   private:
-    /* data */
-  };
-
-  class VideoSink {
-   protected:
-    VideoSink() = default;
-    virtual ~VideoSink() = default;
-
-   private:
-    /* data */
-  };
-
   // Notify Event
   enum {
     kWhatSetDataSourceCompleted,
@@ -180,8 +169,8 @@ class PlayerBase {
   virtual status_t setDataSource(
       const std::shared_ptr<ContentSource>& source) = 0;
 
-  virtual status_t setAudioRender(std::shared_ptr<AudioSink> render) = 0;
-  virtual status_t setVideoRender(std::shared_ptr<VideoSink> render) = 0;
+  virtual status_t setAudioSink(std::shared_ptr<AudioSink> sink) = 0;
+  virtual status_t setVideoSink(std::shared_ptr<VideoSink> sink) = 0;
 
   virtual status_t prepare() = 0;
 

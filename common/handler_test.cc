@@ -30,6 +30,7 @@ class TestHandler : public avp::Handler {
 class TestObject : public avp::MessageObject {
  public:
   TestObject() = default;
+  ~TestObject() { std::cout << "~TestObject" << std::endl; }
 
   void printHello() { std::cout << "i: " << i_ << std::endl; }
 
@@ -137,33 +138,37 @@ int main() {
     }
 
     std::cout << "post 13" << std::endl;
-    auto msg4 = message->dup();
-    msg4->setWhat(13);
 
-    std::shared_ptr<avp::TestObject> testObject(
-        std::make_shared<avp::TestObject>());
+    {
+      auto msg4 = message->dup();
+      msg4->setWhat(13);
 
-    testObject->setI(100);
+      std::shared_ptr<avp::TestObject> testObject(
+          std::make_shared<avp::TestObject>());
 
-    std::shared_ptr<avp::MessageObject> base;
-    base = std::static_pointer_cast<avp::MessageObject>(testObject);
+      testObject->setI(100);
 
-    msg4->setObject("testObject",
-                    std::static_pointer_cast<avp::MessageObject>(testObject));
+      std::shared_ptr<avp::MessageObject> base;
+      base = std::static_pointer_cast<avp::MessageObject>(testObject);
 
-    std::shared_ptr<avp::Message> response;
-    msg4->postAndWaitResponse(response);
+      msg4->setObject("testObject",
+                      std::static_pointer_cast<avp::MessageObject>(testObject));
 
-    int err;
-    bool found = response->findInt32("err", &err);
+      std::shared_ptr<avp::Message> response;
+      msg4->postAndWaitResponse(response);
 
-    if (found) {
-      std::cout << "after 13, get message.err: " << err << std::endl;
-    } else {
-      std::cout << "after 13, not get message.err" << std::endl;
+      int err;
+      bool found = response->findInt32("err", &err);
+
+      if (found) {
+        std::cout << "after 13, get message.err: " << err << std::endl;
+      } else {
+        std::cout << "after 13, not get message.err" << std::endl;
+      }
     }
 
-    std::this_thread::sleep_for(3000ms);
+    std::cout << "sleep" << std::endl;
+    std::this_thread::sleep_for(10000ms);
     mLooper->unregisterHandler(id);
 
     std::cout << "goto stop" << std::endl;

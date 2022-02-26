@@ -27,7 +27,7 @@ enum LogSeverity {
   LS_VERBOSE,
   LS_DEBUG,
   LS_INFO,
-  LS_WARING,
+  LS_WARNING,
   LS_ERROR,
   LS_NONE,
 };

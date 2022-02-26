@@ -19,9 +19,9 @@
 #ifdef AVP_FFMPEG_DEMUXER
 #include "demuxer/ffmpeg_demuxer_factory.h"
 #endif
+#include "common/meta_data.h"
 #include "player/default_demuxer_factory.h"
 #include "player/file_source.h"
-#include "player/meta_data.h"
 
 namespace avp {
 
@@ -65,7 +65,7 @@ void GenericSource::prepare() {
   mLooper->start();
 
   auto msg = std::make_shared<Message>(kWhatPrepare, shared_from_this());
-  msg->post(0);
+  msg->post();
 }
 
 void GenericSource::start() {}
@@ -88,6 +88,20 @@ status_t GenericSource::seekTo(int64_t seekTimeUs, SeekMode mode) {
     CHECK(response->findInt32("err", &err));
   }
   return err;
+}
+
+std::shared_ptr<MetaData> GenericSource::getSourceMeta() {
+  return nullptr;
+}
+
+std::shared_ptr<MetaData> GenericSource::getMeta(bool audio) {
+  std::lock_guard<std::mutex> lock(mLock);
+  std::shared_ptr<MediaSource> source =
+      audio ? mAudioTrack.mSource : mVideoTrack.mSource;
+  if (source.get() == nullptr) {
+    return nullptr;
+  }
+  return source->getMeta();
 }
 
 status_t GenericSource::dequeueAccussUnit(bool audio,
@@ -151,11 +165,8 @@ status_t GenericSource::initFromDataSource() {
   LOG(LS_INFO) << "GenericSource::initFromDataSource";
 
   std::shared_ptr<DataSource> datasource;
+  datasource = mDataSource;
 
-  {
-    std::lock_guard<std::mutex> lock(mLock);
-    datasource = mDataSource;
-  }
   CHECK(datasource.get() != nullptr);
 
   mLock.unlock();
@@ -180,7 +191,6 @@ status_t GenericSource::initFromDataSource() {
   size_t numTracks = mDemuxer->getTrackCount();
   if (numTracks == 0) {
     LOG(LS_ERROR) << "initFromDataSource, source has no track!";
-    mLock.lock();
     return UNKNOWN_ERROR;
   }
 
@@ -439,6 +449,7 @@ status_t GenericSource::doSeek(int64_t seekTimeUs, SeekMode mode) {
 }
 
 void GenericSource::onMessageReceived(const std::shared_ptr<Message>& msg) {
+  std::lock_guard<std::mutex> lock(mLock);
   switch (msg->what()) {
     case kWhatPrepare: {
       onPrepare();

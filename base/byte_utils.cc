@@ -7,6 +7,8 @@
 
 #include "byte_utils.h"
 
+namespace avp {
+
 uint16_t U16_AT(const uint8_t* ptr) {
   return ptr[0] << 8 | ptr[1];
 }
@@ -47,3 +49,4 @@ void MakeFourCCString(uint32_t x, char* s) {
   s[3] = x & 0xff;
   s[4] = '\0';
 }
+} /* namespace avp */
