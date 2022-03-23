@@ -40,7 +40,7 @@ class PacketSource {
 
  private:
   PlayerBase::media_track_type mTrackType;
-  std::list<std::shared_ptr<Buffer>> mBuffers;
+  std::queue<std::shared_ptr<Buffer>> mBuffers;
   std::mutex mLock;
   std::condition_variable mCondition;
 

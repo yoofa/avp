@@ -57,7 +57,7 @@ void Buffer::setRange(size_t offset, size_t size) {
 }
 
 std::shared_ptr<Message> Buffer::meta() {
-  if (mMeta == NULL) {
+  if (mMeta.get() == nullptr) {
     mMeta = std::make_shared<Message>();
   }
   return mMeta;

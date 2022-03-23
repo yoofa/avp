@@ -4,12 +4,12 @@
  *
  * Distributed under terms of the GPLv2 license.
  */
-
 #include "utils.h"
 
 #include <memory>
 
 #include "base/byte_utils.h"
+#include "base/checks.h"
 #include "base/errors.h"
 #include "base/logging.h"
 #include "common/Lookup.h"
@@ -811,8 +811,24 @@ status_t convertMetaDataToMessage(const MetaData* meta,
     return BAD_VALUE;
   }
 
+  int32_t codecType;
+  if (!meta->findInt32(kKeyCodecType, &codecType)) {
+    return BAD_VALUE;
+  }
+
   auto msg = std::make_shared<Message>();
   msg->setString("mime", mime);
+
+  msg->setInt32("codec", codecType);
+  uint32_t ffType;
+  const void* ffExData;
+  size_t ffExsize;
+  if (meta->findData(kKeyFFmpegExtraData, &ffType, &ffExData, &ffExsize)) {
+    auto buffer = Buffer::CreateAsCopy(ffExData, ffExsize);
+    msg->setBuffer("ffmpeg-exdata", buffer);
+    std::shared_ptr<Buffer> buf;
+    DCHECK(msg->findBuffer("ffmpeg-exdata", buf));
+  }
 
   convertMetaDataToMessageFromMappings(meta, msg);
 

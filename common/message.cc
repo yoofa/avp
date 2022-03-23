@@ -46,7 +46,7 @@ uint32_t Message::what() const {
 }
 
 void Message::setHandler(const std::shared_ptr<Handler> handler) {
-  if (handler.get() == nullptr) {
+  if (handler == nullptr || handler.get() == nullptr) {
     mHandlerId = 0;
     mHandler.reset();
     mLooper.reset();

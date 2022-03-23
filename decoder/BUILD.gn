@@ -1,17 +1,21 @@
 import("//avp.gni")
 
-group("video_decoder") {
+group("decoder") {
 }
 
 avp_library("ffmpeg_decoder") {
   sources = [
+    "ffmpeg_audio_decoder.cc",
+    "ffmpeg_audio_decoder.h",
     "ffmpeg_decoder.cc",
     "ffmpeg_decoder.h",
     "ffmpeg_decoder_factory.cc",
     "ffmpeg_decoder_factory.h",
+    "ffmpeg_video_decoder.cc",
+    "ffmpeg_video_decoder.h",
   ]
 
-  deps = [
+  public_deps = [
     "//base:utils",
     "//modules/ffmpeg:ffmpeg_helper",
     "//player:player_interface",

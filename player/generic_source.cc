@@ -104,7 +104,7 @@ std::shared_ptr<MetaData> GenericSource::getMeta(bool audio) {
   return source->getMeta();
 }
 
-status_t GenericSource::dequeueAccussUnit(bool audio,
+status_t GenericSource::dequeueAccessUnit(bool audio,
                                           std::shared_ptr<Buffer>& accessUnit) {
   std::lock_guard<std::mutex> lock(mLock);
 
@@ -364,8 +364,6 @@ void GenericSource::readBuffer(media_track_type trackType,
       break;
   }
 
-  LOG(LS_INFO) << "readBuffers:" << maxBuffers;
-
   if (track && track->mSource.get() == nullptr) {
     return;
   }
@@ -392,6 +390,7 @@ void GenericSource::readBuffer(media_track_type trackType,
     // will unlock later, add reference
     std::shared_ptr<MediaSource> source = track->mSource;
 
+    //    LOG(LS_INFO) << "before read type:" << trackType;
     mLock.unlock();
     if (couldReadMultiple) {
       err = source->readMultiple(mediaBuffers, maxBuffers - numBuffer,
@@ -404,6 +403,7 @@ void GenericSource::readBuffer(media_track_type trackType,
       }
     }
     mLock.lock();
+    //    LOG(LS_INFO) << "after read" << trackType;
 
     // maybe reset, return;
     if (!track->mPacketSource.get()) {

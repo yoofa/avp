@@ -10,13 +10,14 @@
 
 #include "base/checks.h"
 #include "base/logging.h"
+#include "common/media_defs.h"
 #include "common/media_errors.h"
 #include "common/message.h"
 #include "player/default_decoder_factory.h"
 
 #ifdef AVP_FFMPEG_DECODER
-#include "video/decoder/ffmpeg_decoder.h"
-#include "video/decoder/ffmpeg_decoder_factory.h"
+#include "decoder/ffmpeg_decoder.h"
+#include "decoder/ffmpeg_decoder_factory.h"
 #endif
 
 namespace avp {
@@ -85,6 +86,12 @@ void AvpDecoder::setVideoSink(const std::shared_ptr<VideoSink> sink) {
 //    msg->post();
 //  }
 
+void AvpDecoder::start() {
+  std::shared_ptr<Message> msg(
+      std::make_shared<Message>(kWhatStart, shared_from_this()));
+  msg->post();
+}
+
 void AvpDecoder::pause() {
   std::shared_ptr<Message> msg(
       std::make_shared<Message>(kWhatPause, shared_from_this()));
@@ -125,11 +132,18 @@ void AvpDecoder::onConfigure(const std::shared_ptr<Message>& format) {
   LOG(LS_INFO) << "onConfigure, mime:" << mime;
 
   mIsAudio = !strncasecmp("audio/", mime.c_str(), 6);
+  CodecType codecType = mimeToCodec(mime.c_str());
 
-  mDecoder = mDecoderFactory->createDecoder(mime.c_str());
+  if (codecType == CODEC_UNKNOWN) {
+    LOG(LS_ERROR) << "unknown codec, mime:" << mime;
+    handleError(ERROR_UNSUPPORTED);
+    return;
+  }
+
+  mDecoder = mDecoderFactory->createDecoder(mIsAudio, codecType);
 
   if (mDecoder == nullptr || mDecoder.get() == nullptr) {
-    LOG(LS_ERROR) << "notsupport, mime:" << mime;
+    LOG(LS_ERROR) << "decoder create failed, mime:" << mime;
 
     handleError(ERROR_UNSUPPORTED);
     return;
@@ -144,19 +158,93 @@ void AvpDecoder::onConfigure(const std::shared_ptr<Message>& format) {
     return;
   }
 
-  mDecoder->setCallback(this);
+  mDecoder->setCallback(static_cast<Decoder::DecoderCallback*>(this));
+}
 
-  err = mDecoder->start();
+void AvpDecoder::onStart() {
+  LOG(LS_INFO) << "onStart";
+  status_t err = mDecoder->start();
   if (err != OK) {
-    LOG(LS_ERROR) << "Failed to start decoder [" << mime.c_str()
-                  << "], err:" << err;
+    LOG(LS_ERROR) << "Failed to start decoder, err:" << err;
     mDecoder.reset();
     handleError(err);
   }
+
+  onRequestInputBuffers();
+}
+void AvpDecoder::onPause() {}
+void AvpDecoder::onResume() {}
+void AvpDecoder::onFlush() {}
+void AvpDecoder::onShutdown() {}
+
+/////////////////////
+
+bool AvpDecoder::isSated() {
+  return mInputBufferMessageQueue.size() > 5;
+}
+// fetch buffer and save it in message
+status_t AvpDecoder::fetchInputBuffer(std::shared_ptr<Message>& message) {
+  std::shared_ptr<Buffer> accessUnit;
+  bool drop = true;
+  do {
+    status_t err = mSource->dequeueAccessUnit(mIsAudio, accessUnit);
+
+    if (err == WOULD_BLOCK) {
+      return err;
+    } else if (err != OK) {
+      return err;
+    }
+
+    drop = false;
+    // TODO(youfa) drop: no need to decode if too late
+  } while (drop);
+  int64_t timeUs;
+  accessUnit->meta()->findInt64("timeUs", &timeUs);
+
+  //  LOG(LS_INFO) << " fetchInputBuffer, pts:" << timeUs;
+
+  message->setBuffer("buffer", std::move(accessUnit));
+  return OK;
+}
+
+bool AvpDecoder::onInputBufferFetched(const std::shared_ptr<Message>& message) {
+  std::shared_ptr<Buffer> buffer;
+  bool hasBuffer = message->findBuffer("buffer", buffer);
+  if (!buffer.get()) {
+    status_t streamErr = ERROR_END_OF_STREAM;
+    CHECK(message->findInt32("err", &streamErr) || !hasBuffer);
+    CHECK(streamErr != OK);
+  } else {
+    status_t err;
+    err = mDecoder->queueInputBuffer(buffer);
+    if (err != OK) {
+      if (err == ERROR_RETRY) {
+        return false;
+      }
+      LOG(LS_ERROR) << "onInputBufferFetched: queueInputBuffer failed:" << err;
+      handleError(err);
+    }
+  }
+  return true;
 }
 
 bool AvpDecoder::doRequestInputBuffers() {
-  return true;
+  status_t err = OK;
+
+  while (err == OK && !isSated()) {
+    auto message = std::make_shared<Message>();
+    err = fetchInputBuffer(message);
+
+    if (err != OK && err != ERROR_END_OF_STREAM) {
+      break;
+    }
+
+    if (!mInputBufferMessageQueue.empty() || !onInputBufferFetched(message)) {
+      mInputBufferMessageQueue.push_back(std::move(message));
+    }
+  }
+
+  return err == WOULD_BLOCK;
 }
 void AvpDecoder::onRequestInputBuffers() {
   if (mRequestInputBuffersPending) {
@@ -168,14 +256,65 @@ void AvpDecoder::onRequestInputBuffers() {
 
     std::shared_ptr<Message> msg(std::make_shared<Message>(
         kWhatRequestInputBuffers, shared_from_this()));
+
+    // TODO(youfa) use frame rate
     msg->post(10 * 1000LL);
   }
 }
 
-void AvpDecoder::onPause() {}
-void AvpDecoder::onResume() {}
-void AvpDecoder::onFlush() {}
-void AvpDecoder::onShutdown() {}
+void AvpDecoder::handleAnInputBuffer() {
+  while (!mInputBufferMessageQueue.empty()) {
+    if (!onInputBufferFetched(*mInputBufferMessageQueue.begin())) {
+      break;
+    }
+    mInputBufferMessageQueue.erase(mInputBufferMessageQueue.begin());
+  }
+
+  onRequestInputBuffers();
+}
+
+void AvpDecoder::handleAnOutputBuffer() {
+  std::shared_ptr<Buffer> buffer;
+  status_t err = mDecoder->dequeueOutputBuffer(buffer, 10 * 1000LL);
+  if (buffer.get() == nullptr) {
+    if (err != TIMED_OUT) {
+      handleError(err);
+      return;
+    }
+    return;
+  }
+  int64_t timeUs;
+  CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
+
+  auto renderMsg =
+      std::make_shared<Message>(kWhatRenderBuffer, shared_from_this());
+  renderMsg->setBuffer("buffer", buffer);
+
+  mRender->queueBuffer(mIsAudio, buffer, renderMsg);
+}
+
+void AvpDecoder::onInputBufferAvailable() {
+  auto msg = std::make_shared<Message>(AvpDecoder::kWhatInputBufferAvailable,
+                                       shared_from_this());
+  msg->post();
+}
+void AvpDecoder::onOutputBufferAvailable() {
+  auto msg = std::make_shared<Message>(AvpDecoder::kWhatOutputBufferAvailable,
+                                       shared_from_this());
+  msg->post();
+}
+void AvpDecoder::onFormatChange(std::shared_ptr<Message> format) {
+  auto msg = std::make_shared<Message>(AvpDecoder::kWhatDecodingFormatChange,
+                                       shared_from_this());
+  msg->setMessage("message", std::move(format));
+  msg->post();
+}
+void AvpDecoder::onError(status_t error) {
+  auto msg = std::make_shared<Message>(AvpDecoder::kWhatDecodingError,
+                                       shared_from_this());
+  msg->setInt32("err", error);
+  msg->post();
+}
 
 void AvpDecoder::onMessageReceived(const std::shared_ptr<Message>& msg) {
   switch (msg->what()) {
@@ -204,6 +343,12 @@ void AvpDecoder::onMessageReceived(const std::shared_ptr<Message>& msg) {
     }
 
     case kWhatRequestInputBuffers: {
+      mRequestInputBuffersPending = false;
+      onRequestInputBuffers();
+      break;
+    }
+    case kWhatStart: {
+      onStart();
       break;
     }
 
@@ -220,6 +365,26 @@ void AvpDecoder::onMessageReceived(const std::shared_ptr<Message>& msg) {
     case kWhatShutdown: {
       break;
     }
+
+    case kWhatRenderBuffer: {
+      break;
+    }
+
+    case kWhatInputBufferAvailable: {
+      handleAnInputBuffer();
+      break;
+    }
+    case kWhatOutputBufferAvailable: {
+      handleAnOutputBuffer();
+      break;
+    }
+    case kWhatDecodingFormatChange: {
+      break;
+    }
+    case kWhatDecodingError: {
+      break;
+    }
+
     default:
       break;
   }

@@ -14,9 +14,10 @@
 #include "base/constructor_magic.h"
 
 // TODO(youfa) use logging instead
-#define CHECK(x) \
-  if (!(x))      \
-  LogMessageFatal(__FILE__, __LINE__).stream() << "Check failed: " #x
+#define CHECK(x)                               \
+  if (!(x))                                    \
+  LogMessageFatal(__FILE__, __LINE__).stream() \
+      << "Check failed: " #x << __FILE__ << __LINE__
 
 #define CHECK_EQ(x, y) CHECK((x) == (y))
 #define CHECK_NE(x, y) CHECK((x) != (y))

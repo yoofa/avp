@@ -8,6 +8,7 @@
 
 #include "base/checks.h"
 #include "base/errors.h"
+#include "base/logging.h"
 
 namespace avp {
 
@@ -16,6 +17,10 @@ AvpRenderSynchronizer::AvpRenderSynchronizer(std::shared_ptr<Message> msg,
     : mLooper(std::move(looper)), mNotify(std::move(msg)) {}
 
 AvpRenderSynchronizer::~AvpRenderSynchronizer() {}
+
+void AvpRenderSynchronizer::init() {
+  mLooper->registerHandler(shared_from_this());
+}
 
 void AvpRenderSynchronizer::setAudioSink(
     const std::shared_ptr<AudioSink> audioSink) {
@@ -37,8 +42,7 @@ void AvpRenderSynchronizer::queueBuffer(
     bool audio,
     const std::shared_ptr<Buffer> buffer,
     const std::shared_ptr<Message> renderMessage) {
-  std::shared_ptr<Message> msg(
-      std::make_shared<Message>(kWhatQueueBuffer, shared_from_this()));
+  auto msg = std::make_shared<Message>(kWhatQueueBuffer, shared_from_this());
   msg->setInt32("audio", static_cast<int32_t>(audio));
   msg->setBuffer("buffer", std::move(buffer));
   msg->setMessage("renderMessage", std::move(renderMessage));
@@ -54,7 +58,18 @@ void AvpRenderSynchronizer::onSetVideoSink(
     const std::shared_ptr<VideoSink>& sink) {
   mVideoSink = sink;
 }
+
 void AvpRenderSynchronizer::onQueueBuffer(const std::shared_ptr<Message>& msg) {
+  int32_t audio;
+  CHECK(msg->findInt32("audio", &audio));
+  std::shared_ptr<Buffer> buffer;
+  CHECK(msg->findBuffer("buffer", buffer));
+  if (!audio && mVideoSink) {
+    // LOG(LS_INFO) << "onQueueBuffer video:";
+    mVideoSink->onFrame(buffer);
+  } else if (audio && mAudioSink) {
+    mAudioSink->onFrame(buffer);
+  }
 }
 
 void AvpRenderSynchronizer::onRenderAudio(

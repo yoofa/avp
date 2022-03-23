@@ -29,7 +29,10 @@ AvPlayer::AvPlayer()
   mPlayerLooper->setName("AvPlayer");
 }
 
-AvPlayer::~AvPlayer() {}
+AvPlayer::~AvPlayer() {
+  mPlayerLooper->unregisterHandler(id());
+  mPlayerLooper->stop();
+}
 
 status_t AvPlayer::setListener(const std::shared_ptr<Listener>& listener) {
   mListener = listener;
@@ -148,7 +151,6 @@ status_t AvPlayer::instantiateDecoder(bool audio,
   }
 
   auto format = mSource->getFormat(audio);
-  LOG(LS_INFO) << "instantiateDecoder format: " << format.get();
 
   if (format.get() == nullptr) {
     return UNKNOWN_ERROR;
@@ -161,7 +163,7 @@ status_t AvPlayer::instantiateDecoder(bool audio,
   if (audio) {
     auto notify =
         std::make_shared<Message>(kWhatAudioNotify, shared_from_this());
-    decoder = std::make_shared<AvpDecoder>(notify, mSource);
+    decoder = std::make_shared<AvpDecoder>(notify, mSource, mRender);
   } else {
     auto notify =
         std::make_shared<Message>(kWhatVideoNotify, shared_from_this());
@@ -172,6 +174,8 @@ status_t AvPlayer::instantiateDecoder(bool audio,
   decoder->init();
 
   decoder->configure(format);
+
+  decoder->start();
 
   return OK;
 }
@@ -195,6 +199,7 @@ void AvPlayer::onStart(int64_t startUs, SeekMode seekMode) {
       std::make_shared<Message>(kWhatRendererNotify, shared_from_this()));
   mRender =
       std::make_shared<AvpRenderSynchronizer>(renderNotify, mPlayerLooper);
+  mRender->init();
 
   mRender->setAudioSink(mAudioSink);
   mRender->setVideoSink(mVideoSink);
@@ -314,13 +319,13 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
       mScanSourcesPendding = false;
 
       bool rescan = false;
-      if (/*mVideoSink.get() != nullptr &&*/ mVideoDecoder.get() == nullptr) {
+      if (mVideoSink.get() != nullptr && mVideoDecoder.get() == nullptr) {
         if (instantiateDecoder(false, mVideoDecoder) == WOULD_BLOCK) {
           rescan = true;
         }
       }
 
-      if (/*mAudioSink.get() != nullptr &&*/ mAudioDecoder.get() == nullptr) {
+      if (mAudioSink.get() != nullptr && mAudioDecoder.get() == nullptr) {
         if (instantiateDecoder(true, mAudioDecoder) == WOULD_BLOCK) {
           rescan = true;
         }

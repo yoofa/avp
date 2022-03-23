@@ -19,7 +19,8 @@ class FFmpegDecoderFactory : public DecoderFactory {
   FFmpegDecoderFactory();
   virtual ~FFmpegDecoderFactory();
 
-  virtual std::shared_ptr<Decoder> createDecoder(const char* name) override;
+  virtual std::shared_ptr<Decoder> createDecoder(bool audio,
+                                                 CodecType codecType) override;
 };
 
 } /* namespace avp */

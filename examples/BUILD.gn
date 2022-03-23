@@ -10,7 +10,36 @@ avp_executable("avplay") {
     "avplay/av_play.h",
   ]
   deps = [
+    ":audio_file_render",
+    ":video_file_render",
     "../base:logging",
     "../player:avplayer",
+  ]
+}
+
+avp_library("video_file_render") {
+  sources = [
+    "VideoFileRender.cc",
+    "VideoFileRender.h",
+  ]
+
+  deps = [
+    "../base:logging",
+    "../common:foundation",
+    "../player:avplayer",
+    "../player:player_interface",
+  ]
+}
+avp_library("audio_file_render") {
+  sources = [
+    "AudioFileRender.cc",
+    "AudioFileRender.h",
+  ]
+
+  deps = [
+    "../base:logging",
+    "../common:foundation",
+    "../player:avplayer",
+    "../player:player_interface",
   ]
 }

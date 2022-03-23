@@ -47,7 +47,7 @@ size_t PacketSource::getAvailableBufferCount(status_t* result) {
 
 status_t PacketSource::queueAccessunit(std::shared_ptr<Buffer> buffer) {
   std::unique_lock<std::mutex> l(mLock);
-  mBuffers.push_back(buffer);
+  mBuffers.push(buffer);
   return OK;
 }
 
@@ -61,8 +61,8 @@ status_t PacketSource::dequeueAccessUnit(std::shared_ptr<Buffer>& buffer) {
   }
 
   if (mBuffers.size()) {
-    buffer = *mBuffers.begin();
-    mBuffers.pop_front();
+    buffer = mBuffers.front();
+    mBuffers.pop();
   }
 
   return OK;

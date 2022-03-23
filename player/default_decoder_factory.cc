@@ -13,8 +13,9 @@ DefaultDecoderFactory::DefaultDecoderFactory() {}
 DefaultDecoderFactory::~DefaultDecoderFactory() {}
 
 std::shared_ptr<Decoder> DefaultDecoderFactory::createDecoder(
-    const char* name) {
+    bool audio,
+    CodecType codecType) {
   return nullptr;
 }
 
-} /* namespace avp */
+}  // namespace avp

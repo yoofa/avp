@@ -73,6 +73,58 @@ extern const char* MEDIA_MIMETYPE_TEXT_CEA_608;
 extern const char* MEDIA_MIMETYPE_TEXT_CEA_708;
 extern const char* MEDIA_MIMETYPE_DATA_TIMED_ID3;
 
+enum CodecType {
+  CODEC_UNKNOWN,
+
+  // VIDEO
+  VIDEO_VP8,
+  VIDEO_VP9,
+  VIDEO_AV1,
+  VIDEO_AVC,
+  VIDEO_HEVC,
+  VIDEO_MPEG4,
+  VIDEO_H263,
+  VIDEO_MPEG2,
+  VIDEO_RAW,
+  VIDEO_DOLBY_VISION,
+  VIDEO_SCRAMBLED,
+  VIDEO_DIVX,
+  VIDEO_DIVX3,
+  VIDEO_XVID,
+  VIDEO_MJPEG,
+
+  // AUDIO
+  AUDIO_AMR_NB,
+  AUDIO_AMR_WB,
+  AUDIO_MPEG,  // layer III
+  AUDIO_MPEG_LAYER_I,
+  AUDIO_MPEG_LAYER_II,
+  AUDIO_MIDI,
+  AUDIO_AAC,
+  AUDIO_QCELP,
+  AUDIO_VORBIS,
+  AUDIO_OPUS,
+  AUDIO_G711_ALAW,
+  AUDIO_G711_MLAW,
+  AUDIO_RAW,
+  AUDIO_FLAC,
+  AUDIO_AAC_ADTS,
+  AUDIO_MSGSM,
+  AUDIO_AC3,
+  AUDIO_EAC3,
+  AUDIO_EAC3_JOC,
+  AUDIO_AC4,
+  AUDIO_MPEGH_MHA1,
+  AUDIO_MPEGH_MHM1,
+  AUDIO_SCRAMBLED,
+  AUDIO_ALAC,
+  AUDIO_WMA,
+  AUDIO_MS_ADPCM,
+  AUDIO_DVI_IMA_ADPCM,
+};
+
+CodecType mimeToCodec(const char* mime);
+
 // These are values exported to JAVA API that need to be in sync with
 // frameworks/base/media/java/android/media/AudioFormat.java. Unfortunately,
 // they are not defined in frameworks/av, so defining them here.

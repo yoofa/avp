@@ -10,6 +10,7 @@
 
 #include <memory>
 
+#include "common/media_defs.h"
 #include "decoder.h"
 
 namespace avp {
@@ -19,7 +20,8 @@ class DecoderFactory {
   DecoderFactory() = default;
   virtual ~DecoderFactory() = default;
 
-  virtual std::shared_ptr<Decoder> createDecoder(const char* mime) = 0;
+  virtual std::shared_ptr<Decoder> createDecoder(bool audio,
+                                                 CodecType type) = 0;
 };
 
 } /* namespace avp */

@@ -19,7 +19,7 @@ class VideoSink : public MessageObject {
  public:
   VideoSink() = default;
   virtual ~VideoSink() = default;
-  virtual void onFrame(std::shared_ptr<VideoFrame>& frame) = 0;
+  virtual void onFrame(std::shared_ptr<Buffer>& frame) = 0;
 };
 } /* namespace avp */
 

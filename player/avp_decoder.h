@@ -26,6 +26,11 @@ class AvpDecoder : public Handler, public Decoder::DecoderCallback {
     kWhatResumeCompleted = 'resC',
     kWhatEOS = 'eos ',
     kWhatError = 'err ',
+
+    kWhatRenderBuffer = 'rndr',
+    kWhatSetVideoSurface = 'sSur',
+    kWhatAudioOutputFormatChanged = 'aofc',
+    kWhatDrmReleaseCrypto = 'rDrm',
   };
 
   explicit AvpDecoder(std::shared_ptr<Message> notify,
@@ -40,39 +45,59 @@ class AvpDecoder : public Handler, public Decoder::DecoderCallback {
   void setParameters(const std::shared_ptr<Message>& parameters);
   void setRender(const std::shared_ptr<AvpRenderSynchronizer> render);
   void setVideoSink(const std::shared_ptr<VideoSink> sink);
+  void start();
   void pause();
   void resume();
   void flush();
   void shutdown();
 
  private:
+  friend DecoderCallback;
   enum {
     kWhatConfigure = 'conf',
     kWhatSetParameters = 'setP',
     kWhatSetRenderer = 'setR',
     kWhatSetVideoSink = 'setV',
+    kWhatStart = 'star',
     kWhatPause = 'paus',
     kWhatResume = 'resu',
     kWhatRequestInputBuffers = 'reqB',
     kWhatFlush = 'flus',
     kWhatShutdown = 'shuD',
+
+    // codec notify
+    kWhatInputBufferAvailable = 'inAv',
+    kWhatOutputBufferAvailable = 'outA',
+    kWhatDecodingFormatChange = 'fmtC',
+    kWhatDecodingError = 'ddEr',
   };
 
+  void handleAnInputBuffer();
+  void handleAnOutputBuffer();
+
+  status_t fetchInputBuffer(std::shared_ptr<Message>& message);
   bool doRequestInputBuffers();
   void handleError(status_t err);
 
   void onConfigure(const std::shared_ptr<Message>& format);
   void onSetParameters(const std::shared_ptr<Message>& params);
-  void onRequestInputBuffers();
+  void onStart();
   void onPause();
   void onResume();
   void onFlush();
   void onShutdown();
   void onMessageReceived(const std::shared_ptr<Message>& message) override;
 
-  void onOutputBufferAvailable();
-  void onFormatChange(std::shared_ptr<Message> format);
-  void onError(status_t err);
+  bool isSated();
+  // return message consumed
+  bool onInputBufferFetched(const std::shared_ptr<Message>& message);
+  void onRequestInputBuffers();
+
+  // DecoderCallback
+  void onInputBufferAvailable() override;
+  void onOutputBufferAvailable() override;
+  void onFormatChange(std::shared_ptr<Message> format) override;
+  void onError(status_t err) override;
 
   std::shared_ptr<Looper> mLooper;
   std::shared_ptr<Message> mNotify;
@@ -83,6 +108,7 @@ class AvpDecoder : public Handler, public Decoder::DecoderCallback {
   std::unique_ptr<DecoderFactory> mDecoderFactory;
   std::shared_ptr<Decoder> mDecoder;
   bool mIsAudio;
+  std::vector<std::shared_ptr<Message>> mInputBufferMessageQueue;
 };
 } /* namespace avp */
 

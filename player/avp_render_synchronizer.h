@@ -20,6 +20,7 @@ class AvpRenderSynchronizer : public Handler, public MessageObject {
   AvpRenderSynchronizer(std::shared_ptr<Message> msg,
                         std::shared_ptr<Looper> looper);
   virtual ~AvpRenderSynchronizer();
+  void init();
   void setAudioSink(const std::shared_ptr<AudioSink> audioSink);
   void setVideoSink(const std::shared_ptr<VideoSink> videoSink);
   void queueBuffer(bool audio,

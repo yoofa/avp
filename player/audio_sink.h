@@ -19,7 +19,7 @@ class AudioSink : public MessageObject {
   AudioSink() = default;
   virtual ~AudioSink() = default;
 
-  virtual void onFrame(std::shared_ptr<AudioFrame>& frame) = 0;
+  virtual void onFrame(std::shared_ptr<Buffer>& frame) = 0;
 };
 } /* namespace avp */
 

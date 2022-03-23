@@ -1,10 +1,7 @@
 import("//avp.gni")
 
 group("player") {
-  deps = [
-    ":avplayer",
-    ":avplayer_so",
-  ]
+  deps = [ ":avplayer" ]
 }
 
 avp_library("player_interface") {
@@ -13,7 +10,6 @@ avp_library("player_interface") {
     "audio_frame.h",
     "audio_sink.h",
     "data_source.h",
-    "decoder.h",
     "decoder.h",
     "decoder_factory.h",
     "demuxer.h",
@@ -55,16 +51,11 @@ avp_library("avplayer") {
     "../base:utils",
     "../base/system:avp_export",
     "../common:foundation",
-    "../video/decoder:ffmpeg_decoder",
   ]
 
   deps += [ "../demuxer:ffmpeg_demuxer" ]
-  deps += [ "../video/decoder:ffmpeg_decoder" ]
+  deps += [ "../decoder:ffmpeg_decoder" ]
+  deps += [ "../modules/ffmpeg:ffmpeg_helper" ]
 
   cflags = [ "-Wno-multichar" ]
-}
-
-avp_shared_library("avplayer_so") {
-  deps = [ ":avplayer" ]
-  output_extension = "so"
 }

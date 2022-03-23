@@ -93,7 +93,7 @@ class PlayerBase {
     virtual std::shared_ptr<MetaData> getSourceMeta() = 0;
     virtual std::shared_ptr<MetaData> getMeta(bool audio) = 0;
 
-    virtual status_t dequeueAccussUnit(bool audio,
+    virtual status_t dequeueAccessUnit(bool audio,
                                        std::shared_ptr<Buffer>& accessUnit) = 0;
     virtual std::shared_ptr<Message> getFormat(bool audio);
     virtual status_t getDuration(int64_t* /* durationUs */) {

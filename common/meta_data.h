@@ -17,6 +17,7 @@ namespace avp {
 // The following keys map to int32_t data unless indicated otherwise.
 enum {
   kKeyMIMEType = 'mime',         // cstring
+  kKeyCodecType = 'codc',        // int32_t, codec type
   kKeyWidth = 'widt',            // int32_t, image pixel
   kKeyHeight = 'heig',           // int32_t, image pixel
   kKeyDisplayWidth = 'dWid',     // int32_t, display/presentation
@@ -275,6 +276,9 @@ enum {
       'lsic',  // int64_t, index of last sample in a chunk.
   kKeySampleTimeBeforeAppend =
       'lsba',  // int64_t, timestamp of last sample of a track.
+
+  kKeyFFmpegExtraData = 'ffex',
+  kKeyFFmpegExtraSize = 'ffes',
 
 };
 

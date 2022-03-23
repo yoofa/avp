@@ -10,7 +10,9 @@
 #include <iostream>
 
 #include "base/checks.h"
+#include "base/hexdump.h"
 #include "base/logging.h"
+#include "common/utils.h"
 #include "player/data_source.h"
 #include "player/media_source.h"
 
@@ -19,6 +21,7 @@
 namespace avp {
 
 enum { kBufferSize = 32 * 1024 };
+int lastVideoTimeUs = 0;
 
 static int AVIOReadOperation(void* opaque, uint8_t* buf, int size) {
   DataSource* dataSource = reinterpret_cast<DataSource*>(opaque);
@@ -174,21 +177,11 @@ std::shared_ptr<MetaData> createMetaFromAVStream(const AVStream* avStream) {
 
   switch (avStream->codecpar->codec_type) {
     case AVMEDIA_TYPE_VIDEO: {
-      meta->setCString(kKeyMIMEType,
-                       VideoCodecId2Mime(avStream->codecpar->codec_id));
-      meta->setInt32(kKeyWidth, avStream->codecpar->width);
-      meta->setInt32(kKeyHeight, avStream->codecpar->height);
-      meta->setInt32(kKeyDisplayWidth, avStream->codecpar->width);
-      meta->setInt32(kKeyDisplayHeight, avStream->codecpar->height);
+      AVStreamToVideoMeta(avStream, meta);
       break;
     }
     case AVMEDIA_TYPE_AUDIO: {
-      meta->setCString(kKeyMIMEType,
-                       AudioCodecId2Mime(avStream->codecpar->codec_id));
-      meta->setInt32(kKeySampleRate, avStream->codecpar->sample_rate);
-      meta->setInt32(kKeyChannelCount, avStream->codecpar->channels);
-      meta->setInt32(kKeyBitsPerSample,
-                     avStream->codecpar->bits_per_coded_sample);
+      AVStreamToAudioMeta(avStream, meta);
       break;
     }
     case AVMEDIA_TYPE_SUBTITLE: {
@@ -209,6 +202,11 @@ std::shared_ptr<MetaData> createMetaFromAVStream(const AVStream* avStream) {
 
 status_t FFmpegDemuxer::addTrack(const AVStream* avStream, size_t index) {
   std::shared_ptr<MetaData> meta = createMetaFromAVStream(avStream);
+  // if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+  LOG(LS_INFO) << "dump(" << avStream->codecpar->codec_type << "):";
+  hexdump(avStream->codecpar->extradata, avStream->codecpar->extradata_size);
+  //}
+
   std::shared_ptr<FFmpegSource> source(
       std::make_shared<FFmpegSource>(this, index, meta));
   mTracks.emplace_back(index, meta, source);
@@ -254,6 +252,14 @@ status_t FFmpegDemuxer::readAnAvPacket(size_t index) {
 
     DCHECK_GE(pkt.stream_index, 0);
     DCHECK_LT(static_cast<size_t>(pkt.stream_index), mTracks.size());
+
+    //    if (pkt.stream_index == 0) {
+    //      LOG(LS_INFO) << "readAnAvPacket, index:" << pkt.stream_index
+    //                   << ", pts:" << pkt.pts
+    //                   << ", diff:" << (pkt.pts - lastVideoTimeUs);
+    //
+    //      lastVideoTimeUs = pkt.pts;
+    //    }
 
     if (pkt.stream_index >= 0 &&
         pkt.stream_index < static_cast<int>(mTracks.size())) {

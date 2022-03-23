@@ -49,6 +49,9 @@ enum {
   INFO_DISCONTINUITY = MEDIA_ERROR_BASE - 13,
   INFO_OUTPUT_BUFFERS_CHANGED = MEDIA_ERROR_BASE - 14,
 
+  // decoding retry
+  ERROR_RETRY = MEDIA_ERRORS_H - 15,
+
   // The following constant values should be in sync with
   // drm/drm_framework_common.h
   DRM_ERROR_BASE = -2000,

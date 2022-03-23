@@ -47,7 +47,7 @@ class GenericSource : public PlayerBase::ContentSource {
   std::shared_ptr<MetaData> getSourceMeta() override;
   std::shared_ptr<MetaData> getMeta(bool audio) override;
 
-  status_t dequeueAccussUnit(bool audio,
+  status_t dequeueAccessUnit(bool audio,
                              std::shared_ptr<Buffer>& accessUnit) override;
   status_t getDuration(int64_t* durationUs) override;
   size_t getTrackCount() const override;

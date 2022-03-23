@@ -32,6 +32,8 @@ avp_library("utils") {
     "checks.h",
     "errors.cc",
     "errors.h",
+    "hexdump.cc",
+    "hexdump.h",
     "types.h",
     "unique_fd.h",
     "utils.cc",

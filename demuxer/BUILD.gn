@@ -12,6 +12,7 @@ avp_library("ffmpeg_demuxer") {
   ]
   deps = [
     "../base:logging",
+    "../base:utils",
     "../modules/ffmpeg:ffmpeg_helper",
     "../player:player_interface",
     "//third_party/ffmpeg",

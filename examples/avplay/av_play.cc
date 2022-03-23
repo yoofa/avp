@@ -18,6 +18,8 @@
 
 #include "base/checks.h"
 #include "base/logging.h"
+#include "examples/AudioFileRender.h"
+#include "examples/VideoFileRender.h"
 #include "player/avplayer.h"
 
 using namespace avp;
@@ -95,10 +97,16 @@ int main(int argc, char* argv[]) {
   url = std::string("file://") + filename;
 
   std::shared_ptr<ExListener> listener(std::make_shared<ExListener>());
+  std::shared_ptr<VideoFileRender> videoRender =
+      std::make_unique<VideoFileRender>("local.yuv");
+  std::shared_ptr<AudioFileRender> audioRender =
+      std::make_unique<AudioFileRender>("local.pcm");
 
   std::shared_ptr<AvPlayer> mPlayer = std::make_shared<AvPlayer>();
   mPlayer->setListener(std::static_pointer_cast<AvPlayer::Listener>(listener));
   mPlayer->init();
+  mPlayer->setVideoSink(videoRender);
+  mPlayer->setAudioSink(audioRender);
 
   mPlayer->setDataSource(url.c_str());
 

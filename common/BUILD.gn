@@ -36,6 +36,8 @@ avp_library("foundation") {
     "message.h",
     "meta_data.cc",
     "meta_data.h",
+    "meta_data_utils.cc",
+    "meta_data_utils.h",
     "utils.cc",
     "utils.h",
   ]

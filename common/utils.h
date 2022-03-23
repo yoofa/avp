@@ -15,7 +15,6 @@
 #include "common/meta_data.h"
 
 namespace avp {
-
 status_t convertMetaDataToMessage(const MetaData* meta,
                                   std::shared_ptr<Message>& format);
 
