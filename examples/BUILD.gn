@@ -32,6 +32,7 @@ avp_library("gtk_window") {
     "../common:foundation",
     "../player:avplayer",
     "../player:player_interface",
+    "//third_party/libyuv",
   ]
 
   deps += [ "//build/config/linux/gtk" ]

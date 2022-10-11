@@ -74,6 +74,8 @@ deps = {
     'https://chromium.googlesource.com/chromium/src/tools@2a1184f6a084142fedae1f0b9e44ae1ec4431fc3',
   'src/tools/swarming_client':
     'https://chromium.googlesource.com/infra/luci/client-py.git@d46ea7635f2911208268170512cb611412488fd8',
+  'src/third_party/libjpeg_turbo':
+    'https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git@ff19e5b2e176c61d552f68768e0e051867745321',
 
   # used by ffmpeg
   'src/third_party/nasm': {

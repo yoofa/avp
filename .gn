@@ -25,4 +25,5 @@ default_args = {
   clang_use_chrome_plugins = false
 
   #  ffmpeg_branding = "Chrome"
+  libyuv_use_absl_flags = false
 }
