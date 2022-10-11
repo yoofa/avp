@@ -12,7 +12,7 @@ vars = {
 
 deps = {
   'src/build':
-    'https://github.com/vsyf/chromium-build.git@2d5dfe36da1e972c260781db30628a3dc1b01aa7',
+    'https://github.com/vsyf/chromium-build.git@cd64fac308aa1c466ab1f91bbe7fdb92f04d7822',
   'src/buildtools':
     'https://chromium.googlesource.com/chromium/src/buildtools@6302c1175607a436e18947a5abe9df2209e845fc',
     'src/buildtools/linux64': {
