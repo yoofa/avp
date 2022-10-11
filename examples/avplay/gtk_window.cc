@@ -12,6 +12,8 @@
 
 #include "base/checks.h"
 #include "base/logging.h"
+#include "third_party/libyuv/include/libyuv/convert.h"
+#include "third_party/libyuv/include/libyuv/convert_from.h"
 
 namespace {
 
@@ -36,6 +38,12 @@ gboolean OnKeyPressCallback(GtkWidget* widget,
 gboolean Redraw(gpointer data) {
   GtkWnd* wnd = reinterpret_cast<GtkWnd*>(data);
   wnd->onRedraw();
+  return false;
+}
+
+gboolean Draw(GtkWidget* widget, cairo_t* cr, gpointer data) {
+  GtkWnd* wnd = reinterpret_cast<GtkWnd*>(data);
+  wnd->draw(widget, cr);
   return false;
 }
 }  // namespace
@@ -67,6 +75,7 @@ void GtkWnd::addVideoRender() {
   gtk_container_set_border_width(GTK_CONTAINER(mWindow), 0);
   mDrawArea = gtk_drawing_area_new();
   gtk_container_add(GTK_CONTAINER(mWindow), mDrawArea);
+  g_signal_connect(G_OBJECT(mDrawArea), "draw", G_CALLBACK(Draw), this);
   gtk_widget_show_all(mWindow);
   mVideoRender.reset(new GtkVideoRender(this));
 }
@@ -143,12 +152,18 @@ GtkWnd::GtkVideoRender::GtkVideoRender(GtkWnd* window) : mGtkWnd(window) {}
 GtkWnd::GtkVideoRender::~GtkVideoRender() {}
 
 void GtkWnd::GtkVideoRender::onFrame(std::shared_ptr<avp::Buffer>& frame) {
-  LOG(avp::LS_INFO) << "onFrame";
   int32_t width;
   CHECK(frame->meta()->findInt32("width", &width));
   int32_t height;
   CHECK(frame->meta()->findInt32("height", &height));
+  int32_t stride;
+  CHECK(frame->meta()->findInt32("stride", &stride));
+
   setSize(width, height);
+
+  libyuv::I420ToARGB(frame->data(), stride, frame->data() + stride * height,
+                     stride / 2, frame->data() + stride * height * 5 / 4,
+                     stride / 2, mImage.get(), mWidth * 4, width, height);
 
   g_idle_add(Redraw, mGtkWnd);
 }
