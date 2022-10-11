@@ -236,6 +236,7 @@ void AVStreamToAudioMeta(const AVStream* audioStream,
 
   meta->clear();
 
+  LOG(LS_INFO) << "audio codec id:" << audioStream->codecpar->codec_id;
   const char* mime = AudioCodecId2Mime(audioStream->codecpar->codec_id);
   if (mime != nullptr) {
     meta->setCString(kKeyMIMEType, mime);

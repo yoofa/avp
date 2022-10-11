@@ -76,7 +76,7 @@ FileSource::~FileSource() {
 }
 
 status_t FileSource::initCheck() const {
-  return mFd >= 0 ? 0 : -1;
+  return mFd >= 0 ? OK : UNKNOWN_ERROR;
 }
 
 status_t FileSource::getPosition(off64_t* position) {

@@ -23,4 +23,6 @@ exec_script_whitelist = build_dotfile_settings.exec_script_whitelist +
 default_args = {
   is_component_build = true
   clang_use_chrome_plugins = false
+
+  #  ffmpeg_branding = "Chrome"
 }

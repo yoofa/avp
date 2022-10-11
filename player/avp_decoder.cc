@@ -163,7 +163,14 @@ void AvpDecoder::onConfigure(const std::shared_ptr<Message>& format) {
 
 void AvpDecoder::onStart() {
   LOG(LS_INFO) << "onStart";
+  if (mDecoder == nullptr) {
+    LOG(LS_ERROR) << "Failed to start decoder, no support decoder";
+    handleError(UNKNOWN_ERROR);
+    return;
+  }
+
   status_t err = mDecoder->start();
+
   if (err != OK) {
     LOG(LS_ERROR) << "Failed to start decoder, err:" << err;
     mDecoder.reset();

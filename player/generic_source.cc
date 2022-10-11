@@ -51,6 +51,7 @@ status_t GenericSource::setDataSource(const char* url) {
 }
 status_t GenericSource::setDataSource(int fd, int64_t offset, int64_t length) {
   std::lock_guard<std::mutex> lock(mLock);
+  LOG(LS_VERBOSE) << "setDataSource";
   resetDataSource();
 
   mFd.reset(dup(fd));
@@ -253,16 +254,28 @@ status_t GenericSource::initFromDataSource() {
 
 void GenericSource::onPrepare() {
   // create DataSource
-  if (mDataSource.get() == nullptr) {
+  if (mDataSource == nullptr) {
     if (!mUri.empty()) {
       const char* uri = mUri.c_str();
-      LOG(LS_INFO) << "onPrepare:uri" << uri;
+      LOG(LS_INFO) << "onPrepare, uri (" << uri << ")";
       if (!strncasecmp("file://", uri, 7)) {
-        mDataSource = std::make_shared<FileSource>(mUri.substr(7).c_str());
+        auto fileSource = std::make_shared<FileSource>(mUri.substr(7).c_str());
+        if (fileSource->initCheck() == OK) {
+          mDataSource = std::move(fileSource);
+        }
       }
     } else {
-      mDataSource =
+      auto fileSource =
           std::make_shared<FileSource>(dup(mFd.get()), mOffset, mLength);
+      if (fileSource->initCheck() == OK) {
+        mDataSource = std::move(fileSource);
+      }
+    }
+
+    if (mDataSource == nullptr) {
+      LOG(LS_ERROR) << "Failed to create DataSource";
+      notifyPreparedAndCleanup(UNKNOWN_ERROR);
+      return;
     }
   }
 

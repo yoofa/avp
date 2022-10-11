@@ -16,10 +16,13 @@
 #include <iostream>
 #include <memory>
 
+#include <gtk/gtk.h>
+
 #include "base/checks.h"
 #include "base/logging.h"
 #include "examples/AudioFileRender.h"
 #include "examples/VideoFileRender.h"
+#include "examples/avplay/gtk_window.h"
 #include "player/avplayer.h"
 
 using namespace avp;
@@ -63,6 +66,7 @@ class ExListener : public AvPlayer::Listener {
 };
 
 int main(int argc, char* argv[]) {
+  gtk_init(&argc, &argv);
   std::string filename;
   std::string url;
   int choice;
@@ -93,20 +97,27 @@ int main(int argc, char* argv[]) {
   // avp::LogMessage::LogToDebug(avp::LogSeverity::LS_VERBOSE);
   std::unique_lock<std::mutex> lock(mMutex);
 
+  std::unique_ptr<GtkWnd> gtkWindow(std::make_unique<GtkWnd>());
+  gtkWindow->create();
+
   std::cout << "play file: " << filename << std::endl;
   url = std::string("file://") + filename;
 
   std::shared_ptr<ExListener> listener(std::make_shared<ExListener>());
-  std::shared_ptr<VideoFileRender> videoRender =
-      std::make_unique<VideoFileRender>("local.yuv");
-  std::shared_ptr<AudioFileRender> audioRender =
-      std::make_unique<AudioFileRender>("local.pcm");
 
   std::shared_ptr<AvPlayer> mPlayer = std::make_shared<AvPlayer>();
   mPlayer->setListener(std::static_pointer_cast<AvPlayer::Listener>(listener));
   mPlayer->init();
-  mPlayer->setVideoSink(videoRender);
-  mPlayer->setAudioSink(audioRender);
+
+  gtkWindow->addVideoRender();
+  mPlayer->setVideoSink(gtkWindow->videoRender());
+
+  // std::shared_ptr<VideoFileRender> videoRender =
+  //    std::make_unique<VideoFileRender>("local.yuv");
+  // std::shared_ptr<AudioFileRender> audioRender =
+  //    std::make_unique<AudioFileRender>("local.pcm");
+  // mPlayer->setVideoSink(videoRender);
+  // mPlayer->setAudioSink(audioRender);
 
   mPlayer->setDataSource(url.c_str());
 
@@ -117,7 +128,8 @@ int main(int argc, char* argv[]) {
 
   mPlayer->start();
 
-  event_loop();
+  // event_loop();
+  gtk_main();
 
   mPlayer->stop();
 

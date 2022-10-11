@@ -11,10 +11,30 @@ avp_executable("avplay") {
   ]
   deps = [
     ":audio_file_render",
+    ":gtk_window",
     ":video_file_render",
     "../base:logging",
     "../player:avplayer",
   ]
+
+  deps += [ "//build/config/linux/gtk" ]
+}
+
+avp_library("gtk_window") {
+  sources = [
+    "avplay/gtk_window.cc",
+    "avplay/gtk_window.h",
+  ]
+  cflags = [ "-Wno-deprecated-declarations" ]
+
+  deps = [
+    "../base:logging",
+    "../common:foundation",
+    "../player:avplayer",
+    "../player:player_interface",
+  ]
+
+  deps += [ "//build/config/linux/gtk" ]
 }
 
 avp_library("video_file_render") {

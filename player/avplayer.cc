@@ -46,13 +46,74 @@ status_t AvPlayer::init() {
   return 0;
 }
 
+static bool IsHTTPLiveURL(const char* url) {
+  if (!strncasecmp("http://", url, 7) || !strncasecmp("https://", url, 8) ||
+      !strncasecmp("file://", url, 7)) {
+    size_t len = strlen(url);
+    if (len >= 5 && !strcasecmp(".m3u8", &url[len - 5])) {
+      return true;
+    }
+
+    if (strstr(url, "m3u8")) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+static bool IsRTSPURL(const char* url) {
+  if (!strncasecmp(url, "rtsp://", 7)) {
+    return true;
+  }
+  if (!strncasecmp("http://", url, 7) || !strncasecmp("https://", url, 8) ||
+      !strncasecmp("file://", url, 7)) {
+    size_t len = strlen(url);
+    if (len >= 4 && !strcasecmp(".sdp", &url[len - 4])) {
+      return true;
+    }
+
+    if (strstr(url, ".sdp?")) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+static bool IsDASHUrl(const char* url) {
+  if (!strncasecmp("http://", url, 7) || !strncasecmp("https://", url, 8) ||
+      !strncasecmp("file://", url, 7)) {
+    size_t len = strlen(url);
+    if (len >= 4 && !strcasecmp(".mpd", &url[len - 4])) {
+      return true;
+    }
+
+    if (strstr(url, ".mpd?")) {
+      return true;
+    }
+  }
+  return false;
+}
+
 status_t AvPlayer::setDataSource(const char* url) {
   std::shared_ptr<ContentSource> source;
-  {
+  if (IsHTTPLiveURL(url)) {
+    // httplive
+  } else if (IsRTSPURL(url)) {
+    // rtsp
+  } else if (IsDASHUrl(url)) {
+    // dash
+  } else {
+    // generic
     std::shared_ptr<GenericSource> genericSource(
         std::make_shared<GenericSource>());
-    genericSource->setDataSource(url);
-    source = std::move(genericSource);
+    status_t err = genericSource->setDataSource(url);
+    if (err == OK) {
+      source = std::move(genericSource);
+    } else {
+      LOG(LS_ERROR) << "setDataSource (" << url << ") error";
+    }
   }
 
   return setDataSource(source);
