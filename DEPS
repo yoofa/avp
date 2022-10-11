@@ -82,6 +82,8 @@ deps = {
 
   'src/third_party/ffmpeg':
     'https://chromium.googlesource.com/chromium/third_party/ffmpeg.git@14e1145ddd3d5f3ba478a19b4ae8822679d83a6c',
+  'src/third_party/libyuv':
+    'https://chromium.googlesource.com/libyuv/libyuv.git@49ebc996aa8c4bdf89c1b5ea461eb677234c61cc',
 }
 
 hooks = [
