@@ -891,6 +891,13 @@ status_t convertMetaDataToMessage(const MetaData* meta,
   if (meta->findCString(kKeyMediaLanguage, &lang)) {
     msg->setString("language", lang);
   }
+  // time base
+  int64_t numerator, denominator;
+  if (meta->findInt64(kKeyNumerator, &numerator) &&
+      meta->findInt64(kKeyDenominator, &denominator)) {
+    msg->setInt64("timebase-num", numerator);
+    msg->setInt64("timebase-den", denominator);
+  }
 
   if (!strncasecmp("video/", mime, 6) || !strncasecmp("image/", mime, 6)) {
     int32_t width, height;

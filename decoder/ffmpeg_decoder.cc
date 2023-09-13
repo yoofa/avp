@@ -11,6 +11,7 @@
 #include "base/logging.h"
 #include "common/media_errors.h"
 #include "common/utils.h"
+#include "modules/ffmpeg/ffmpeg_helper.h"
 
 namespace avp {
 
@@ -20,6 +21,7 @@ FFmpegDecoder::FFmpegDecoder(bool audio, CodecType codecType)
       mLooper(std::make_shared<Looper>()),
       mCodecContext(avcodec_alloc_context3(nullptr)),
       mAvFrame(nullptr),
+      time_base_({1, 1000000}),
       mInputPenddingCount(0) {
   mLooper->setName("FFmpegDecoder");
   LOG(LS_INFO) << "is audio:" << mAudio << ", type:" << mCodecType;

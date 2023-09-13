@@ -21,7 +21,7 @@
 namespace avp {
 
 AudioFileRender::AudioFileRender(const char* file) : mFd(-1) {
-  mFd = open(file, O_LARGEFILE | O_RDWR | O_CREAT);
+  mFd = ::open(file, O_LARGEFILE | O_RDWR | O_CREAT);
 
   if (mFd >= 0) {
     lseek64(mFd, 0, SEEK_END);

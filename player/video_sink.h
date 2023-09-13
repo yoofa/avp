@@ -20,6 +20,7 @@ class VideoSink : public MessageObject {
   VideoSink() = default;
   virtual ~VideoSink() = default;
   virtual void onFrame(std::shared_ptr<Buffer>& frame) = 0;
+  virtual int64_t render_latency() { return 0; }
 };
 } /* namespace avp */
 

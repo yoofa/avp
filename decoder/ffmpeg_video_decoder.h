@@ -9,6 +9,7 @@
 #define FFMPEG_VIDEO_DECODER_H
 
 #include "decoder/ffmpeg_decoder.h"
+#include "libavutil/rational.h"
 #include "player/decoder.h"
 
 namespace avp {

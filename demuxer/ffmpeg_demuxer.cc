@@ -253,17 +253,25 @@ status_t FFmpegDemuxer::readAnAvPacket(size_t index) {
     DCHECK_GE(pkt.stream_index, 0);
     DCHECK_LT(static_cast<size_t>(pkt.stream_index), mTracks.size());
 
-    //    if (pkt.stream_index == 0) {
-    //      LOG(LS_INFO) << "readAnAvPacket, index:" << pkt.stream_index
-    //                   << ", pts:" << pkt.pts
-    //                   << ", diff:" << (pkt.pts - lastVideoTimeUs);
-    //
-    //      lastVideoTimeUs = pkt.pts;
-    //    }
+    if (pkt.stream_index == 0) {
+      LOG(LS_INFO) << "readAnAvPacket, index:" << pkt.stream_index
+                   << "time_base:"
+                   << mFormatContext->streams[pkt.stream_index]->time_base.num
+                   << "/"
+                   << mFormatContext->streams[pkt.stream_index]->time_base.den
+                   << ", pts:" << pkt.pts << ",time_us:"
+                   << ConvertFromTimeBase(
+                          mFormatContext->streams[pkt.stream_index]->time_base,
+                          pkt.pts)
+                   << ", diff:" << (pkt.pts - lastVideoTimeUs);
+
+      lastVideoTimeUs = pkt.pts;
+    }
 
     if (pkt.stream_index >= 0 &&
         pkt.stream_index < static_cast<int>(mTracks.size())) {
-      mTracks[pkt.stream_index].enqueuePacket(createBufferFromAvPacket(&pkt));
+      mTracks[pkt.stream_index].enqueuePacket(createBufferFromAvPacket(
+          &pkt, mFormatContext->streams[pkt.stream_index]->time_base));
     }
     if (static_cast<size_t>(pkt.stream_index) == index) {
       break;

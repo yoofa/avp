@@ -1,0 +1,13 @@
+group("audio") {
+}
+
+avp_library("audio_base") {
+  visibility = [ "*" ]
+  sources = [
+    "audio_format.h",
+    "channel_layout.cc",
+    "channel_layout.h",
+  ]
+
+  deps = [ "../base:utils" ]
+}

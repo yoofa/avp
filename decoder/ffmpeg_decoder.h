@@ -14,6 +14,7 @@
 #include "base/logging.h"
 #include "common/handler.h"
 #include "common/media_defs.h"
+#include "libavutil/rational.h"
 #include "modules/ffmpeg/ffmpeg_helper.h"
 #include "player/decoder.h"
 #include "player/video_frame.h"
@@ -58,6 +59,7 @@ class FFmpegDecoder : public Decoder, public Handler {
   void notifyFormatChanged(std::shared_ptr<Message> format);
   void notifyError(status_t err);
 
+  AVRational& time_base() { return time_base_; }
   void Decode(std::shared_ptr<Buffer>& buffer);
 
   virtual status_t DecodeToBuffers(
@@ -70,6 +72,7 @@ class FFmpegDecoder : public Decoder, public Handler {
   DecoderCallback* mCallback;
   AVCodecContext* mCodecContext;
   AVFrame* mAvFrame;
+  AVRational time_base_;
   std::mutex mLock;
   std::vector<std::shared_ptr<Buffer>> mBufferQueue;
   size_t mInputPenddingCount;

@@ -22,6 +22,7 @@
 #include "player/avp_render_synchronizer.h"
 #include "player/default_Audio_decoder_factory.h"
 #include "player/default_video_decoder_factory.h"
+#include "player/media_clock.h"
 #include "player/player_interface.h"
 #include "player/video_decoder.h"
 #include "player/video_decoder_factory.h"
@@ -112,6 +113,7 @@ AVP_EXPORT class AvPlayer : public PlayerBase, public Handler {
   std::shared_ptr<AvpDecoder> mVideoDecoder;
   std::shared_ptr<Looper> mPlayerLooper;
 
+  std::shared_ptr<MediaClock> mMediaClock;
   std::shared_ptr<AudioSink> mAudioSink;
   std::shared_ptr<VideoSink> mVideoSink;
   std::shared_ptr<ContentSource> mSource;

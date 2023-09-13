@@ -21,12 +21,14 @@ namespace avp {
 
 AvPlayer::AvPlayer()
     : mPlayerLooper(std::make_shared<Looper>()),
+      mMediaClock(std::make_shared<MediaClock>()),
       mStarted(false),
       mPrepared(false),
       mPaused(false),
       mSourceStarted(false),
       mScanSourcesPendding(false) {
   mPlayerLooper->setName("AvPlayer");
+  mMediaClock->init();
 }
 
 AvPlayer::~AvPlayer() {
@@ -258,8 +260,8 @@ void AvPlayer::onStart(int64_t startUs, SeekMode seekMode) {
 
   auto renderNotify(
       std::make_shared<Message>(kWhatRendererNotify, shared_from_this()));
-  mRender =
-      std::make_shared<AvpRenderSynchronizer>(renderNotify, mPlayerLooper);
+  mRender = std::make_shared<AvpRenderSynchronizer>(renderNotify, mPlayerLooper,
+                                                    mMediaClock);
   mRender->init();
 
   mRender->setAudioSink(mAudioSink);

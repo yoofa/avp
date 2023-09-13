@@ -12,9 +12,21 @@
 #include "common/channel_layout.h"
 #include "common/codec_constants.h"
 #include "common/media_defs.h"
+#include "common/meta_data.h"
 #include "common/meta_data_utils.h"
+#include "libavutil/rational.h"
 
 namespace avp {
+
+static const AVRational kMicrosBase = {1, 1000000};
+
+int64_t ConvertFromTimeBase(const AVRational& time_base, int64_t pkt_pts) {
+  return av_rescale_q(pkt_pts, time_base, kMicrosBase);
+}
+
+int64_t ConvertToTimeBase(const AVRational& time_base, const int64_t time_us) {
+  return av_rescale_q(time_us, kMicrosBase, time_base);
+}
 
 void ffmpeg_log_default(void* p_unused,
                         int i_level,
@@ -281,6 +293,9 @@ void AVStreamToVideoMeta(const AVStream* videoStream,
     meta->setCString(kKeyMIMEType, mime);
   }
 
+  meta->setInt64(kKeyNumerator, videoStream->time_base.num);
+  meta->setInt64(kKeyDenominator, videoStream->time_base.den);
+
   meta->setInt32(kKeyCodecType,
                  CodecIDToAvpCodec(videoStream->codecpar->codec_id));
 
@@ -323,6 +338,7 @@ void AVStreamToVideoMeta(const AVStream* videoStream,
 void VideoFormatToAVCodecContext(const std::shared_ptr<Message>& format,
                                  AVCodecContext* codecContext) {
   codecContext->codec_type = AVMEDIA_TYPE_VIDEO;
+  codecContext->time_base = kMicrosBase;
 
   std::string mime;
   CHECK(format->findString("mime", mime));
@@ -413,14 +429,17 @@ void AudioFormatToAVCodecContext(const std::shared_ptr<Message>& format,
   }
 }
 
-std::shared_ptr<Buffer> createBufferFromAvPacket(AVPacket* pkt) {
+std::shared_ptr<Buffer> createBufferFromAvPacket(const AVPacket* pkt,
+                                                 const AVRational& time_base) {
   std::shared_ptr<Buffer> buffer = Buffer::CreateAsCopy(pkt->data, pkt->size);
-  buffer->meta()->setInt64("timeUs", pkt->pts);
+  buffer->meta()->setInt64("timeUs", ConvertFromTimeBase(time_base, pkt->pts));
 
   return buffer;
 }
 
-std::shared_ptr<Buffer> createAudioBufferFromAvFrame(AVFrame* frame) {
+std::shared_ptr<Buffer> createAudioBufferFromAvFrame(
+    const AVFrame* frame,
+    const AVRational& time_base) {
   int sampleSize =
       av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format));
   if (sampleSize < 0) {
@@ -441,12 +460,15 @@ std::shared_ptr<Buffer> createAudioBufferFromAvFrame(AVFrame* frame) {
     }
   }
   // hexdump(buffer->data(), 100);
-  buffer->meta()->setInt64("timeUs", frame->pts);
+  buffer->meta()->setInt64("timeUs",
+                           ConvertFromTimeBase(time_base, frame->pts));
 
   return buffer;
 }
 
-std::shared_ptr<Buffer> createVideoBufferFromAvFrame(AVFrame* frame) {
+std::shared_ptr<Buffer> createVideoBufferFromAvFrame(
+    const AVFrame* frame,
+    const AVRational& time_base) {
   // only support 420p and 422p now
   CHECK((frame->format == AV_PIX_FMT_YUV420P) ||
         (frame->format == AV_PIX_FMT_YUV422P));
@@ -463,7 +485,8 @@ std::shared_ptr<Buffer> createVideoBufferFromAvFrame(AVFrame* frame) {
   memcpy(buffer->data() + vOffset, frame->data[2],
          frame->linesize[0] * frame->height / 4);
 
-  buffer->meta()->setInt64("timeUs", frame->pts);
+  buffer->meta()->setInt64("timeUs",
+                           ConvertFromTimeBase(time_base, frame->pts));
   buffer->meta()->setInt32("width", frame->width);
   buffer->meta()->setInt32("height", frame->height);
   buffer->meta()->setInt32("stride", frame->linesize[0]);

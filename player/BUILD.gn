@@ -41,6 +41,8 @@ avp_library("avplayer") {
     "file_source.h",
     "generic_source.cc",
     "generic_source.h",
+    "media_clock.cc",
+    "media_clock.h",
     "packet_source.cc",
     "packet_source.h",
   ]

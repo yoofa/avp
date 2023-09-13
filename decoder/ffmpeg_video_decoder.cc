@@ -10,13 +10,25 @@
 #include "base/checks.h"
 #include "base/logging.h"
 #include "common/media_errors.h"
+#include "modules/ffmpeg/ffmpeg_helper.h"
 
 namespace avp {
 
 FFmpegVideoDecoder::FFmpegVideoDecoder(CodecType codecType)
     : FFmpegDecoder(false, codecType) {}
 
-FFmpegVideoDecoder::~FFmpegVideoDecoder() {}
+FFmpegVideoDecoder::~FFmpegVideoDecoder() {
+  if (mCodecContext) {
+    av_free(mCodecContext->extradata);
+    avcodec_close(mCodecContext);
+    av_free(mCodecContext);
+    mCodecContext = NULL;
+  }
+  if (mAvFrame) {
+    av_free(mAvFrame);
+    mAvFrame = NULL;
+  }
+}
 
 status_t FFmpegVideoDecoder::setVideoSink(
     std::shared_ptr<VideoSink> videoSink) {
@@ -42,6 +54,13 @@ status_t FFmpegVideoDecoder::configure(std::shared_ptr<Message> format) {
 
   VideoFormatToAVCodecContext(format, mCodecContext);
 
+  int64_t numeroator, denominator;
+  if (format->findInt64("numeroator", &numeroator) &&
+      format->findInt64("denominator", &denominator)) {
+    time_base().num = numeroator;
+    time_base().den = denominator;
+  }
+
   mCodecContext->error_concealment = FF_EC_GUESS_MVS | FF_EC_DEBLOCK;
   mCodecContext->err_recognition = AV_EF_CAREFUL;
   mCodecContext->thread_count = 2;
@@ -62,7 +81,7 @@ status_t FFmpegVideoDecoder::configure(std::shared_ptr<Message> format) {
   }
   avcodec_flush_buffers(mCodecContext);
 
-  mAvFrame = av_frame_alloc();
+  mAvFrame = mAvFramealloc();
 
   LOG(LS_INFO) << "codec open success";
 
@@ -79,6 +98,7 @@ status_t FFmpegVideoDecoder::DecodeToBuffers(
   int64_t timeUs;
 
   CHECK(in->meta()->findInt64("timeUs", &timeUs));
+
   std::shared_ptr<Buffer> nalBuffer = std::make_shared<Buffer>(in->size() + 4);
   memcpy(nalBuffer->data(), "\x00\x00\x00\x01", 4);
   memcpy(nalBuffer->data() + 4, in->data(), in->size());
@@ -88,10 +108,13 @@ status_t FFmpegVideoDecoder::DecodeToBuffers(
   packet.side_data = nullptr;
   packet.data = in->data();
   packet.size = in->size();
-  // hexdump(nalBuffer->data(), 100);
-  // av_packet_unref(&packet);
+  packet.pts = ConvertToTimeBase(time_base(), timeUs);
+  // LOG(LS_INFO) << "timeUs:" << timeUs << ",pts: " << packet.pts
+  //              << ",time base:" << time_base().num << "/" << time_base().den;
+  //   hexdump(nalBuffer->data(), 100);
+  //   av_packet_unref(&packet);
 
-  // av_frame_unref(mAvFrame);
+  // mAvFrameunref(mAvFrame);
 
   int gotFrame = 0;
   int ret = avcodec_send_packet(mCodecContext, &packet);
@@ -129,8 +152,13 @@ status_t FFmpegVideoDecoder::DecodeToBuffers(
     // LOG(LS_INFO) << "#################### got frame, res: [" <<
     // mAvFrame->width
     //             << "x" << mAvFrame->height << "], pts:" << mAvFrame->pts
+    //             << ",converted pts:"
+    //             << ConvertFromTimeBase(time_base(), mAvFrame->pts)
     //             << ", size: " << mAvFrame->pkt_size;
-    auto frame = createVideoBufferFromAvFrame(mAvFrame);
+    auto frame = createVideoBufferFromAvFrame(mAvFrame, time_base());
+    // int64_t time_us;
+    // CHECK(frame->meta()->findInt64("timeUs", &time_us));
+    // LOG(LS_INFO) << "after decode, ts:" << time_us;
     if (frame != nullptr) {
       out.push_back(frame);
     }

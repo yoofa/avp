@@ -290,8 +290,6 @@ void AvpDecoder::handleAnOutputBuffer() {
     }
     return;
   }
-  int64_t timeUs;
-  CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
 
   auto renderMsg =
       std::make_shared<Message>(kWhatRenderBuffer, shared_from_this());

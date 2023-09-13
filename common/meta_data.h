@@ -149,6 +149,10 @@ enum {
   kKeyMpeghReferenceChannelLayout = 'hrcl',  // int32_t
   kKeyMpeghCompatibleSets = 'hcos',          // raw data
 
+  // time base
+  kKeyNumerator = 'nume',    // int64_t
+  kKeyDenominator = 'deno',  // int64_t
+
   // If a MediaBuffer's data represents (at least partially) encrypted
   // data, the following fields aid in decryption.
   // The data can be thought of as pairs of plain and encrypted data

@@ -104,7 +104,8 @@ status_t FFmpegAudioDecoder::DecodeToBuffers(
     if (dataSize < 0) {
       return -1;
     }
-    auto frame = createAudioBufferFromAvFrame(mAvFrame);
+    auto frame =
+        createAudioBufferFromAvFrame(mAvFrame, mCodecContext->time_base);
     if (frame != nullptr) {
       out.push_back(frame);
     }

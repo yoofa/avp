@@ -42,7 +42,7 @@ class Looper : public std::enable_shared_from_this<Looper> {
   int32_t stop();
   void post(const std::shared_ptr<Message>& message, const int64_t delayUs);
 
-  int64_t getNowUs() {
+  static int64_t getNowUs() {
     auto systemClock = std::chrono::system_clock::now();
     return std::chrono::duration_cast<std::chrono::microseconds>(
                systemClock.time_since_epoch())
