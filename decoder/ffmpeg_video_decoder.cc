@@ -81,7 +81,7 @@ status_t FFmpegVideoDecoder::configure(std::shared_ptr<Message> format) {
   }
   avcodec_flush_buffers(mCodecContext);
 
-  mAvFrame = mAvFramealloc();
+  mAvFrame = av_frame_alloc();
 
   LOG(LS_INFO) << "codec open success";
 
