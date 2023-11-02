@@ -31,12 +31,14 @@ avp_common_inherited_config = avp_root + ":common_inherited_config"
 
 # Common configs to remove or add in all avp targets.
 avp_remove_configs = []
+avp_remove_configs += [ "//build/config/compiler:no_exceptions" ]
 
 if (is_clang) {
   avp_remove_configs += [ "//build/config/clang:find_bad_constructs" ]
 }
 avp_add_configs = avp_common_configs
 avp_add_configs += [ "//build/config/compiler:rtti" ]
+avp_add_configs += [ "//build/config/compiler:exceptions" ]
 
 avp_prod_configs = [ avp_root + ":avp_prod_config" ]
 
