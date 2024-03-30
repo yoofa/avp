@@ -11,6 +11,12 @@ vars = {
 }
 
 deps = {
+  # ave module
+  'src/base':
+    'https://github.com/yoofa/base.git@3f69082763375f50f401a19416cb3945ba21311b',
+  'src/media':
+    'https://github.com/yoofa/media_common.git@28f186f35d78a75a32069cfe03bb5cecf1ec3c4c',
+
   'src/build':
     'https://github.com/vsyf/chromium-build.git@cd64fac308aa1c466ab1f91bbe7fdb92f04d7822',
   'src/buildtools':
