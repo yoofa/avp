@@ -6,7 +6,7 @@
  */
 
 #include "base/logging.h"
-#include "common/utils.h"
+#include "media/utils.h"
 #include "player/player_interface.h"
 
 namespace avp {

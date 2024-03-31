@@ -14,12 +14,12 @@
 #include "base/errors.h"
 #include "base/logging.h"
 #include "base/unique_fd.h"
-#include "common/looper.h"
-#include "common/message.h"
+#include "media/looper.h"
+#include "media/message.h"
 #ifdef AVP_FFMPEG_DEMUXER
 #include "demuxer/ffmpeg_demuxer_factory.h"
 #endif
-#include "common/meta_data.h"
+#include "media/meta_data.h"
 #include "player/default_demuxer_factory.h"
 #include "player/file_source.h"
 

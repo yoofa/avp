@@ -10,9 +10,9 @@
 
 #include <memory>
 
-#include "common/handler.h"
-#include "common/looper.h"
-#include "common/message.h"
+#include "media/handler.h"
+#include "media/looper.h"
+#include "media/message.h"
 
 #include "base/system/avp_export.h"
 #include "player/audio_decoder.h"

@@ -16,7 +16,8 @@
 
 #include "base/logging.h"
 #include "base/utils.h"
-#include "common/buffer.h"
+
+#include "media/buffer.h"
 
 namespace avp {
 

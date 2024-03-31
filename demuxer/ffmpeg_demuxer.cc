@@ -12,7 +12,9 @@
 #include "base/checks.h"
 #include "base/hexdump.h"
 #include "base/logging.h"
-#include "common/utils.h"
+
+#include "media/utils.h"
+
 #include "player/data_source.h"
 #include "player/media_source.h"
 

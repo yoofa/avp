@@ -9,11 +9,13 @@
 #include "base/checks.h"
 #include "base/hexdump.h"
 #include "base/logging.h"
-#include "common/channel_layout.h"
-#include "common/codec_constants.h"
-#include "common/media_defs.h"
-#include "common/meta_data.h"
-#include "common/meta_data_utils.h"
+
+#include "media/channel_layout.h"
+#include "media/codec_constants.h"
+#include "media/media_defs.h"
+#include "media/meta_data.h"
+#include "media/meta_data_utils.h"
+
 #include "libavutil/rational.h"
 
 namespace avp {

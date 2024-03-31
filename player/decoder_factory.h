@@ -10,8 +10,8 @@
 
 #include <memory>
 
-#include "common/media_defs.h"
 #include "decoder.h"
+#include "media/media_defs.h"
 
 namespace avp {
 

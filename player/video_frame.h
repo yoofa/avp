@@ -8,7 +8,7 @@
 #ifndef VIDEO_FRAME_H
 #define VIDEO_FRAME_H
 
-#include "common/message.h"
+#include "media/message.h"
 
 namespace avp {
 class VideoFrame : public MessageObject {

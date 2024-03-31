@@ -15,7 +15,7 @@
 
 #include "base/constructor_magic.h"
 #include "base/types.h"
-#include "common/buffer.h"
+#include "media/buffer.h"
 #include "player/player_interface.h"
 
 namespace avp {

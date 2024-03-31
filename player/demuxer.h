@@ -11,7 +11,7 @@
 #include <memory>
 
 #include "base/types.h"
-#include "common/meta_data.h"
+#include "media/meta_data.h"
 #include "player/media_source.h"
 
 namespace avp {

@@ -13,9 +13,9 @@
 
 #include "base/errors.h"
 #include "base/unique_fd.h"
-#include "common/looper.h"
-#include "common/message.h"
-#include "common/meta_data.h"
+#include "media/looper.h"
+#include "media/message.h"
+#include "media/meta_data.h"
 #include "player/data_source.h"
 #include "player/demuxer_factory.h"
 #include "player/media_source.h"

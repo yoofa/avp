@@ -11,7 +11,8 @@
 
 #include <base/checks.h>
 #include <base/logging.h>
-#include <common/message.h>
+
+#include "media/message.h"
 
 namespace avp {
 

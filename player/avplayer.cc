@@ -11,7 +11,7 @@
 #include "base/checks.h"
 #include "base/errors.h"
 #include "base/logging.h"
-#include "common/message.h"
+#include "media/message.h"
 #include "player/default_Audio_decoder_factory.h"
 #include "player/default_video_decoder_factory.h"
 

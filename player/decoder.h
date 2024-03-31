@@ -11,7 +11,7 @@
 #include <memory>
 
 #include "base/errors.h"
-#include "common/message.h"
+#include "media/message.h"
 #include "player/video_sink.h"
 
 namespace avp {

@@ -12,10 +12,10 @@
 
 #include "base/constructor_magic.h"
 #include "base/errors.h"
-#include "common/buffer.h"
-#include "common/handler.h"
-#include "common/message.h"
-#include "common/meta_data.h"
+#include "media/buffer.h"
+#include "media/handler.h"
+#include "media/message.h"
+#include "media/meta_data.h"
 #include "player/audio_sink.h"
 #include "player/video_sink.h"
 

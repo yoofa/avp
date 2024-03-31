@@ -9,7 +9,7 @@
 
 #include "base/checks.h"
 #include "base/logging.h"
-#include "common/media_errors.h"
+#include "media/media_errors.h"
 #include "modules/ffmpeg/ffmpeg_helper.h"
 
 namespace avp {

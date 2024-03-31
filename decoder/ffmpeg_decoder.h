@@ -12,9 +12,9 @@
 #include <vector>
 
 #include "base/logging.h"
-#include "common/handler.h"
-#include "common/media_defs.h"
 #include "libavutil/rational.h"
+#include "media/handler.h"
+#include "media/media_defs.h"
 #include "modules/ffmpeg/ffmpeg_helper.h"
 #include "player/decoder.h"
 #include "player/video_frame.h"

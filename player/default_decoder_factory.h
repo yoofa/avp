@@ -8,7 +8,7 @@
 #ifndef DEFAULT_DECODER_FACTORY_H
 #define DEFAULT_DECODER_FACTORY_H
 
-#include "common/media_defs.h"
+#include "media/media_defs.h"
 #include "player/decoder.h"
 #include "player/decoder_factory.h"
 

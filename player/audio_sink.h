@@ -12,7 +12,7 @@
 
 #include "audio/audio_format.h"
 #include "audio/channel_layout.h"
-#include "common/message.h"
+#include "media/message.h"
 #include "player/audio_frame.h"
 
 namespace avp {

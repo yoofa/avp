@@ -8,7 +8,7 @@
 #ifndef AVP_DECODER_H
 #define AVP_DECODER_H
 
-#include "common/handler.h"
+#include "media/handler.h"
 #include "player/avp_render_synchronizer.h"
 #include "player/decoder.h"
 #include "player/decoder_factory.h"

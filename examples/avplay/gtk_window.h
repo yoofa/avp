@@ -12,8 +12,8 @@
 
 #include <gtk/gtk.h>
 
-#include "common/buffer.h"
-#include "common/message.h"
+#include "media/buffer.h"
+#include "media/message.h"
 #include "player/video_sink.h"
 
 class GtkWnd {

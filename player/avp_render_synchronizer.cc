@@ -10,7 +10,7 @@
 #include "base/checks.h"
 #include "base/errors.h"
 #include "base/logging.h"
-#include "common/buffer.h"
+#include "media/buffer.h"
 
 namespace avp {
 

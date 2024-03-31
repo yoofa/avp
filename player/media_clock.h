@@ -13,7 +13,7 @@
 #include <mutex>
 
 #include "base/constructor_magic.h"
-#include "common/handler.h"
+#include "media/handler.h"
 
 namespace avp {
 

@@ -10,9 +10,9 @@
 
 #include "base/checks.h"
 #include "base/logging.h"
-#include "common/media_defs.h"
-#include "common/media_errors.h"
-#include "common/message.h"
+#include "media/media_defs.h"
+#include "media/media_errors.h"
+#include "media/message.h"
 #include "player/default_decoder_factory.h"
 
 #ifdef AVP_FFMPEG_DECODER
