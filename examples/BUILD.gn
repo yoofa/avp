@@ -4,7 +4,7 @@ group("examples") {
   public_deps = [ ":avplay" ]
 }
 
-avp_executable("avplay") {
+ave_executable("avplay") {
   sources = [
     "avplay/av_play.cc",
     "avplay/av_play.h",
@@ -20,7 +20,7 @@ avp_executable("avplay") {
   deps += [ "//build/config/linux/gtk" ]
 }
 
-avp_library("gtk_window") {
+ave_library("gtk_window") {
   sources = [
     "avplay/gtk_window.cc",
     "avplay/gtk_window.h",
@@ -29,7 +29,7 @@ avp_library("gtk_window") {
 
   deps = [
     "../base:logging",
-    "../common:foundation",
+    "../media:foundation",
     "../player:avplayer",
     "../player:player_interface",
     "//third_party/libyuv",
@@ -38,7 +38,7 @@ avp_library("gtk_window") {
   deps += [ "//build/config/linux/gtk" ]
 }
 
-avp_library("video_file_render") {
+ave_library("video_file_render") {
   sources = [
     "VideoFileRender.cc",
     "VideoFileRender.h",
@@ -46,12 +46,12 @@ avp_library("video_file_render") {
 
   deps = [
     "../base:logging",
-    "../common:foundation",
+    "../media:foundation",
     "../player:avplayer",
     "../player:player_interface",
   ]
 }
-avp_library("audio_file_render") {
+ave_library("audio_file_render") {
   sources = [
     "AudioFileRender.cc",
     "AudioFileRender.h",
@@ -59,7 +59,7 @@ avp_library("audio_file_render") {
 
   deps = [
     "../base:logging",
-    "../common:foundation",
+    "../media:foundation",
     "../player:avplayer",
     "../player:player_interface",
   ]

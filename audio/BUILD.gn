@@ -1,7 +1,7 @@
 group("audio") {
 }
 
-avp_library("audio_base") {
+ave_library("audio_base") {
   visibility = [ "*" ]
   sources = [
     "audio_format.h",

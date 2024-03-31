@@ -4,7 +4,7 @@ group("player") {
   deps = [ ":avplayer" ]
 }
 
-avp_library("player_interface") {
+ave_library("player_interface") {
   sources = [
     "audio_frame.cc",
     "audio_frame.h",
@@ -25,7 +25,7 @@ avp_library("player_interface") {
   deps = [ "../base:utils" ]
 }
 
-avp_library("avplayer") {
+ave_library("avplayer") {
   sources = [
     "avp_decoder.cc",
     "avp_decoder.h",
@@ -52,7 +52,7 @@ avp_library("avplayer") {
     "../base:logging",
     "../base:utils",
     "../base/system:avp_export",
-    "../common:foundation",
+    "../media:foundation",
   ]
 
   deps += [ "../demuxer:ffmpeg_demuxer" ]

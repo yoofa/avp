@@ -58,7 +58,7 @@ config("common_config") {
   defines = []
 }
 
-avp_static_library("avp") {
+ave_static_library("avp") {
   sources = []
 
   complete_static_lib = true
@@ -68,7 +68,7 @@ avp_static_library("avp") {
 
   deps += [
     "base",
-    "common",
+    "media",
     "player",
   ]
 

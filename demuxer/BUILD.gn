@@ -3,7 +3,7 @@ import("//avp.gni")
 group("demuxer") {
 }
 
-avp_library("ffmpeg_demuxer") {
+ave_library("ffmpeg_demuxer") {
   sources = [
     "ffmpeg_demuxer.cc",
     "ffmpeg_demuxer.h",
