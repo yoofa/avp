@@ -11,6 +11,9 @@
 #include "media/message.h"
 
 namespace avp {
+
+using ave::MessageObject;
+
 class VideoFrame : public MessageObject {
  public:
   VideoFrame();

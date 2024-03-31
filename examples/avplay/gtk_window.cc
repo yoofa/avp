@@ -81,11 +81,11 @@ void GtkWnd::addVideoRender() {
 }
 
 void GtkWnd::onDestroyed(GtkWidget* widget) {
-  LOG(avp::LS_INFO) << "onDestroyed";
+  AVE_LOG(ave::LS_INFO) << "onDestroyed";
 }
 
 void GtkWnd::onKeyPress(GtkWidget* widget, GdkEventKey* key) {
-  LOG(avp::LS_INFO) << "onKeyPress, type:" << key->type;
+  AVE_LOG(ave::LS_INFO) << "onKeyPress, type:" << key->type;
 }
 
 void GtkWnd::onClicked(GtkWidget* widget) {}
@@ -151,13 +151,13 @@ GtkWnd::GtkVideoRender::GtkVideoRender(GtkWnd* window) : mGtkWnd(window) {}
 
 GtkWnd::GtkVideoRender::~GtkVideoRender() {}
 
-void GtkWnd::GtkVideoRender::onFrame(std::shared_ptr<avp::Buffer>& frame) {
+void GtkWnd::GtkVideoRender::onFrame(std::shared_ptr<ave::Buffer>& frame) {
   int32_t width;
-  CHECK(frame->meta()->findInt32("width", &width));
+  AVE_CHECK(frame->meta()->findInt32("width", &width));
   int32_t height;
-  CHECK(frame->meta()->findInt32("height", &height));
+  AVE_CHECK(frame->meta()->findInt32("height", &height));
   int32_t stride;
-  CHECK(frame->meta()->findInt32("stride", &stride));
+  AVE_CHECK(frame->meta()->findInt32("stride", &stride));
 
   setSize(width, height);
 

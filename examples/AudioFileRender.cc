@@ -26,7 +26,8 @@ AudioFileRender::AudioFileRender(const char* file) : mFd(-1) {
   if (mFd >= 0) {
     lseek64(mFd, 0, SEEK_END);
   } else {
-    LOG(LS_ERROR) << "Failed to open file" << file << ". " << strerror(errno);
+    AVE_LOG(LS_ERROR) << "Failed to open file" << file << ". "
+                      << strerror(errno);
   }
 }
 
@@ -40,7 +41,8 @@ AudioFileRender::~AudioFileRender() {
 void AudioFileRender::onFrame(std::shared_ptr<Buffer>& frame) {
   int64_t timeUs;
   frame->meta()->findInt64("timeUs", &timeUs);
-  // LOG(LS_INFO) << "onFrame, pts: " << timeUs << ", size:" << frame->size();
+  // AVE_LOG(LS_INFO) << "onFrame, pts: " << timeUs << ", size:" <<
+  // frame->size();
   ::write(mFd, frame->data(), frame->size());
 }
 

@@ -114,7 +114,7 @@ status_t AvPlayer::setDataSource(const char* url) {
     if (err == OK) {
       source = std::move(genericSource);
     } else {
-      LOG(LS_ERROR) << "setDataSource (" << url << ") error";
+      AVE_LOG(LS_ERROR) << "setDataSource (" << url << ") error";
     }
   }
 
@@ -220,8 +220,8 @@ status_t AvPlayer::instantiateDecoder(bool audio,
   }
 
   std::string mime;
-  CHECK(format->findString("mime", mime));
-  LOG(LS_INFO) << "instantiateDecoder mime: " << mime;
+  AVE_CHECK(format->findString("mime", mime));
+  AVE_LOG(LS_INFO) << "instantiateDecoder mime: " << mime;
 
   if (audio) {
     auto notify =
@@ -246,7 +246,7 @@ status_t AvPlayer::instantiateDecoder(bool audio,
 ///////////////////////////////////////////
 
 void AvPlayer::onStart(int64_t startUs, SeekMode seekMode) {
-  LOG(LS_INFO) << "onStart";
+  AVE_LOG(LS_INFO) << "onStart";
   if (!mSourceStarted) {
     mSource->start();
     mSourceStarted = true;
@@ -284,15 +284,15 @@ void AvPlayer::performReset() {
 
 void AvPlayer::onSourceNotify(const std::shared_ptr<Message>& msg) {
   int32_t what;
-  CHECK(msg->findInt32("what", &what));
+  AVE_CHECK(msg->findInt32("what", &what));
   switch (what) {
     case ContentSource::kWhatPrepared: {
-      LOG(LS_INFO) << "source prepared: " << mSource.get();
+      AVE_LOG(LS_INFO) << "source prepared: " << mSource.get();
       if (mSource.get() == nullptr) {
         return;
       }
       int32_t err;
-      CHECK(msg->findInt32("err", &err));
+      AVE_CHECK(msg->findInt32("err", &err));
       if (err != OK) {
       } else {
         mPrepared = true;
@@ -309,7 +309,7 @@ void AvPlayer::onSourceNotify(const std::shared_ptr<Message>& msg) {
 }
 void AvPlayer::onDecoderNotify(const std::shared_ptr<Message>& msg) {
   int32_t what;
-  CHECK(msg->findInt32("what", &what));
+  AVE_CHECK(msg->findInt32("what", &what));
   switch (what) {
     case AvpDecoder::kWhatInputDiscontinuity: {
       break;
@@ -340,7 +340,7 @@ void AvPlayer::onDecoderNotify(const std::shared_ptr<Message>& msg) {
 void AvPlayer::onRenderNotify(const std::shared_ptr<Message>& msg) {}
 
 void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
-  LOG(LS_DEBUG) << "AvPlayer::onMessageReceived:" << message->what();
+  AVE_LOG(LS_DEBUG) << "AvPlayer::onMessageReceived:" << message->what();
   switch (message->what()) {
       /************* from avplayer ***************/
     case kWhatSetDataSource: {
@@ -378,7 +378,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
     }
 
     case kWhatScanSources: {
-      LOG(LS_INFO) << "kWhatScanSources";
+      AVE_LOG(LS_INFO) << "kWhatScanSources";
       mScanSourcesPendding = false;
 
       bool rescan = false;

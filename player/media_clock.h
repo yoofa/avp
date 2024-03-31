@@ -17,6 +17,10 @@
 
 namespace avp {
 
+using ave::Handler;
+using ave::Looper;
+using ave::Message;
+
 class MediaClock : public Handler {
  public:
   enum {
@@ -111,7 +115,7 @@ class MediaClock : public Handler {
   std::list<Timer> mTimers;
   std::shared_ptr<Message> mNotify;
 
-  AVP_DISALLOW_COPY_AND_ASSIGN(MediaClock);
+  AVE_DISALLOW_COPY_AND_ASSIGN(MediaClock);
 };
 
 }  // namespace avp

@@ -8,10 +8,11 @@
 #ifndef AUDIO_DECODER_H
 #define AUDIO_DECODER_H
 
-#include "base/system/avp_export.h"
+#include "base/system/ave_export.h"
 
 namespace avp {
-AVP_EXPORT class AudioDecoder {
+
+AVE_EXPORT class AudioDecoder {
  protected:
   AudioDecoder() = delete;
   virtual ~AudioDecoder() = delete;

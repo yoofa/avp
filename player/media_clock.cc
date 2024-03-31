@@ -77,7 +77,7 @@ void MediaClock::updateAnchor(int64_t anchorTimeMediaUs,
                               int64_t anchorTimeRealUs,
                               int64_t maxTimeMediaUs) {
   if (anchorTimeMediaUs < 0 || anchorTimeRealUs < 0) {
-    LOG(LS_WARNING) << "reject anchor time since it is negative.";
+    AVE_LOG(LS_WARNING) << "reject anchor time since it is negative.";
     return;
   }
 
@@ -86,7 +86,7 @@ void MediaClock::updateAnchor(int64_t anchorTimeMediaUs,
   int64_t nowMediaUs =
       anchorTimeMediaUs + (nowUs - anchorTimeRealUs) * (double)mPlaybackRate;
   if (nowMediaUs < 0) {
-    LOG(LS_WARNING)
+    AVE_LOG(LS_WARNING)
         << "reject anchor time since it leads to negative media time.";
     return;
   }
@@ -114,7 +114,7 @@ void MediaClock::updateMaxTimeMedia(int64_t maxTimeMediaUs) {
 }
 
 void MediaClock::setPlaybackRate(float rate) {
-  CHECK_GE(rate, 0.0);
+  AVE_CHECK_GE(rate, 0.0);
   std::lock_guard<std::mutex> l(mLock);
   if (mAnchorTimeRealUs == -1) {
     mPlaybackRate = rate;
@@ -125,7 +125,8 @@ void MediaClock::setPlaybackRate(float rate) {
   int64_t nowMediaUs =
       mAnchorTimeMediaUs + (nowUs - mAnchorTimeRealUs) * (double)mPlaybackRate;
   if (nowMediaUs < 0) {
-    LOG(LS_WARNING) << "setRate: anchor time should not be negative, set to 0.";
+    AVE_LOG(LS_WARNING)
+        << "setRate: anchor time should not be negative, set to 0.";
     nowMediaUs = 0;
   }
   updateAnchorTimesAndPlaybackRate_l(nowMediaUs, nowUs, rate);
@@ -232,7 +233,7 @@ void MediaClock::onMessageReceived(const std::shared_ptr<Message>& msg) {
   switch (msg->what()) {
     case kWhatTimeIsUp: {
       int32_t generation;
-      CHECK(msg->findInt32("generation", &generation));
+      AVE_CHECK(msg->findInt32("generation", &generation));
 
       std::lock_guard<std::mutex> l(mLock);
       if (generation != mGeneration) {

@@ -22,7 +22,7 @@ class GtkWnd {
    public:
     GtkVideoRender(GtkWnd* window);
     virtual ~GtkVideoRender();
-    void onFrame(std::shared_ptr<avp::Buffer>& frame) override;
+    void onFrame(std::shared_ptr<ave::Buffer>& frame) override;
     const uint8_t* image() const { return mImage.get(); }
 
     int width() const { return mWidth; }

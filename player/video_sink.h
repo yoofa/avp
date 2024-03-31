@@ -15,6 +15,8 @@
 
 namespace avp {
 
+using ave::Buffer;
+
 class VideoSink : public MessageObject {
  public:
   VideoSink() = default;

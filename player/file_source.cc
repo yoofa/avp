@@ -24,21 +24,21 @@ FileSource::FileSource(const char* filename)
   if (filename) {
     mName = std::string("FileSource(") + filename + ")";
   }
-  LOG(LS_VERBOSE) << mName;
+  AVE_LOG(LS_VERBOSE) << mName;
   mFd = open(filename, O_LARGEFILE | O_RDONLY);
 
   if (mFd >= 0) {
     mLength = lseek64(mFd, 0, SEEK_END);
   } else {
-    LOG(LS_ERROR) << "Failed to open file" << filename << ". "
-                  << strerror(errno);
+    AVE_LOG(LS_ERROR) << "Failed to open file" << filename << ". "
+                      << strerror(errno);
   }
 }
 
 FileSource::FileSource(int fd, int64_t offset, int64_t length)
     : mFd(fd), mStartOffset(offset), mLength(length), mName("<null>") {
-  LOG(LS_VERBOSE) << "fd=" << fd << ", offset=" << offset
-                  << ", length=" << length;
+  AVE_LOG(LS_VERBOSE) << "fd=" << fd << ", offset=" << offset
+                      << ", length=" << length;
 
   if (mStartOffset < 0) {
     mStartOffset = 0;
@@ -60,8 +60,8 @@ FileSource::FileSource(int fd, int64_t offset, int64_t length)
     }
   }
   if (mStartOffset != offset || mLength != length) {
-    LOG(LS_WARNING) << "offset/length adjusted from" << offset << "/" << length
-                    << " to " << mStartOffset << "/" << mLength;
+    AVE_LOG(LS_WARNING) << "offset/length adjusted from" << offset << "/"
+                        << length << " to " << mStartOffset << "/" << mLength;
   }
 
   mName = std::string("FileSource(fd(") + nameForFd(fd).c_str() + "), " +

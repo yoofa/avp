@@ -14,7 +14,7 @@
 #include "media/looper.h"
 #include "media/message.h"
 
-#include "base/system/avp_export.h"
+#include "base/system/ave_export.h"
 #include "player/audio_decoder.h"
 #include "player/audio_decoder_factory.h"
 #include "player/audio_sink.h"
@@ -29,7 +29,7 @@
 #include "player/video_sink.h"
 
 namespace avp {
-AVP_EXPORT class AvPlayer : public PlayerBase, public Handler {
+AVE_EXPORT class AvPlayer : public PlayerBase, public ave::Handler {
  public:
   AvPlayer();
   virtual ~AvPlayer() override;

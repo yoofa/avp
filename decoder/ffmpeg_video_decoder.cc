@@ -47,7 +47,7 @@ status_t FFmpegVideoDecoder::configure(std::shared_ptr<Message> format) {
   void* iterate_data = nullptr;
   const AVCodec* tCodec = av_codec_iterate(&iterate_data);
   while (tCodec != nullptr) {
-    LOG(LS_INFO) << "##### tCodec.name:" << tCodec->name;
+    AVE_LOG(LS_INFO) << "##### tCodec.name:" << tCodec->name;
     tCodec = av_codec_iterate(&iterate_data);
   }
 #endif
@@ -76,14 +76,14 @@ status_t FFmpegVideoDecoder::configure(std::shared_ptr<Message> format) {
 
   int32_t err = avcodec_open2(mCodecContext, codec, nullptr);
   if (err < 0) {
-    LOG(LS_ERROR) << "avcodec open failed :" << err;
+    AVE_LOG(LS_ERROR) << "avcodec open failed :" << err;
     return UNKNOWN_ERROR;
   }
   avcodec_flush_buffers(mCodecContext);
 
   mAvFrame = av_frame_alloc();
 
-  LOG(LS_INFO) << "codec open success";
+  AVE_LOG(LS_INFO) << "codec open success";
 
   return OK;
 }
@@ -97,7 +97,7 @@ status_t FFmpegVideoDecoder::DecodeToBuffers(
     std::vector<std::shared_ptr<Buffer>>& out) {
   int64_t timeUs;
 
-  CHECK(in->meta()->findInt64("timeUs", &timeUs));
+  AVE_CHECK(in->meta()->findInt64("timeUs", &timeUs));
 
   std::shared_ptr<Buffer> nalBuffer = std::make_shared<Buffer>(in->size() + 4);
   memcpy(nalBuffer->data(), "\x00\x00\x00\x01", 4);
@@ -109,7 +109,7 @@ status_t FFmpegVideoDecoder::DecodeToBuffers(
   packet.data = in->data();
   packet.size = in->size();
   packet.pts = ConvertToTimeBase(time_base(), timeUs);
-  // LOG(LS_INFO) << "timeUs:" << timeUs << ",pts: " << packet.pts
+  // AVE_LOG(LS_INFO) << "timeUs:" << timeUs << ",pts: " << packet.pts
   //              << ",time base:" << time_base().num << "/" << time_base().den;
   //   hexdump(nalBuffer->data(), 100);
   //   av_packet_unref(&packet);
@@ -134,22 +134,23 @@ status_t FFmpegVideoDecoder::DecodeToBuffers(
     }
 
     if (ret < 0) {
-      LOG(LS_INFO) << "error decoding a video frame with timestamp " << timeUs;
+      AVE_LOG(LS_INFO) << "error decoding a video frame with timestamp "
+                       << timeUs;
       continue;
     }
 
     if (!mAvFrame->data[0] || !mAvFrame->data[1] || !mAvFrame->data[2]) {
-      LOG(LS_ERROR)
+      AVE_LOG(LS_ERROR)
           << "Video frame was produced yet has invalid frame data. and err:"
           << ret;
       continue;
     }
 
     // if (!mAvFrame->opaque) {
-    //  LOG(LS_ERROR) << "VideoFrame object associated with frame data not
+    //  AVE_LOG(LS_ERROR) << "VideoFrame object associated with frame data not
     //  set."; return ret;
     //}
-    // LOG(LS_INFO) << "#################### got frame, res: [" <<
+    // AVE_LOG(LS_INFO) << "#################### got frame, res: [" <<
     // mAvFrame->width
     //             << "x" << mAvFrame->height << "], pts:" << mAvFrame->pts
     //             << ",converted pts:"
@@ -157,8 +158,8 @@ status_t FFmpegVideoDecoder::DecodeToBuffers(
     //             << ", size: " << mAvFrame->pkt_size;
     auto frame = createVideoBufferFromAvFrame(mAvFrame, time_base());
     // int64_t time_us;
-    // CHECK(frame->meta()->findInt64("timeUs", &time_us));
-    // LOG(LS_INFO) << "after decode, ts:" << time_us;
+    // AVE_CHECK(frame->meta()->findInt64("timeUs", &time_us));
+    // AVE_LOG(LS_INFO) << "after decode, ts:" << time_us;
     if (frame != nullptr) {
       out.push_back(frame);
     }

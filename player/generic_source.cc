@@ -51,7 +51,7 @@ status_t GenericSource::setDataSource(const char* url) {
 }
 status_t GenericSource::setDataSource(int fd, int64_t offset, int64_t length) {
   std::lock_guard<std::mutex> lock(mLock);
-  LOG(LS_VERBOSE) << "setDataSource";
+  AVE_LOG(LS_VERBOSE) << "setDataSource";
   resetDataSource();
 
   mFd.reset(dup(fd));
@@ -78,7 +78,7 @@ void GenericSource::pause() {}
 void GenericSource::resume() {}
 
 status_t GenericSource::seekTo(int64_t seekTimeUs, SeekMode mode) {
-  LOG(LS_VERBOSE) << "seekTo: " << seekTimeUs << ", mode: " << mode;
+  AVE_LOG(LS_VERBOSE) << "seekTo: " << seekTimeUs << ", mode: " << mode;
   auto msg = std::make_shared<Message>(kWhatSeek, shared_from_this());
   msg->setInt64("seekTimeUs", seekTimeUs);
   msg->setInt32("mode", mode);
@@ -86,7 +86,7 @@ status_t GenericSource::seekTo(int64_t seekTimeUs, SeekMode mode) {
   std::shared_ptr<Message> response;
   status_t err = msg->postAndWaitResponse(response);
   if (err == OK && response.get() != nullptr) {
-    CHECK(response->findInt32("err", &err));
+    AVE_CHECK(response->findInt32("err", &err));
   }
   return err;
 }
@@ -133,7 +133,7 @@ status_t GenericSource::dequeueAccessUnit(bool audio,
   }
 
   int64_t timeUs;
-  CHECK(accessUnit->meta()->findInt64("timeUs", &timeUs));
+  AVE_CHECK(accessUnit->meta()->findInt64("timeUs", &timeUs));
 
   // TODO(youfa) fetch subtitle data with timeUs
 
@@ -163,12 +163,12 @@ status_t GenericSource::selectTrack(size_t trackIndex, bool select) const {
 
 /***************************************/
 status_t GenericSource::initFromDataSource() {
-  LOG(LS_INFO) << "GenericSource::initFromDataSource";
+  AVE_LOG(LS_INFO) << "GenericSource::initFromDataSource";
 
   std::shared_ptr<DataSource> datasource;
   datasource = mDataSource;
 
-  CHECK(datasource.get() != nullptr);
+  AVE_CHECK(datasource.get() != nullptr);
 
   mLock.unlock();
   mDemuxer = mDemuxerFactory->createDemuxer(datasource);
@@ -191,7 +191,7 @@ status_t GenericSource::initFromDataSource() {
 
   size_t numTracks = mDemuxer->getTrackCount();
   if (numTracks == 0) {
-    LOG(LS_ERROR) << "initFromDataSource, source has no track!";
+    AVE_LOG(LS_ERROR) << "initFromDataSource, source has no track!";
     return UNKNOWN_ERROR;
   }
 
@@ -206,13 +206,13 @@ status_t GenericSource::initFromDataSource() {
     std::shared_ptr<MetaData> meta;
     mDemuxer->getTrackMeta(meta, i);
     if (!meta.get()) {
-      LOG(LS_ERROR) << "no metadata for track " << i;
+      AVE_LOG(LS_ERROR) << "no metadata for track " << i;
       return UNKNOWN_ERROR;
     }
 
     const char* mime;
-    CHECK(meta->findCString(kKeyMIMEType, &mime));
-    LOG(LS_VERBOSE) << "initFromDataSource track[" << i << "]: " << mime;
+    AVE_CHECK(meta->findCString(kKeyMIMEType, &mime));
+    AVE_LOG(LS_VERBOSE) << "initFromDataSource track[" << i << "]: " << mime;
 
     if (!strncasecmp(mime, "audio/", 6) && !mAudioTrack.mSource.get()) {
       mAudioTrack.mIndex = i;
@@ -242,8 +242,8 @@ status_t GenericSource::initFromDataSource() {
 
   mBitrate = totalBitrate;
 
-  LOG(LS_VERBOSE) << "initFromDataSource done. mSources.size: "
-                  << mSources.size();
+  AVE_LOG(LS_VERBOSE) << "initFromDataSource done. mSources.size: "
+                      << mSources.size();
 
   if (mSources.size() == 0) {
     return UNKNOWN_ERROR;
@@ -257,7 +257,7 @@ void GenericSource::onPrepare() {
   if (mDataSource == nullptr) {
     if (!mUri.empty()) {
       const char* uri = mUri.c_str();
-      LOG(LS_INFO) << "onPrepare, uri (" << uri << ")";
+      AVE_LOG(LS_INFO) << "onPrepare, uri (" << uri << ")";
       if (!strncasecmp("file://", uri, 7)) {
         auto fileSource = std::make_shared<FileSource>(mUri.substr(7).c_str());
         if (fileSource->initCheck() == OK) {
@@ -273,7 +273,7 @@ void GenericSource::onPrepare() {
     }
 
     if (mDataSource == nullptr) {
-      LOG(LS_ERROR) << "Failed to create DataSource";
+      AVE_LOG(LS_ERROR) << "Failed to create DataSource";
       notifyPreparedAndCleanup(UNKNOWN_ERROR);
       return;
     }
@@ -290,7 +290,7 @@ void GenericSource::onPrepare() {
 }
 
 void GenericSource::finishPrepare() {
-  LOG(LS_VERBOSE) << "finishPrepare";
+  AVE_LOG(LS_VERBOSE) << "finishPrepare";
   status_t err = startSources();
   if (err != OK) {
     notifyPreparedAndCleanup(err);
@@ -312,13 +312,13 @@ void GenericSource::finishPrepare() {
 status_t GenericSource::startSources() {
   if (mAudioTrack.mSource.get() != nullptr &&
       mAudioTrack.mSource->start() != OK) {
-    LOG(LS_ERROR) << "failed to start audio track!";
+    AVE_LOG(LS_ERROR) << "failed to start audio track!";
     return UNKNOWN_ERROR;
   }
 
   if (mVideoTrack.mSource.get() != nullptr &&
       mVideoTrack.mSource->start() != OK) {
-    LOG(LS_ERROR) << "failed to start video track!";
+    AVE_LOG(LS_ERROR) << "failed to start video track!";
     return UNKNOWN_ERROR;
   }
 
@@ -345,7 +345,7 @@ void GenericSource::postReadBuffer(media_track_type trackType) {
 
 void GenericSource::onReadBuffer(const std::shared_ptr<Message>& msg) {
   int32_t tmpType;
-  CHECK(msg->findInt32("trackType", &tmpType));
+  AVE_CHECK(msg->findInt32("trackType", &tmpType));
   media_track_type trackType = (media_track_type)tmpType;
   mPendingReadBufferTypes &= ~(1 << trackType);
   readBuffer(trackType);
@@ -403,7 +403,7 @@ void GenericSource::readBuffer(media_track_type trackType,
     // will unlock later, add reference
     std::shared_ptr<MediaSource> source = track->mSource;
 
-    //    LOG(LS_INFO) << "before read type:" << trackType;
+    //    AVE_LOG(LS_INFO) << "before read type:" << trackType;
     mLock.unlock();
     if (couldReadMultiple) {
       err = source->readMultiple(mediaBuffers, maxBuffers - numBuffer,
@@ -416,7 +416,7 @@ void GenericSource::readBuffer(media_track_type trackType,
       }
     }
     mLock.lock();
-    //    LOG(LS_INFO) << "after read" << trackType;
+    //    AVE_LOG(LS_INFO) << "after read" << trackType;
 
     // maybe reset, return;
     if (!track->mPacketSource.get()) {
@@ -477,15 +477,15 @@ void GenericSource::onMessageReceived(const std::shared_ptr<Message>& msg) {
     case kWhatSeek: {
       int64_t seekTimeUs;
       int32_t mode;
-      CHECK(msg->findInt64("seekTimeUs", &seekTimeUs));
-      CHECK(msg->findInt32("mode", &mode));
+      AVE_CHECK(msg->findInt64("seekTimeUs", &seekTimeUs));
+      AVE_CHECK(msg->findInt32("mode", &mode));
 
       std::shared_ptr<Message> response = std::make_shared<Message>();
       status_t err = doSeek(seekTimeUs, static_cast<SeekMode>(mode));
       response->setInt32("err", err);
 
       std::shared_ptr<ReplyToken> replyID;
-      CHECK(msg->senderAwaitsResponse(replyID));
+      AVE_CHECK(msg->senderAwaitsResponse(replyID));
       response->postReply(replyID);
 
       break;

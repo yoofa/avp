@@ -37,7 +37,7 @@ void ffmpeg_log_default(void* p_unused,
   char buf[4096];
   int length = vsnprintf(buf, sizeof(buf), psz_fmt, arg);
   if (length) {
-    LOG(avp::LS_ERROR) << "ffmpeg log:" << buf;
+    AVE_LOG(avp::LS_ERROR) << "ffmpeg log:" << buf;
   }
 }
 
@@ -182,7 +182,7 @@ int32_t pixelFormatToColorFormat(int32_t pixelFormat) {
     case AV_PIX_FMT_YUV422P:
       return COLOR_FormatYUV422Planar;
     default:
-      LOG(LS_ERROR) << "Unsupported PixelFormat: " << pixelFormat;
+      AVE_LOG(LS_ERROR) << "Unsupported PixelFormat: " << pixelFormat;
   }
   return -1;
 }
@@ -194,7 +194,7 @@ AVPixelFormat colorFormatToPixelFormat(int32_t colorFormat) {
     case COLOR_FormatYUV422Planar:
       return AV_PIX_FMT_YUV422P;
     default:
-      LOG(LS_ERROR) << "Unsupported PixelFormat: " << colorFormat;
+      AVE_LOG(LS_ERROR) << "Unsupported PixelFormat: " << colorFormat;
   }
   return AV_PIX_FMT_NONE;
 }
@@ -238,19 +238,19 @@ ChannelLayout ChannelLayoutToAvpChannelLayout(int64_t layout, int channels) {
         return CHANNEL_LAYOUT_MONO;
       if (channels == 2)
         return CHANNEL_LAYOUT_STEREO;
-      LOG(LS_DEBUG) << "Unsupported channel layout: " << layout;
+      AVE_LOG(LS_DEBUG) << "Unsupported channel layout: " << layout;
   }
   return CHANNEL_LAYOUT_UNSUPPORTED;
 }
 
 void AVStreamToAudioMeta(const AVStream* audioStream,
                          std::shared_ptr<MetaData>& meta) {
-  CHECK_NE(audioStream, nullptr);
-  CHECK_EQ(audioStream->codecpar->codec_type, AVMEDIA_TYPE_AUDIO);
+  AVE_CHECK_NE(audioStream, nullptr);
+  AVE_CHECK_EQ(audioStream->codecpar->codec_type, AVMEDIA_TYPE_AUDIO);
 
   meta->clear();
 
-  LOG(LS_INFO) << "audio codec id:" << audioStream->codecpar->codec_id;
+  AVE_LOG(LS_INFO) << "audio codec id:" << audioStream->codecpar->codec_id;
   const char* mime = AudioCodecId2Mime(audioStream->codecpar->codec_id);
   if (mime != nullptr) {
     meta->setCString(kKeyMIMEType, mime);
@@ -272,8 +272,8 @@ void AVStreamToAudioMeta(const AVStream* audioStream,
                                       audioStream->codecpar->channels));
 
   int32_t bitsPerSample = audioStream->codecpar->bits_per_coded_sample;
-  LOG(LS_INFO) << "bitsPerSample:" << bitsPerSample
-               << ", raw:" << audioStream->codecpar->bits_per_raw_sample;
+  AVE_LOG(LS_INFO) << "bitsPerSample:" << bitsPerSample
+                   << ", raw:" << audioStream->codecpar->bits_per_raw_sample;
   if (bitsPerSample > 0) {
     meta->setInt32(kKeyBitsPerSample, bitsPerSample);
   }
@@ -286,8 +286,8 @@ void AVStreamToAudioMeta(const AVStream* audioStream,
 
 void AVStreamToVideoMeta(const AVStream* videoStream,
                          std::shared_ptr<MetaData>& meta) {
-  CHECK_NE(videoStream, nullptr);
-  CHECK_EQ(videoStream->codecpar->codec_type, AVMEDIA_TYPE_VIDEO);
+  AVE_CHECK_NE(videoStream, nullptr);
+  AVE_CHECK_EQ(videoStream->codecpar->codec_type, AVMEDIA_TYPE_VIDEO);
   meta->clear();
 
   const char* mime = VideoCodecId2Mime(videoStream->codecpar->codec_id);
@@ -310,8 +310,8 @@ void AVStreamToVideoMeta(const AVStream* videoStream,
     aspectRatio = videoStream->codecpar->sample_aspect_ratio;
   }
 
-  LOG(LS_INFO) << "Video Meta, extra:" << videoStream->codecpar->extradata
-               << ", size:" << videoStream->codecpar->extradata_size;
+  AVE_LOG(LS_INFO) << "Video Meta, extra:" << videoStream->codecpar->extradata
+                   << ", size:" << videoStream->codecpar->extradata_size;
 
   int32_t profile = videoStream->codecpar->profile;
   if (profile > 0) {
@@ -327,8 +327,8 @@ void AVStreamToVideoMeta(const AVStream* videoStream,
   }
 
   if (videoStream->codecpar->extradata) {
-    LOG(LS_INFO) << "### extradata size:"
-                 << videoStream->codecpar->extradata_size;
+    AVE_LOG(LS_INFO) << "### extradata size:"
+                     << videoStream->codecpar->extradata_size;
     hexdump(videoStream->codecpar->extradata,
             videoStream->codecpar->extradata_size);
     meta->setData(kKeyFFmpegExtraData, MetaData::TYPE_POINTER,
@@ -343,20 +343,20 @@ void VideoFormatToAVCodecContext(const std::shared_ptr<Message>& format,
   codecContext->time_base = kMicrosBase;
 
   std::string mime;
-  CHECK(format->findString("mime", mime));
+  AVE_CHECK(format->findString("mime", mime));
 
   int32_t codecType;
-  CHECK(format->findInt32("codec", &codecType));
+  AVE_CHECK(format->findInt32("codec", &codecType));
   codecContext->codec_id = AvpCodecToCodecID(static_cast<CodecType>(codecType));
   int32_t profile;
   format->findInt32("profile", &profile);
   codecContext->profile = profile;
   int32_t width;
-  CHECK(format->findInt32("width", &width));
+  AVE_CHECK(format->findInt32("width", &width));
   codecContext->coded_width = width;
 
   int32_t height;
-  CHECK(format->findInt32("height", &height));
+  AVE_CHECK(format->findInt32("height", &height));
   codecContext->coded_height = height;
 
   int32_t colorFormat = -1;
@@ -365,9 +365,9 @@ void VideoFormatToAVCodecContext(const std::shared_ptr<Message>& format,
   codecContext->pix_fmt = colorFormatToPixelFormat(colorFormat);
 
   std::shared_ptr<Buffer> exData;
-  LOG(LS_INFO) << "VideoFormatToAVCodecContext";
+  AVE_LOG(LS_INFO) << "VideoFormatToAVCodecContext";
   if (format->findBuffer("ffmpeg-exdata", exData)) {
-    LOG(LS_INFO) << "has ffmpeg-exdata";
+    AVE_LOG(LS_INFO) << "has ffmpeg-exdata";
     codecContext->extradata_size = exData->size();
     codecContext->extradata = reinterpret_cast<uint8_t*>(
         av_malloc(exData->size() + AV_INPUT_BUFFER_PADDING_SIZE));
@@ -384,14 +384,14 @@ void AudioFormatToAVCodecContext(const std::shared_ptr<Message>& format,
                                  AVCodecContext* codecContext) {
   codecContext->codec_type = AVMEDIA_TYPE_AUDIO;
   int32_t codecType;
-  CHECK(format->findInt32("codec", &codecType));
-  LOG(LS_INFO) << "------------------ codecType:" << codecType << ", id:"
-               << AvpCodecToCodecID(static_cast<CodecType>(codecType));
+  AVE_CHECK(format->findInt32("codec", &codecType));
+  AVE_LOG(LS_INFO) << "------------------ codecType:" << codecType << ", id:"
+                   << AvpCodecToCodecID(static_cast<CodecType>(codecType));
   codecContext->codec_id = AvpCodecToCodecID(static_cast<CodecType>(codecType));
 
   int32_t bitsPerSample;
-  CHECK(format->findInt32("bits-per-sample", &bitsPerSample));
-  LOG(LS_INFO) << "bitsPerSample:" << bitsPerSample;
+  AVE_CHECK(format->findInt32("bits-per-sample", &bitsPerSample));
+  AVE_LOG(LS_INFO) << "bitsPerSample:" << bitsPerSample;
 
   switch (bitsPerSample) {
     case 8:
@@ -404,20 +404,20 @@ void AudioFormatToAVCodecContext(const std::shared_ptr<Message>& format,
       codecContext->sample_fmt = AV_SAMPLE_FMT_S32;
       break;
     default:
-      LOG(LS_ERROR) << "Unsupported bits per channel: " << bitsPerSample;
+      AVE_LOG(LS_ERROR) << "Unsupported bits per channel: " << bitsPerSample;
       codecContext->sample_fmt = AV_SAMPLE_FMT_NONE;
   }
 
   int32_t channels;
-  CHECK(format->findInt32("channel-count", &channels));
+  AVE_CHECK(format->findInt32("channel-count", &channels));
   codecContext->channels = channels;
 
   int32_t channelLayout;
-  CHECK(format->findInt32("channel-mask", &channelLayout));
+  AVE_CHECK(format->findInt32("channel-mask", &channelLayout));
   codecContext->channel_layout = channelLayout;
 
   int32_t sampleRate;
-  CHECK(format->findInt32("sample-rate", &sampleRate));
+  AVE_CHECK(format->findInt32("sample-rate", &sampleRate));
   codecContext->sample_rate = sampleRate;
 
   std::shared_ptr<Buffer> exData;
@@ -447,7 +447,7 @@ std::shared_ptr<Buffer> createAudioBufferFromAvFrame(
   if (sampleSize < 0) {
     return nullptr;
   }
-  // LOG(LS_INFO) << "create audio buffer, sampleSize:" << sampleSize
+  // AVE_LOG(LS_INFO) << "create audio buffer, sampleSize:" << sampleSize
   //             << ", nb_samples:" << frame->nb_samples
   //             << ", channels:" << frame->channels;
   int nbSamples = frame->nb_samples;
@@ -472,13 +472,13 @@ std::shared_ptr<Buffer> createVideoBufferFromAvFrame(
     const AVFrame* frame,
     const AVRational& time_base) {
   // only support 420p and 422p now
-  CHECK((frame->format == AV_PIX_FMT_YUV420P) ||
-        (frame->format == AV_PIX_FMT_YUV422P));
+  AVE_CHECK((frame->format == AV_PIX_FMT_YUV420P) ||
+            (frame->format == AV_PIX_FMT_YUV422P));
 
   int32_t size = frame->linesize[0] * frame->height * 3 / 2;
   auto buffer = std::make_shared<Buffer>(size);
 
-  // LOG(LS_INFO) << "######## create bufer, stride:" << frame->linesize[0];
+  // AVE_LOG(LS_INFO) << "######## create bufer, stride:" << frame->linesize[0];
   int32_t uOffset = frame->linesize[0] * frame->height;
   int32_t vOffset = frame->linesize[0] * frame->height * 5 / 4;
   memcpy(buffer->data(), frame->data[0], frame->linesize[0] * frame->height);

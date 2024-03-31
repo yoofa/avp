@@ -123,19 +123,19 @@ void AvpDecoder::handleError(status_t err) {
 //////////////////////////////////////////
 
 void AvpDecoder::onConfigure(const std::shared_ptr<Message>& format) {
-  CHECK(format.get() != nullptr);
-  CHECK(mDecoder.get() == nullptr);
+  AVE_CHECK(format.get() != nullptr);
+  AVE_CHECK(mDecoder.get() == nullptr);
 
   std::string mime;
-  CHECK(format->findString("mime", mime));
+  AVE_CHECK(format->findString("mime", mime));
 
-  LOG(LS_INFO) << "onConfigure, mime:" << mime;
+  AVE_LOG(LS_INFO) << "onConfigure, mime:" << mime;
 
   mIsAudio = !strncasecmp("audio/", mime.c_str(), 6);
   CodecType codecType = mimeToCodec(mime.c_str());
 
   if (codecType == CODEC_UNKNOWN) {
-    LOG(LS_ERROR) << "unknown codec, mime:" << mime;
+    AVE_LOG(LS_ERROR) << "unknown codec, mime:" << mime;
     handleError(ERROR_UNSUPPORTED);
     return;
   }
@@ -143,7 +143,7 @@ void AvpDecoder::onConfigure(const std::shared_ptr<Message>& format) {
   mDecoder = mDecoderFactory->createDecoder(mIsAudio, codecType);
 
   if (mDecoder == nullptr || mDecoder.get() == nullptr) {
-    LOG(LS_ERROR) << "decoder create failed, mime:" << mime;
+    AVE_LOG(LS_ERROR) << "decoder create failed, mime:" << mime;
 
     handleError(ERROR_UNSUPPORTED);
     return;
@@ -162,9 +162,9 @@ void AvpDecoder::onConfigure(const std::shared_ptr<Message>& format) {
 }
 
 void AvpDecoder::onStart() {
-  LOG(LS_INFO) << "onStart";
+  AVE_LOG(LS_INFO) << "onStart";
   if (mDecoder == nullptr) {
-    LOG(LS_ERROR) << "Failed to start decoder, no support decoder";
+    AVE_LOG(LS_ERROR) << "Failed to start decoder, no support decoder";
     handleError(UNKNOWN_ERROR);
     return;
   }
@@ -172,7 +172,7 @@ void AvpDecoder::onStart() {
   status_t err = mDecoder->start();
 
   if (err != OK) {
-    LOG(LS_ERROR) << "Failed to start decoder, err:" << err;
+    AVE_LOG(LS_ERROR) << "Failed to start decoder, err:" << err;
     mDecoder.reset();
     handleError(err);
   }
@@ -208,7 +208,7 @@ status_t AvpDecoder::fetchInputBuffer(std::shared_ptr<Message>& message) {
   int64_t timeUs;
   accessUnit->meta()->findInt64("timeUs", &timeUs);
 
-  //  LOG(LS_INFO) << " fetchInputBuffer, pts:" << timeUs;
+  //  AVE_LOG(LS_INFO) << " fetchInputBuffer, pts:" << timeUs;
 
   message->setBuffer("buffer", std::move(accessUnit));
   return OK;
@@ -219,8 +219,8 @@ bool AvpDecoder::onInputBufferFetched(const std::shared_ptr<Message>& message) {
   bool hasBuffer = message->findBuffer("buffer", buffer);
   if (!buffer.get()) {
     status_t streamErr = ERROR_END_OF_STREAM;
-    CHECK(message->findInt32("err", &streamErr) || !hasBuffer);
-    CHECK(streamErr != OK);
+    AVE_CHECK(message->findInt32("err", &streamErr) || !hasBuffer);
+    AVE_CHECK(streamErr != OK);
   } else {
     status_t err;
     err = mDecoder->queueInputBuffer(buffer);
@@ -228,7 +228,8 @@ bool AvpDecoder::onInputBufferFetched(const std::shared_ptr<Message>& message) {
       if (err == ERROR_RETRY) {
         return false;
       }
-      LOG(LS_ERROR) << "onInputBufferFetched: queueInputBuffer failed:" << err;
+      AVE_LOG(LS_ERROR) << "onInputBufferFetched: queueInputBuffer failed:"
+                        << err;
       handleError(err);
     }
   }
@@ -325,7 +326,7 @@ void AvpDecoder::onMessageReceived(const std::shared_ptr<Message>& msg) {
   switch (msg->what()) {
     case kWhatConfigure: {
       std::shared_ptr<Message> format;
-      CHECK(msg->findMessage("format", format));
+      AVE_CHECK(msg->findMessage("format", format));
       onConfigure(format);
       break;
     }
@@ -334,14 +335,14 @@ void AvpDecoder::onMessageReceived(const std::shared_ptr<Message>& msg) {
     }
     case kWhatSetRenderer: {
       std::shared_ptr<MessageObject> obj;
-      CHECK(msg->findObject("render", obj));
+      AVE_CHECK(msg->findObject("render", obj));
       auto render = std::dynamic_pointer_cast<AvpRenderSynchronizer>(obj);
       mRender = render;
       break;
     }
     case kWhatSetVideoSink: {
       std::shared_ptr<MessageObject> obj;
-      CHECK(msg->findObject("videoSink", obj));
+      AVE_CHECK(msg->findObject("videoSink", obj));
       auto sink = std::dynamic_pointer_cast<VideoSink>(obj);
       mVideoSink = sink;
       break;

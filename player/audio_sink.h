@@ -21,7 +21,7 @@ namespace avp {
 #define DEFAULT_AUDIOSINK_BUFFERSIZE 1200
 #define DEFAULT_AUDIOSINK_SAMPLERATE 44100
 
-class AudioSink : public MessageObject {
+class AudioSink : public ave::MessageObject {
  public:
   // TODO(youfa) support AudioCallback mode
   // Callback returns the number of bytes actually written to the buffer.

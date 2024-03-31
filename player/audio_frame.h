@@ -12,7 +12,7 @@
 
 namespace avp {
 
-class AudioFrame : public MessageObject {
+class AudioFrame : public ave::MessageObject {
  public:
   AudioFrame();
   virtual ~AudioFrame();

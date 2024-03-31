@@ -16,6 +16,10 @@
 
 namespace avp {
 
+using ave::Handler;
+using ave::Looper;
+using ave::Message;
+
 class AvpDecoder : public Handler, public Decoder::DecoderCallback {
  public:
   enum {

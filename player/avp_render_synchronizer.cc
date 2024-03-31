@@ -100,7 +100,7 @@ void AvpRenderSynchronizer::onQueueBuffer(const std::shared_ptr<Message>& msg) {
   // TODO(youfa) do not enqueue if msg is old
 
   int32_t audio;
-  CHECK(msg->findInt32("audio", &audio));
+  AVE_CHECK(msg->findInt32("audio", &audio));
 
   if (audio) {
     mHasAudio = true;
@@ -109,14 +109,14 @@ void AvpRenderSynchronizer::onQueueBuffer(const std::shared_ptr<Message>& msg) {
   }
 
   std::shared_ptr<Buffer> buffer;
-  CHECK(msg->findBuffer("buffer", buffer));
+  AVE_CHECK(msg->findBuffer("buffer", buffer));
 
   std::shared_ptr<Message> render_message;
-  CHECK(msg->findMessage("renderMessage", render_message));
+  AVE_CHECK(msg->findMessage("renderMessage", render_message));
 
   // int64_t time_us;
-  // CHECK(buffer->meta()->findInt64("timeUs", &time_us));
-  // LOG(LS_INFO) << "onQueueBuffer, ts:" << time_us;
+  // AVE_CHECK(buffer->meta()->findInt64("timeUs", &time_us));
+  // AVE_LOG(LS_INFO) << "onQueueBuffer, ts:" << time_us;
 
   QueueEntry entry;
   entry.mBuffer = std::move(buffer);
@@ -133,7 +133,7 @@ void AvpRenderSynchronizer::onQueueBuffer(const std::shared_ptr<Message>& msg) {
   // TODO(youfa) remove some audio frame if audio is too fast than video
 
   // if (!audio && mVideoSink) {
-  //   // LOG(LS_INFO) << "onQueueBuffer video:";
+  //   // AVE_LOG(LS_INFO) << "onQueueBuffer video:";
   //   mVideoSink->onFrame(buffer);
   // } else if (audio && mAudioSink) {
   //   mAudioSink->onFrame(buffer);
@@ -176,7 +176,7 @@ void AvpRenderSynchronizer::postDrainVideo() {
   int64_t now = Looper::getNowUs();
 
   int64_t time_us;
-  CHECK(entry.mBuffer->meta()->findInt64("timeUs", &time_us));
+  AVE_CHECK(entry.mBuffer->meta()->findInt64("timeUs", &time_us));
   {
     // TODO(youfa) with lock
     if (mAnchorTimeMediaUs < 0) {
@@ -210,8 +210,8 @@ void AvpRenderSynchronizer::onRenderVideo(
     int64_t now = Looper::getNowUs();
     int64_t now_media_us;
     mMediaClock->getMediaTime(now, &now_media_us, true);
-    CHECK(entry.mBuffer->meta()->findInt64("timeUs", &time_us));
-    // LOG(LS_INFO) << "onRenderVideo, ts:" << time_us / 1000
+    AVE_CHECK(entry.mBuffer->meta()->findInt64("timeUs", &time_us));
+    // AVE_LOG(LS_INFO) << "onRenderVideo, ts:" << time_us / 1000
     //              << "ms, now media time:" << now_media_us / 1000
     //              << "ms, now:" << now;
     mVideoSink->onFrame(entry.mBuffer);
@@ -223,14 +223,14 @@ void AvpRenderSynchronizer::onMessageReceived(
   switch (msg->what()) {
     case kWhatSetAudioSink: {
       std::shared_ptr<MessageObject> obj;
-      CHECK(msg->findObject("audioSink", obj));
+      AVE_CHECK(msg->findObject("audioSink", obj));
       onSetAudioSink(std::dynamic_pointer_cast<AudioSink>(obj));
 
       break;
     }
     case kWhatSetVideoSink: {
       std::shared_ptr<MessageObject> obj;
-      CHECK(msg->findObject("videoSink", obj));
+      AVE_CHECK(msg->findObject("videoSink", obj));
       onSetVideoSink(std::dynamic_pointer_cast<VideoSink>(obj));
       break;
     }
