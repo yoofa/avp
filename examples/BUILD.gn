@@ -17,7 +17,7 @@ ave_executable("avplay") {
     "../player:avplayer",
   ]
 
-  deps += [ "//build/config/linux/gtk" ]
+  deps += [ "gtk" ]
 }
 
 ave_library("gtk_window") {
@@ -35,7 +35,7 @@ ave_library("gtk_window") {
     "//third_party/libyuv",
   ]
 
-  deps += [ "//build/config/linux/gtk" ]
+  deps += [ "gtk" ]
 }
 
 ave_library("video_file_render") {
