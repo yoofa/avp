@@ -51,7 +51,7 @@ ave_library("avplayer") {
     ":player_interface",
     "../base:logging",
     "../base:utils",
-    "../base/system:avp_export",
+    "../base/system:ave_export",
     "../media:foundation",
   ]
 
