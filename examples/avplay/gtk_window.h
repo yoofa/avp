@@ -13,7 +13,7 @@
 #include <gtk/gtk.h>
 
 #include "media/buffer.h"
-#include "media/message.h"
+#include "media/foundation/message.h"
 #include "player/video_sink.h"
 
 class GtkWnd {

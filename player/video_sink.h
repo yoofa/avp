@@ -10,7 +10,7 @@
 
 #include <memory>
 
-#include "media/message.h"
+#include "media/foundation/message.h"
 #include "player/video_frame.h"
 
 namespace avp {

@@ -8,7 +8,7 @@
 #ifndef AUDIO_FRAME_H
 #define AUDIO_FRAME_H
 
-#include "media/message.h"
+#include "media/foundation/message.h"
 
 namespace avp {
 
