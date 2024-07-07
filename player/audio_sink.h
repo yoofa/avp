@@ -10,6 +10,7 @@
 
 #include <memory>
 
+#include "api/player.h"
 #include "audio/audio_format.h"
 #include "audio/channel_layout.h"
 #include "media/foundation/message.h"

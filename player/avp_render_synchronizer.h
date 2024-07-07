@@ -8,9 +8,9 @@
 #ifndef AVP_RENDER_SYNCHRONIZER_H
 #define AVP_RENDER_SYNCHRONIZER_H
 
-#include "media/handler.h"
-#include "media/looper.h"
-#include "media/message.h"
+#include "media/foundation/handler.h"
+#include "media/foundation/looper.h"
+#include "media/foundation/message.h"
 #include "player/audio_sink.h"
 #include "player/media_clock.h"
 #include "player/video_sink.h"

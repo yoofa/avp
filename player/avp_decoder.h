@@ -8,7 +8,8 @@
 #ifndef AVP_DECODER_H
 #define AVP_DECODER_H
 
-#include "media/handler.h"
+#include "api/player.h"
+#include "media/foundation/handler.h"
 #include "player/avp_render_synchronizer.h"
 #include "player/decoder.h"
 #include "player/decoder_factory.h"
@@ -41,7 +42,7 @@ class AvpDecoder : public Handler, public Decoder::DecoderCallback {
                       std::shared_ptr<PlayerBase::ContentSource> source,
                       std::shared_ptr<AvpRenderSynchronizer> render = nullptr,
                       std::shared_ptr<VideoSink> videoSink = nullptr);
-  virtual ~AvpDecoder();
+  ~AvpDecoder() override;
 
   virtual void init();
 

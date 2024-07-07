@@ -68,6 +68,7 @@ ave_static_library("avp") {
   deps = []
 
   deps += [
+    "api",
     "base",
     "media",
 

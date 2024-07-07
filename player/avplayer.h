@@ -10,14 +10,19 @@
 
 #include <memory>
 
-#include "media/handler.h"
-#include "media/looper.h"
-#include "media/message.h"
-
 #include "base/system/ave_export.h"
+
+#include "media/audio/audio_device_factory.h"
+#include "media/codec/codec_factory.h"
+
+#include "media/foundation/handler.h"
+#include "media/foundation/looper.h"
+#include "media/foundation/message.h"
+
+#include "api/player.h"
+
 #include "player/audio_decoder.h"
 #include "player/audio_decoder_factory.h"
-#include "player/audio_sink.h"
 #include "player/avp_decoder.h"
 #include "player/avp_render_synchronizer.h"
 #include "player/default_Audio_decoder_factory.h"
@@ -29,33 +34,25 @@
 #include "player/video_sink.h"
 
 namespace avp {
-AVE_EXPORT class AvPlayer : public PlayerBase, public ave::Handler {
+
+AVE_EXPORT class AvPlayer : public Player, public ave::Handler {
  public:
   AvPlayer();
-  virtual ~AvPlayer() override;
+  ~AvPlayer() override;
 
-  virtual status_t setListener(
-      const std::shared_ptr<Listener>& listener) override;
-  virtual status_t init() override;
-  status_t setDataSource(const char* url) override;
-  virtual status_t setDataSource(int fd,
-                                 int64_t offset,
-                                 int64_t length) override;
-  virtual status_t setDataSource(
-      const std::shared_ptr<ContentSource>& source) override;
+  status_t SetListener(const std::shared_ptr<Listener>& listener) override;
+  status_t Init() override;
+  status_t SetDataSource(const char* url) override;
+  status_t SetDataSource(int fd, int64_t offset, int64_t length) override;
+  status_t SetDataSource(const std::shared_ptr<ContentSource>& source) override;
 
-  virtual status_t setAudioSink(std::shared_ptr<AudioSink> sink) override;
-  virtual status_t setVideoSink(std::shared_ptr<VideoSink> sink) override;
-
-  virtual status_t prepare() override;
-  virtual status_t start() override;
-  virtual status_t stop() override;
-  virtual status_t pause() override;
-  virtual status_t resume() override;
-  virtual status_t seekTo(
-      int msec,
-      SeekMode mode = SeekMode::SEEK_PREVIOUS_SYNC) override;
-  virtual status_t reset() override;
+  status_t Prepare() override;
+  status_t Start() override;
+  status_t Stop() override;
+  status_t Pause() override;
+  status_t Resume() override;
+  status_t SeekTo(int msec, SeekMode mode) override;
+  status_t Reset() override;
 
  private:
   void postScanSources();
