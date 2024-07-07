@@ -1,0 +1,13 @@
+import("//base/build/ave.gni")
+
+group("api") {
+  deps = [ ":player_interface" ]
+}
+
+ave_library("player_interface") {
+  sources = [
+    "content_source.h",
+    "player.h",
+    "player_interface.h",
+  ]
+}
