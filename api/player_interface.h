@@ -9,8 +9,11 @@
 #define PLAYER_INTERFACE_H
 
 #include <cstdint>
+#include "base/errors.h"
 
 namespace avp {
+
+using status_t = ave::status_t;
 
 enum media_track_type {
   MEDIA_TRACK_TYPE_UNKNOWN = 0,

@@ -10,21 +10,17 @@
 
 #include <memory>
 
-#include "base/attributes.h"
 #include "base/errors.h"
 
-#include "media/foundation/handler.h"
-#include "media/foundation/message.h"
+#include "media/foundation/media_format.h"
 
 #include "player_interface.h"
 
 namespace avp {
 
-using ave::Buffer;
-using ave::Message;
-using status_t = ave::status_t;
+using ave::media::MediaFormat;
 
-class ContentSource : public ave::Handler, public ave::MessageObject {
+class ContentSource {
  public:
   enum class Flags {
     FLAG_CAN_PAUSE = 1,
@@ -37,71 +33,152 @@ class ContentSource : public ave::Handler, public ave::MessageObject {
         64,  // The screen needs to be protected (screenshot is disabled).
   };
 
-  // Message type
-  enum {
-    kWhatPrepared,
-    kWhatFlagsChanged,
-    kWhatVideoSizeChanged,
-    kWhatBufferingUpdate,
-    kWhatPauseOnBufferingStart,
-    kWhatResumeOnBufferingEnd,
-    kWhatCacheStats,
-    kWhatSubtitleData,
-    kWhatTimedTextData,
-    kWhatTimedMetaData,
-    kWhatQueueDecoderShutdown,
-    kWhatDrmNoLicense,
-    kWhatInstantiateSecureDecoders,
-    // Modular DRM
-    kWhatDrmInfo,
+  class Notify {
+   public:
+    Notify() = default;
+    virtual ~Notify() = default;
+
+    /**
+     * @brief Called when the content source is prepared and ready to start
+     * playback.
+     */
+    virtual void OnPrepared() = 0;
+
+    /**
+     * @brief Called when a seek operation is completed.
+     */
+    virtual void OnSeekComplete() {}
+
+    /**
+     * @brief Called when buffering of the content starts.
+     */
+    virtual void OnBufferingStart() {}
+
+    /**
+     * @brief Called to update the buffering progress.
+     * @param percent The buffering progress in percentage.
+     */
+    virtual void OnBufferingUpdate(int percent) {}
+
+    /**
+     * @brief Called when buffering of the content ends.
+     */
+    virtual void OnBufferingEnd() {}
+
+    /**
+     * @brief Called when the playback of the content is completed.
+     */
+    virtual void OnCompletion() = 0;
+
+    /**
+     * @brief Called when an error occurs during playback.
+     * @param error The error code.
+     */
+    virtual void OnError(status_t error) = 0;
+
+    /**
+     * @brief Called when data needs to be fetched for a specific track.
+     * @param trackIndex The index of the track for which data needs to be
+     * fetched.
+     */
+    virtual void OnFetchData(size_t trackIndex) = 0;
   };
 
   ContentSource() = default;
+  virtual ~ContentSource() = default;
 
+  /**
+   * @brief Prepare the content source for playback.
+   */
   virtual void Prepare() = 0;
+
+  /**
+   * @brief Start playback.
+   */
   virtual void Start() = 0;
+
+  /**
+   * @brief Stop playback.
+   */
   virtual void Stop() = 0;
+
+  /**
+   * @brief Pause playback.
+   */
   virtual void Pause() = 0;
+
+  /**
+   * @brief Resume playback.
+   */
   virtual void Resume() = 0;
 
-  virtual status_t DequeueAccessUnit(bool audio,
-                                     std::shared_ptr<Buffer>& accessUnit) = 0;
-  virtual std::shared_ptr<Message> GetFormat(bool audio);
+  /**
+   * @brief Dequeues an access unit from the specified track.
+   * @param trackIndex The index of the track.
+   * @param accessUnit The output parameter to store the dequeued access unit.
+   * @return The status of the operation.
+   */
+  virtual status_t DequeueAccessUnit(
+      size_t trackIndex,
+      std::shared_ptr<ave::media::Buffer>& accessUnit) = 0;
+
+  /**
+   * @brief Retrieves the media format associated with the content source.
+   *
+   * This function returns a shared pointer to the `MediaFormat` object that
+   * represents the format of the media content provided by the content source.
+   *
+   * @return A shared pointer to the `MediaFormat` object representing the media
+   * format.
+   */
+  virtual std::shared_ptr<MediaFormat> GetFormat() = 0;
+
+  /**
+   * @brief Gets the duration of the content source.
+   * @param durationUs The output parameter to store the duration in
+   * microseconds.
+   * @return The status of the operation.
+   */
   virtual status_t GetDuration(int64_t* /* durationUs */) {
     return ave::INVALID_OPERATION;
   }
 
-  virtual size_t getTrackCount() const { return 0; }
-  virtual std::shared_ptr<Message> getTrackInfo(size_t /* trackIndex */) const {
-    return nullptr;
+  /**
+   * @brief Gets the number of tracks in the content source.
+   * @return The number of tracks.
+   */
+  virtual size_t GetTrackCount() const { return 0; }
+
+  /**
+   * @brief Gets the media format of the specified track.
+   * @param trackIndex The index of the track.
+   * @return The media format of the track.
+   */
+  virtual std::shared_ptr<MediaFormat> GetTrackInfo(
+      size_t /* trackIndex */) const {
+    return {};
   }
+
+  /**
+   * @brief Selects or deselects the specified track.
+   * @param trackIndex The index of the track.
+   * @param select True to select the track, false to deselect.
+   * @return The status of the operation.
+   */
   virtual status_t SelectTrack(size_t /* trackIndex */,
                                bool /* select */) const {
     return ave::INVALID_OPERATION;
   }
 
+  /**
+   * @brief Seeks to the specified time position.
+   * @param seekTimeUs The time position to seek to in microseconds.
+   * @param mode The seek mode.
+   * @return The status of the operation.
+   */
   virtual status_t SeekTo(int64_t /* seekTimeUs */, SeekMode /* mode */) {
     return ave::INVALID_OPERATION;
   }
-
- protected:
-  ~ContentSource() override = default;
-  void onMessageReceived(const std::shared_ptr<Message>& message) override = 0;
-
-  std::shared_ptr<Message> dupNotify() const { return mNotify->dup(); }
-
-  void notifyFlagsChanged(uint32_t flags);
-  void notifyVideoSizeChanged(const std::shared_ptr<Message> message = nullptr);
-  void notifyPrepared(status_t err = ave::OK);
-
- private:
-  friend class AvPlayer;
-  void setNotifier(std::shared_ptr<Message> notify) {
-    mNotify = std::move(notify);
-  }
-  std::shared_ptr<Message> mNotify;
-
-  AVE_DISALLOW_COPY_AND_ASSIGN(ContentSource);
 };
 
 }  // namespace avp
