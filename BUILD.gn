@@ -4,8 +4,12 @@ group("default") {
   testonly = true
   deps = [ ":avp" ]
 
-  #deps += [ "examples" ]
-  #deps += [ "test" ]
+  if (ave_include_test) {
+    deps += [
+      "base:base_unittests",
+      "test",
+    ]
+  }
 }
 
 config("library_impl_config") {
@@ -70,7 +74,8 @@ ave_static_library("avp") {
   deps += [
     "api",
     "base",
-    "media",
+
+    #"media",
 
     #"player",
   ]
