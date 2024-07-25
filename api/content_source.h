@@ -88,6 +88,16 @@ class ContentSource {
   virtual ~ContentSource() = default;
 
   /**
+   * @brief Sets the notify object for the content source.
+   *
+   * This function sets the notify object for the content source. The notify
+   * object is responsible for receiving notifications from the content source.
+   *
+   * @param notify A shared pointer to the Notify object.
+   */
+  virtual void SetNotify(std::shared_ptr<Notify> notify) = 0;
+
+  /**
    * @brief Prepare the content source for playback.
    */
   virtual void Prepare() = 0;
