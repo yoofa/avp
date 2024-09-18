@@ -7,485 +7,582 @@
 #include "generic_source.h"
 
 #include <memory>
-
-#include <string.h>
+#include <string>
 
 #include "base/checks.h"
 #include "base/errors.h"
 #include "base/logging.h"
-#include "base/unique_fd.h"
-#include "media/looper.h"
-#include "media/message.h"
-#ifdef AVP_FFMPEG_DEMUXER
-#include "demuxer/ffmpeg_demuxer_factory.h"
-#endif
-#include "media/meta_data.h"
-#include "player/default_demuxer_factory.h"
-#include "player/file_source.h"
+
+#include "base/data_source/file_source.h"
+
+#include "media/foundation/looper.h"
+#include "media/foundation/media_source.h"
+#include "media/foundation/media_utils.h"
+#include "media/foundation/message.h"
 
 namespace avp {
 
+using ave::DataSource;
+using ave::FileSource;
+using ave::media::Looper;
+using ave::media::MediaSource;
+using ave::media::ReplyToken;
+
 GenericSource::GenericSource()
-    : mPendingReadBufferTypes(0),
-#ifdef AVP_FFMPEG_DEMUXER
-      mDemuxerFactory(std::make_unique<FFmpegDemuxerFactory>()),
-#else
-      mDemuxerFactory(std::make_unique<DefaultDemuxerFactory>()),
-#endif
-      mDurationUs(-1LL),
-      mLooper(std::make_shared<Looper>()) {
-  mLooper->setName("generic source");
+    : fd_(-1),
+      offset_(-1),
+      length_(-1),
+      duration_us_(-1LL),
+      bitrate_(-1LL),
+      audio_last_dequeue_time_us_(-1),
+      video_last_dequeue_time_us_(-1),
+      pending_read_buffer_types_(0),
+      preparing_(false),
+      started_(false),
+      is_streaming_(false) {}
+
+GenericSource::~GenericSource() = default;
+
+void GenericSource::SetNotify(std::shared_ptr<Notify> notify) {
+  std::lock_guard<std::mutex> lock(lock_);
+  notify_ = notify;
 }
 
-GenericSource::~GenericSource() {}
+void GenericSource::ResetDataSource() {
+  uri_.clear();
+  offset_ = -1;
+  length_ = -1;
+  duration_us_ = -1;
+  bitrate_ = -1;
 
-void GenericSource::resetDataSource() {}
+  demuxer_.reset();
+  sources_.clear();
 
-status_t GenericSource::setDataSource(const char* url) {
-  std::lock_guard<std::mutex> lock(mLock);
-  resetDataSource();
+  audio_last_dequeue_time_us_ = -1;
+  video_last_dequeue_time_us_ = -1;
+  pending_read_buffer_types_ = 0;
 
-  mUri = url;
+  preparing_ = false;
+  started_ = false;
+  is_streaming_ = false;
+}
+
+// TODO: implement http source
+status_t GenericSource::SetDataSource(const char* url) {
+  std::lock_guard<std::mutex> lock(lock_);
+  ResetDataSource();
+
+  uri_ = url;
+  return 0;
+}
+
+status_t GenericSource::SetDataSource(int fd, int64_t offset, int64_t length) {
+  std::lock_guard<std::mutex> lock(lock_);
+  AVE_LOG(LS_VERBOSE) << "SetDataSource fd: " << fd << ", offset: " << offset
+                      << ", length: " << length;
+  ResetDataSource();
+
+  fd_.reset(dup(fd));
+  offset_ = offset;
+  length_ = length;
 
   return 0;
 }
-status_t GenericSource::setDataSource(int fd, int64_t offset, int64_t length) {
-  std::lock_guard<std::mutex> lock(mLock);
-  AVE_LOG(LS_VERBOSE) << "setDataSource";
-  resetDataSource();
 
-  mFd.reset(dup(fd));
-  mOffset = offset;
-  mLength = length;
-
+status_t GenericSource::SetDataSource(std::shared_ptr<DataSource> data_source) {
+  std::lock_guard<std::mutex> lock(lock_);
+  ResetDataSource();
+  data_source_ = std::move(data_source);
   return 0;
 }
 
-void GenericSource::prepare() {
-  mLooper->registerHandler(shared_from_this());
-  mLooper->start();
+void GenericSource::Prepare() {
+  std::lock_guard<std::mutex> lock(lock_);
+  if (looper_ == nullptr) {
+    looper_ = std::make_shared<Looper>();
+    looper_->setName("GenericSource");
+    looper_->registerHandler(shared_from_this());
+    looper_->start();
+  }
 
-  auto msg = std::make_shared<Message>(kWhatPrepare, shared_from_this());
-  msg->post();
+  auto message = std::make_shared<Message>(kWhatPrepare, shared_from_this());
+  message->post();
 }
 
-void GenericSource::start() {}
+void GenericSource::Start() {
+  std::lock_guard<std::mutex> lock(lock_);
 
-void GenericSource::stop() {}
+  if (audio_track_.source != nullptr) {
+    PostReadBuffer(MediaType::AUDIO);
+  }
 
-void GenericSource::pause() {}
+  if (video_track_.source != nullptr) {
+    PostReadBuffer(MediaType::VIDEO);
+  }
 
-void GenericSource::resume() {}
+  started_ = true;
+}
 
-status_t GenericSource::seekTo(int64_t seekTimeUs, SeekMode mode) {
-  AVE_LOG(LS_VERBOSE) << "seekTo: " << seekTimeUs << ", mode: " << mode;
-  auto msg = std::make_shared<Message>(kWhatSeek, shared_from_this());
-  msg->setInt64("seekTimeUs", seekTimeUs);
-  msg->setInt32("mode", mode);
+void GenericSource::Stop() {
+  std::lock_guard<std::mutex> lock(lock_);
+  started_ = false;
+}
+
+void GenericSource::Pause() {
+  std::lock_guard<std::mutex> lock(lock_);
+  started_ = false;
+}
+
+void GenericSource::Resume() {
+  std::lock_guard<std::mutex> lock(lock_);
+  started_ = true;
+}
+
+status_t GenericSource::SeekTo(int64_t seek_time_us, SeekMode mode) {
+  AVE_LOG(LS_VERBOSE) << "SeekTo: " << seek_time_us << ", mode: " << mode;
+  auto message = std::make_shared<Message>(kWhatSeek, shared_from_this());
+  message->setInt64("seek_time_us", seek_time_us);
+  message->setInt32("mode", mode);
 
   std::shared_ptr<Message> response;
-  status_t err = msg->postAndWaitResponse(response);
-  if (err == OK && response.get() != nullptr) {
+  status_t err = message->postAndWaitResponse(response);
+  if (err == ave::OK && response != nullptr) {
     AVE_CHECK(response->findInt32("err", &err));
   }
   return err;
 }
 
-std::shared_ptr<MetaData> GenericSource::getSourceMeta() {
+std::shared_ptr<MediaFormat> GenericSource::GetFormat() {
   return nullptr;
 }
 
-std::shared_ptr<MetaData> GenericSource::getMeta(bool audio) {
-  std::lock_guard<std::mutex> lock(mLock);
-  std::shared_ptr<MediaSource> source =
-      audio ? mAudioTrack.mSource : mVideoTrack.mSource;
-  if (source.get() == nullptr) {
+std::shared_ptr<MediaFormat> GenericSource::GetTrackInfo(
+    size_t track_index) const {
+  std::lock_guard<std::mutex> lock(lock_);
+  AVE_DCHECK(track_index < sources_.size());
+  if (track_index >= sources_.size()) {
     return nullptr;
   }
-  return source->getMeta();
+
+  return sources_[track_index]->GetFormat();
 }
 
-status_t GenericSource::dequeueAccessUnit(bool audio,
-                                          std::shared_ptr<Buffer>& accessUnit) {
-  std::lock_guard<std::mutex> lock(mLock);
+status_t GenericSource::DequeueAccessUnit(
+    MediaType track_type,
+    std::shared_ptr<MediaPacket>& access_unit) {
+  std::lock_guard<std::mutex> lock(lock_);
 
-  Track* track = audio ? &mAudioTrack : &mVideoTrack;
-  if (track->mSource.get() == nullptr) {
-    return -EWOULDBLOCK;
+  if (!started_) {
+    return ave::WOULD_BLOCK;
   }
-  status_t result;
 
-  if (!track->mPacketSource->hasBufferAvailable(&result)) {
-    if (result == OK) {
-      postReadBuffer(audio ? PlayerBase::MEDIA_TRACK_TYPE_AUDIO
-                           : PlayerBase::MEDIA_TRACK_TYPE_VIDEO);
-      return WOULD_BLOCK;
+  auto& track = track_type == MediaType::VIDEO ? video_track_ : audio_track_;
+
+  if (track.source == nullptr) {
+    return ave::WOULD_BLOCK;
+  }
+
+  status_t result = ave::OK;
+
+  if (!track.packet_source->HasBufferAvailable(&result)) {
+    if (result == ave::OK) {
+      PostReadBuffer(track_type);
+      return ave::WOULD_BLOCK;
     }
     return result;
   }
 
-  result = track->mPacketSource->dequeueAccessUnit(accessUnit);
+  result = track.packet_source->DequeueAccessUnit(access_unit);
 
   // TODO(youfa) judge to read more data here.
 
-  if (result != OK) {
+  if (result != ave::OK) {
     return result;
   }
 
-  int64_t timeUs;
-  AVE_CHECK(accessUnit->meta()->findInt64("timeUs", &timeUs));
+  int64_t time_us = 0;
+  if (access_unit->media_type() == MediaType::VIDEO) {
+    time_us = access_unit->video_info()->pts.us();
+    video_last_dequeue_time_us_ = time_us;
+  } else {
+    time_us = access_unit->audio_info()->pts.us();
+    audio_last_dequeue_time_us_ = time_us;
+  }
 
   // TODO(youfa) fetch subtitle data with timeUs
+  if (subtitle_track_.source != nullptr) {
+    auto msg =
+        std::make_shared<Message>(kWhatFetchSubtitleData, shared_from_this());
+    msg->setInt64("time_us", time_us);
+    msg->post();
+  }
+
+  if (timed_text_track_.source != nullptr) {
+    auto msg =
+        std::make_shared<Message>(kWhatFetchSubtitleData, shared_from_this());
+    msg->setInt64("time_us", time_us);
+    msg->post();
+  }
 
   return result;
 }
 
-status_t GenericSource::getDuration(int64_t* durationUs) {
-  std::lock_guard<std::mutex> lock(mLock);
-  *durationUs = mDurationUs;
-  return OK;
+status_t GenericSource::GetDuration(int64_t* duration_us) {
+  std::lock_guard<std::mutex> lock(lock_);
+  *duration_us = duration_us_;
+  return ave::OK;
 }
 
-size_t GenericSource::getTrackCount() const {
-  std::lock_guard<std::mutex> lock(mLock);
-  return mSources.size();
+size_t GenericSource::GetTrackCount() const {
+  std::lock_guard<std::mutex> lock(lock_);
+  return sources_.size();
 }
 
-std::shared_ptr<Message> GenericSource::getTrackInfo(size_t trackIndex) const {
-  std::lock_guard<std::mutex> lock(mLock);
-  return nullptr;
-}
-
-status_t GenericSource::selectTrack(size_t trackIndex, bool select) const {
-  std::lock_guard<std::mutex> lock(mLock);
-  return OK;
+status_t GenericSource::SelectTrack(size_t track_index, bool select) const {
+  std::lock_guard<std::mutex> lock(lock_);
+  return ave::OK;
 }
 
 /***************************************/
-status_t GenericSource::initFromDataSource() {
-  AVE_LOG(LS_INFO) << "GenericSource::initFromDataSource";
+status_t GenericSource::InitFromDataSource() {
+  AVE_LOG(LS_INFO) << "GenericSource::initFrodata_source_";
 
   std::shared_ptr<DataSource> datasource;
-  datasource = mDataSource;
+  datasource = data_source_;
 
-  AVE_CHECK(datasource.get() != nullptr);
+  AVE_CHECK(datasource != nullptr);
 
-  mLock.unlock();
-  mDemuxer = mDemuxerFactory->createDemuxer(datasource);
-  mLock.lock();
+  lock_.unlock();
+  demuxer_ = demuxer_factory_->CreateDemuxer(datasource);
 
-  if (!mDemuxer.get()) {
-    return UNKNOWN_ERROR;
+  if (demuxer_ == nullptr) {
+    lock_.lock();
+    return ave::UNKNOWN_ERROR;
   }
 
-  std::shared_ptr<MetaData> sourceMeta;
-  mDemuxer->getDemuxerMeta(sourceMeta);
-  mSourceMeta = sourceMeta;
+  std::shared_ptr<MediaFormat> source_format;
 
-  if (mSourceMeta.get() != nullptr) {
-    int64_t duration;
-    if (mSourceMeta->findInt64(kKeyDuration, &duration)) {
-      mDurationUs = duration;
-    }
+  demuxer_->GetFormat(source_format);
+
+  size_t num_tracks = demuxer_->GetTrackCount();
+  if (num_tracks == 0) {
+    AVE_LOG(LS_ERROR) << "InitFrodata_source_, source has no track!";
+    lock_.lock();
+    return ave::UNKNOWN_ERROR;
+  }
+  lock_.lock();
+
+  source_format_ = source_format;
+
+  if (source_format_ != nullptr) {
+    duration_us_ = source_format_->duration().us_or(-1);
   }
 
-  size_t numTracks = mDemuxer->getTrackCount();
-  if (numTracks == 0) {
-    AVE_LOG(LS_ERROR) << "initFromDataSource, source has no track!";
-    return UNKNOWN_ERROR;
-  }
+  int64_t total_bitrate = 0;
 
-  int32_t totalBitrate = 0;
-
-  for (size_t i = 0; i < numTracks; i++) {
-    std::shared_ptr<MediaSource> track = mDemuxer->getTrack(i);
-    if (!track.get()) {
+  for (size_t i = 0; i < num_tracks; i++) {
+    auto track = demuxer_->GetTrack(i);
+    if (track == nullptr) {
       continue;
     }
 
-    std::shared_ptr<MetaData> meta;
-    mDemuxer->getTrackMeta(meta, i);
-    if (!meta.get()) {
+    std::shared_ptr<MediaFormat> format;
+    demuxer_->GetTrackFormat(format, i);
+
+    if (format == nullptr) {
       AVE_LOG(LS_ERROR) << "no metadata for track " << i;
-      return UNKNOWN_ERROR;
+      return ave::UNKNOWN_ERROR;
+    }
+    sources_.push_back(track);
+
+    if (format->stream_type() == MediaType::AUDIO &&
+        audio_track_.source == nullptr) {
+      audio_track_.index = i;
+      audio_track_.source = track;
+      audio_track_.packet_source =
+          std::make_shared<PacketSource>(format->stream_type());
+    } else if (format->stream_type() == MediaType::VIDEO &&
+               video_track_.source == nullptr) {
+      video_track_.index = i;
+      video_track_.source = track;
+      video_track_.packet_source =
+          std::make_shared<PacketSource>(format->stream_type());
     }
 
-    const char* mime;
-    AVE_CHECK(meta->findCString(kKeyMIMEType, &mime));
-    AVE_LOG(LS_VERBOSE) << "initFromDataSource track[" << i << "]: " << mime;
+    AVE_LOG(LS_VERBOSE) << "InitFrodata_source_ track[" << i << "]: ";
 
-    if (!strncasecmp(mime, "audio/", 6) && !mAudioTrack.mSource.get()) {
-      mAudioTrack.mIndex = i;
-      mAudioTrack.mSource = track;
-      mAudioTrack.mPacketSource = std::make_shared<PacketSource>();
-    }
-    if (!strncasecmp(mime, "video/", 6) && !mVideoTrack.mSource.get()) {
-      mVideoTrack.mIndex = i;
-      mVideoTrack.mSource = track;
-      mVideoTrack.mPacketSource = std::make_shared<PacketSource>();
+    auto duration_us = format->duration().us_or(-1);
+    if (duration_us > duration_us_) {
+      duration_us_ = duration_us;
     }
 
-    mSources.push_back(track);
-    int64_t durationUs;
-    if (meta->findInt64(kKeyDuration, &durationUs) &&
-        (durationUs > mDurationUs)) {
-      mDurationUs = durationUs;
-    }
-
-    int32_t bitrate;
-    if (totalBitrate >= 0 && meta->findInt32(kKeyBitRate, &bitrate)) {
-      totalBitrate += bitrate;
-    } else {
-      totalBitrate = -1;
+    auto bitrate = format->bitrate();
+    if (bitrate >= 0) {
+      total_bitrate += bitrate;
     }
   }
 
-  mBitrate = totalBitrate;
+  bitrate_ = total_bitrate;
 
-  AVE_LOG(LS_VERBOSE) << "initFromDataSource done. mSources.size: "
-                      << mSources.size();
+  AVE_LOG(LS_VERBOSE) << "initFrodata_source_ done. tracks.size: "
+                      << sources_.size();
 
-  if (mSources.size() == 0) {
-    return UNKNOWN_ERROR;
+  if (sources_.size() == 0) {
+    return ave::UNKNOWN_ERROR;
   }
 
-  return OK;
+  return ave::OK;
 }
 
-void GenericSource::onPrepare() {
+void GenericSource::OnPrepare() {
+  AVE_LOG(LS_VERBOSE) << "OnPrepare, data_source_:" << data_source_;
   // create DataSource
-  if (mDataSource == nullptr) {
-    if (!mUri.empty()) {
-      const char* uri = mUri.c_str();
-      AVE_LOG(LS_INFO) << "onPrepare, uri (" << uri << ")";
-      if (!strncasecmp("file://", uri, 7)) {
-        auto fileSource = std::make_shared<FileSource>(mUri.substr(7).c_str());
-        if (fileSource->initCheck() == OK) {
-          mDataSource = std::move(fileSource);
-        }
+  if (data_source_ == nullptr) {
+    if (!uri_.empty()) {
+      const char* uri = uri_.c_str();
+      // AVE_LOG(LS_INFO) << "onPrepare, uri (" << uri << ")";
+      if (!strncasecmp("http://", uri, 7) || !strncasecmp("https://", uri, 8)) {
+        // TODO: create http source
       }
     } else {
-      auto fileSource =
-          std::make_shared<FileSource>(dup(mFd.get()), mOffset, mLength);
-      if (fileSource->initCheck() == OK) {
-        mDataSource = std::move(fileSource);
+      auto file_source =
+          std::make_shared<FileSource>(dup(fd_.get()), offset_, length_);
+      if (file_source->InitCheck() == ave::OK) {
+        data_source_ = std::move(file_source);
       }
     }
 
-    if (mDataSource == nullptr) {
+    if (data_source_ == nullptr) {
       AVE_LOG(LS_ERROR) << "Failed to create DataSource";
-      notifyPreparedAndCleanup(UNKNOWN_ERROR);
+      NotifyPreparedAndCleanup(ave::UNKNOWN_ERROR);
       return;
     }
   }
+  // TODO: if streaming, wrap data source with cache source
 
   // probe source and init demuxer
-  status_t err = initFromDataSource();
-  if (err != OK) {
-    notifyPreparedAndCleanup(err);
+  status_t err = InitFromDataSource();
+  if (err != ave::OK) {
+    NotifyPreparedAndCleanup(err);
     return;
   }
 
-  finishPrepare();
+  FinishPrepare();
 }
 
-void GenericSource::finishPrepare() {
-  AVE_LOG(LS_VERBOSE) << "finishPrepare";
-  status_t err = startSources();
-  if (err != OK) {
-    notifyPreparedAndCleanup(err);
+void GenericSource::FinishPrepare() {
+  AVE_LOG(LS_VERBOSE) << "FinishPrepare";
+  status_t err = StartSources();
+  if (err != ave::OK) {
+    NotifyPreparedAndCleanup(err);
     return;
   }
 
   // TODO(yofua) when streaming, notify until buffering done
-  notifyPrepared();
+  // NotifyPrepared();
 
-  if (mAudioTrack.mSource.get() != nullptr) {
-    postReadBuffer(PlayerBase::MEDIA_TRACK_TYPE_AUDIO);
+  if (video_track_.source != nullptr) {
+    PostReadBuffer(MediaType::VIDEO);
   }
 
-  if (mVideoTrack.mSource.get() != nullptr) {
-    postReadBuffer(PlayerBase::MEDIA_TRACK_TYPE_VIDEO);
+  if (audio_track_.source != nullptr) {
+    PostReadBuffer(MediaType::AUDIO);
   }
 }
 
-status_t GenericSource::startSources() {
-  if (mAudioTrack.mSource.get() != nullptr &&
-      mAudioTrack.mSource->start() != OK) {
-    AVE_LOG(LS_ERROR) << "failed to start audio track!";
-    return UNKNOWN_ERROR;
+status_t GenericSource::StartSources() {
+  if (video_track_.source != nullptr) {
+    status_t err = video_track_.source->Start(nullptr);
+    if (err != ave::OK) {
+      AVE_LOG(LS_ERROR) << "Failed to start video source";
+      return err;
+    }
   }
 
-  if (mVideoTrack.mSource.get() != nullptr &&
-      mVideoTrack.mSource->start() != OK) {
-    AVE_LOG(LS_ERROR) << "failed to start video track!";
-    return UNKNOWN_ERROR;
+  if (audio_track_.source != nullptr) {
+    status_t err = audio_track_.source->Start(nullptr);
+    if (err != ave::OK) {
+      AVE_LOG(LS_ERROR) << "Failed to start audio source";
+      return err;
+    }
   }
 
-  return OK;
+  return ave::OK;
 }
 
-void GenericSource::notifyPreparedAndCleanup(status_t err) {
-  if (err != OK) {
+void GenericSource::NotifyPreparedAndCleanup(status_t err) {
+  if (err != ave::OK) {
     // TODO(youfa) reset data source
   }
-  notifyPrepared(err);
+  // FIXME: notify prepared
+  // NotifyPrepared(err);
 }
 
 // with Lock
-void GenericSource::postReadBuffer(media_track_type trackType) {
-  if ((mPendingReadBufferTypes & (1 << trackType)) == 0) {
-    mPendingReadBufferTypes |= (1 << trackType);
-    std::shared_ptr<Message> msg =
+void GenericSource::PostReadBuffer(MediaType track_type) {
+  if ((pending_read_buffer_types_ & (1 << static_cast<uint32_t>(track_type))) ==
+      0) {
+    pending_read_buffer_types_ |= (1 << static_cast<uint32_t>(track_type));
+    auto message =
         std::make_shared<Message>(kWhatReadBuffer, shared_from_this());
-    msg->setInt32("trackType", trackType);
-    msg->post(0);
+    message->setInt32("track_type", static_cast<int32_t>(track_type));
+    message->post();
   }
 }
 
-void GenericSource::onReadBuffer(const std::shared_ptr<Message>& msg) {
-  int32_t tmpType;
-  AVE_CHECK(msg->findInt32("trackType", &tmpType));
-  media_track_type trackType = (media_track_type)tmpType;
-  mPendingReadBufferTypes &= ~(1 << trackType);
-  readBuffer(trackType);
+void GenericSource::OnReadBuffer(const std::shared_ptr<Message>& message) {
+  int32_t type = 0;
+  AVE_CHECK(message->findInt32("track_type", &type));
+  // AVE_DCHECK(type >= 0 && type < static_cast<int32_t>(MediaType::MAX));
+  auto track_type = static_cast<MediaType>(type);
+  pending_read_buffer_types_ &= ~(1 << type);
+  ReadBuffer(track_type);
 }
 
-void GenericSource::readBuffer(media_track_type trackType,
-                               int64_t seekTimeUs,
-                               SeekMode seekMode,
-                               int64_t* actualTimeUs) {
-  Track* track;
-  size_t maxBuffers = 1;
-  switch (trackType) {
-    case PlayerBase::MEDIA_TRACK_TYPE_VIDEO:
-      track = &mVideoTrack;
-      maxBuffers = 8;  // too large of a number may influence seeks
+void GenericSource::ReadBuffer(MediaType track_type,
+                               int64_t seek_time_us,
+                               SeekMode seek_mode,
+                               int64_t* actual_time_us) {
+  size_t max_buffers = 1;
+  Track* track = nullptr;
+  switch (track_type) {
+    case MediaType::VIDEO:
+      max_buffers = 8;
+      track = &video_track_;
       break;
-    case PlayerBase::MEDIA_TRACK_TYPE_AUDIO:
-      track = &mAudioTrack;
-      maxBuffers = 64;
+    case MediaType::AUDIO:
+      max_buffers = 64;
+      track = &audio_track_;
       break;
-    case PlayerBase::MEDIA_TRACK_TYPE_SUBTITLE:
-      track = &mSubtitleTrack;
+    case MediaType::SUBTITLE:
+      track = &subtitle_track_;
       break;
-    case PlayerBase::MEDIA_TRACK_TYPE_TIMEDTEXT:
-      track = &mTimedTextTrack;
+    case MediaType::TIMED_TEXT:
+      track = &timed_text_track_;
       break;
     default:
-      return;
       break;
   }
 
-  if (track && track->mSource.get() == nullptr) {
+  if (track->source == nullptr) {
     return;
   }
 
-  if (actualTimeUs) {
-    *actualTimeUs = seekTimeUs;
+  if (actual_time_us != nullptr) {
+    *actual_time_us = seek_time_us;
   }
 
-  MediaSource::ReadOptions readOptions;
+  MediaSource::ReadOptions read_options;
 
-  if (seekTimeUs >= 0) {
-    readOptions.setSeekTo(seekTimeUs, seekMode);
+  if (seek_time_us >= 0) {
+    read_options.SetSeekTo(
+        seek_time_us,
+        static_cast<MediaSource::ReadOptions::SeekMode>(seek_mode));
   }
 
-  const bool couldReadMultiple = track->mSource->supportReadMultiple();
-  if (couldReadMultiple) {
-    readOptions.setNonBlocking();
+  const bool could_read_multiple = track->source->SupportReadMultiple();
+  if (could_read_multiple) {
+    read_options.SetNonBlocking();
   }
 
-  for (size_t numBuffer = 0; numBuffer < maxBuffers;) {
-    std::vector<std::shared_ptr<Buffer>> mediaBuffers;
-    status_t err = OK;
+  for (size_t num_buffer = 0; num_buffer < max_buffers;) {
+    std::vector<std::shared_ptr<MediaPacket>> media_packets;
+    status_t err = ave::OK;
 
     // will unlock later, add reference
-    std::shared_ptr<MediaSource> source = track->mSource;
+    auto& source = track->source;
 
     //    AVE_LOG(LS_INFO) << "before read type:" << trackType;
-    mLock.unlock();
-    if (couldReadMultiple) {
-      err = source->readMultiple(mediaBuffers, maxBuffers - numBuffer,
-                                 &readOptions);
+    lock_.unlock();
+    if (could_read_multiple) {
+      err = source->ReadMultiple(media_packets, max_buffers - num_buffer,
+                                 &read_options);
     } else {
-      std::shared_ptr<Buffer> buffer;
-      err = source->read(buffer, &readOptions);
-      if (err == OK && buffer.get() != nullptr) {
-        mediaBuffers.push_back(buffer);
+      std::shared_ptr<MediaPacket> packet;
+      err = source->Read(packet, &read_options);
+      if (err == ave::OK && packet != nullptr) {
+        media_packets.push_back(packet);
       }
     }
-    mLock.lock();
+    lock_.lock();
     //    AVE_LOG(LS_INFO) << "after read" << trackType;
 
     // maybe reset, return;
-    if (!track->mPacketSource.get()) {
+    if (track->packet_source == nullptr) {
       return;
     }
 
     size_t id = 0;
-    size_t count = mediaBuffers.size();
+    size_t count = media_packets.size();
 
     for (; id < count; id++) {
-      std::shared_ptr<Buffer> mediaBuffer = mediaBuffers[id];
-      track->mPacketSource->queueAccessunit(mediaBuffer);
-      numBuffer++;
+      auto& media_packet = media_packets[id];
+      track->packet_source->QueueAccessunit(media_packet);
+      num_buffer++;
     }
 
-    if (err == WOULD_BLOCK) {
+    if (err == ave::WOULD_BLOCK) {
       break;
-    } else if (err != OK) {
+    }
+    if (err != ave::OK) {
       // TODO(youfa)
       break;
     }
   }
 }
 
-status_t GenericSource::doSeek(int64_t seekTimeUs, SeekMode mode) {
-  if (mVideoTrack.mSource.get()) {
-    int64_t actualTimeUs;
-    readBuffer(PlayerBase::MEDIA_TRACK_TYPE_VIDEO, seekTimeUs, mode,
-               &actualTimeUs);
+status_t GenericSource::DoSeek(int64_t seek_time_us, SeekMode mode) {
+  if (video_track_.source != nullptr) {
+    int64_t actual_time_us = 0;
+    ReadBuffer(MediaType::VIDEO, seek_time_us, mode, &actual_time_us);
 
-    if (mode != PlayerBase::SEEK_CLOSEST) {
-      seekTimeUs = std::max<int64_t>(0, actualTimeUs);
+    if (mode != SeekMode::SEEK_CLOSEST) {
+      seek_time_us = std::max<int64_t>(0, actual_time_us);
     }
-    mVideoLastDequeueTimeUs = actualTimeUs;
+    video_last_dequeue_time_us_ = actual_time_us;
   }
 
-  if (mAudioTrack.mSource.get()) {
-    readBuffer(PlayerBase::MEDIA_TRACK_TYPE_AUDIO, seekTimeUs, mode);
-    mAudioLastDequeueTimeUs = seekTimeUs;
+  if (audio_track_.source != nullptr) {
+    ReadBuffer(MediaType::AUDIO, seek_time_us, mode);
+    audio_last_dequeue_time_us_ = seek_time_us;
   }
 
-  return OK;
+  if (subtitle_track_.source != nullptr) {
+    subtitle_track_.packet_source->Clear();
+  }
+
+  if (timed_text_track_.source != nullptr) {
+    timed_text_track_.packet_source->Clear();
+  }
+
+  return ave::OK;
 }
 
-void GenericSource::onMessageReceived(const std::shared_ptr<Message>& msg) {
-  std::lock_guard<std::mutex> lock(mLock);
-  switch (msg->what()) {
+void GenericSource::onMessageReceived(const std::shared_ptr<Message>& message) {
+  std::lock_guard<std::mutex> lock(lock_);
+  switch (message->what()) {
     case kWhatPrepare: {
-      onPrepare();
+      OnPrepare();
       break;
     }
 
     case kWhatReadBuffer: {
-      onReadBuffer(msg);
+      OnReadBuffer(message);
       break;
     }
 
     case kWhatSeek: {
-      int64_t seekTimeUs;
-      int32_t mode;
-      AVE_CHECK(msg->findInt64("seekTimeUs", &seekTimeUs));
-      AVE_CHECK(msg->findInt32("mode", &mode));
+      int64_t seek_time_us = -1;
+      int32_t mode = -1;
+      AVE_CHECK(message->findInt64("seek_time_us", &seek_time_us));
+      AVE_CHECK(message->findInt32("mode", &mode));
 
       std::shared_ptr<Message> response = std::make_shared<Message>();
-      status_t err = doSeek(seekTimeUs, static_cast<SeekMode>(mode));
+      status_t err = DoSeek(seek_time_us, static_cast<SeekMode>(mode));
       response->setInt32("err", err);
 
       std::shared_ptr<ReplyToken> replyID;
-      AVE_CHECK(msg->senderAwaitsResponse(replyID));
+      AVE_CHECK(message->senderAwaitsResponse(replyID));
       response->postReply(replyID);
 
       break;
