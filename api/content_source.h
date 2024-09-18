@@ -13,12 +13,14 @@
 #include "base/errors.h"
 
 #include "media/foundation/media_format.h"
+#include "media/foundation/media_packet.h"
 
 #include "player_interface.h"
 
 namespace avp {
 
 using ave::media::MediaFormat;
+using ave::media::MediaType;
 
 class ContentSource {
  public:
@@ -78,10 +80,10 @@ class ContentSource {
 
     /**
      * @brief Called when data needs to be fetched for a specific track.
-     * @param trackIndex The index of the track for which data needs to be
+     * @param track_index The index of the track for which data needs to be
      * fetched.
      */
-    virtual void OnFetchData(size_t trackIndex) = 0;
+    virtual void OnFetchData(size_t track_index) = 0;
   };
 
   ContentSource() = default;
@@ -124,13 +126,13 @@ class ContentSource {
 
   /**
    * @brief Dequeues an access unit from the specified track.
-   * @param trackIndex The index of the track.
-   * @param accessUnit The output parameter to store the dequeued access unit.
+   * @param track_type The media type of the track.
+   * @param access_unit The output parameter to store the dequeued access unit.
    * @return The status of the operation.
    */
   virtual status_t DequeueAccessUnit(
-      size_t trackIndex,
-      std::shared_ptr<ave::media::Buffer>& accessUnit) = 0;
+      MediaType track_type,
+      std::shared_ptr<ave::media::MediaPacket>& access_unit) = 0;
 
   /**
    * @brief Retrieves the media format associated with the content source.
@@ -145,11 +147,11 @@ class ContentSource {
 
   /**
    * @brief Gets the duration of the content source.
-   * @param durationUs The output parameter to store the duration in
+   * @param duration_us The output parameter to store the duration in
    * microseconds.
    * @return The status of the operation.
    */
-  virtual status_t GetDuration(int64_t* /* durationUs */) {
+  virtual status_t GetDuration(int64_t* /* duration_us */) {
     return ave::INVALID_OPERATION;
   }
 
@@ -161,32 +163,32 @@ class ContentSource {
 
   /**
    * @brief Gets the media format of the specified track.
-   * @param trackIndex The index of the track.
+   * @param track_index The index of the track.
    * @return The media format of the track.
    */
   virtual std::shared_ptr<MediaFormat> GetTrackInfo(
-      size_t /* trackIndex */) const {
+      size_t /* track_index */) const {
     return {};
   }
 
   /**
    * @brief Selects or deselects the specified track.
-   * @param trackIndex The index of the track.
+   * @param track_index The index of the track.
    * @param select True to select the track, false to deselect.
    * @return The status of the operation.
    */
-  virtual status_t SelectTrack(size_t /* trackIndex */,
-                               bool /* select */) const {
+  virtual status_t SelectTrack(size_t /* track_index */, bool /* select */
+  ) const {
     return ave::INVALID_OPERATION;
   }
 
   /**
    * @brief Seeks to the specified time position.
-   * @param seekTimeUs The time position to seek to in microseconds.
+   * @param seek_time_us The time position to seek to in microseconds.
    * @param mode The seek mode.
    * @return The status of the operation.
    */
-  virtual status_t SeekTo(int64_t /* seekTimeUs */, SeekMode /* mode */) {
+  virtual status_t SeekTo(int64_t /* seek_time_us */, SeekMode /* mode */) {
     return ave::INVALID_OPERATION;
   }
 };

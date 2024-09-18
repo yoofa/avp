@@ -11,48 +11,61 @@
 #include <memory>
 #include <vector>
 
-#include "base/errors.h"
+#include "api/content_source.h"
+#include "api/demuxer/demuxer.h"
+#include "api/demuxer/demuxer_factory.h"
+
+#include "base/data_source/data_source.h"
+#include "base/thread_annotation.h"
 #include "base/unique_fd.h"
-#include "media/looper.h"
-#include "media/message.h"
-#include "media/meta_data.h"
-#include "player/data_source.h"
-#include "player/demuxer_factory.h"
-#include "player/media_source.h"
+
+#include "media/foundation/handler.h"
+#include "media/foundation/looper.h"
+#include "media/foundation/media_packet.h"
+#include "media/foundation/media_source.h"
+#include "media/foundation/message.h"
 #include "player/packet_source.h"
-#include "player_interface.h"
 
 namespace avp {
 
-using media_track_type = PlayerBase::media_track_type;
-using SeekMode = PlayerBase::SeekMode;
+using ave::media::Buffer;
+using ave::media::Handler;
+using ave::media::MediaPacket;
+using ave::media::MediaSource;
+using ave::media::MediaType;
+using ave::media::Message;
 
-class GenericSource : public PlayerBase::ContentSource {
+class GenericSource : public Handler, public ContentSource {
  public:
   GenericSource();
-  virtual ~GenericSource();
+  ~GenericSource() override;
 
-  status_t setDataSource(const char* url);
-  status_t setDataSource(int fd, int64_t offset, int64_t length);
+  void SetNotify(std::shared_ptr<Notify> notify) override;
 
-  void prepare() override;
-  void start() override;
-  void stop() override;
-  void pause() override;
-  void resume() override;
-  virtual status_t seekTo(
-      int64_t seekTimeUs,
-      SeekMode mode = SeekMode ::SEEK_PREVIOUS_SYNC) override;
+  status_t SetDataSource(const char* url /*, http_downloader*/);
+  status_t SetDataSource(int fd, int64_t offset, int64_t length);
+  status_t SetDataSource(std::shared_ptr<ave::DataSource> data_source);
 
-  std::shared_ptr<MetaData> getSourceMeta() override;
-  std::shared_ptr<MetaData> getMeta(bool audio) override;
+  void Prepare() override;
+  void Start() override;
+  void Stop() override;
+  void Pause() override;
+  void Resume() override;
+  status_t SeekTo(int64_t seek_time_us, SeekMode mode) override;
 
-  status_t dequeueAccessUnit(bool audio,
-                             std::shared_ptr<Buffer>& accessUnit) override;
-  status_t getDuration(int64_t* durationUs) override;
-  size_t getTrackCount() const override;
-  std::shared_ptr<Message> getTrackInfo(size_t trackIndex) const override;
-  status_t selectTrack(size_t trackIndex, bool select) const override;
+  std::shared_ptr<MediaFormat> GetFormat() override;
+
+  status_t DequeueAccessUnit(
+      MediaType track_type,
+      std::shared_ptr<MediaPacket>& access_unit) override;
+
+  status_t GetDuration(int64_t* duration_us) override;
+
+  size_t GetTrackCount() const override;
+
+  std::shared_ptr<MediaFormat> GetTrackInfo(size_t track_index) const override;
+
+  status_t SelectTrack(size_t track_index, bool select) const override;
 
  protected:
   void onMessageReceived(const std::shared_ptr<Message>& message) override;
@@ -70,55 +83,62 @@ class GenericSource : public PlayerBase::ContentSource {
     kWhatSeek,
     kWhatReadBuffer,
     kWhatStart,
+    kWhatStop,
+    kWhatPause,
     kWhatResume,
     kWhatSecureDecodersInstantiated,
   };
 
-  status_t initFromDataSource();
-  status_t startSources();
-  void notifyPreparedAndCleanup(status_t err);
-  void finishPrepare();
-  void resetDataSource();
-  void onPrepare();
-  void postReadBuffer(media_track_type trackType);
-  void onReadBuffer(const std::shared_ptr<Message>& msg);
-  void readBuffer(media_track_type trackType,
-                  int64_t seekTimeUs = -1ll,
-                  SeekMode seekMode = SeekMode::SEEK_PREVIOUS_SYNC,
-                  int64_t* actualTimeUs = nullptr);
-  status_t doSeek(int64_t seekTimeUs, SeekMode mode);
+  status_t InitFromDataSource() REQUIRES(lock_);
+  status_t StartSources() REQUIRES(lock_);
+  void NotifyPreparedAndCleanup(status_t err) REQUIRES(lock_);
+  void FinishPrepare() REQUIRES(lock_);
+  void ResetDataSource() REQUIRES(lock_);
+  void OnPrepare() REQUIRES(lock_);
+  void PostReadBuffer(MediaType track_type) REQUIRES(lock_);
+  void OnReadBuffer(const std::shared_ptr<Message>& message) REQUIRES(lock_);
+  void ReadBuffer(MediaType track_type,
+                  int64_t seek_time_us = -1ll,
+                  SeekMode seek_mode = SeekMode::SEEK_PREVIOUS_SYNC,
+                  int64_t* actual_time_us = nullptr) REQUIRES(lock_);
+  status_t DoSeek(int64_t seek_time_us, SeekMode mode) REQUIRES(lock_);
 
   struct Track {
-    size_t mIndex;
-    std::shared_ptr<MediaSource> mSource;
-    std::shared_ptr<PacketSource> mPacketSource;
+    size_t index;
+    MediaType media_type;
+    std::shared_ptr<MediaSource> source;
+    std::shared_ptr<PacketSource> packet_source;
   };
 
-  std::vector<std::shared_ptr<MediaSource>> mSources;
-  Track mAudioTrack;
-  // int64_t mAudioTimeUs;
-  int64_t mAudioLastDequeueTimeUs;
-  Track mVideoTrack;
-  // int64_t mVideoTimeUs;
-  int64_t mVideoLastDequeueTimeUs;
-  Track mSubtitleTrack;
-  Track mTimedTextTrack;
-  uint32_t mPendingReadBufferTypes;
+  std::weak_ptr<Notify> notify_ GUARDED_BY(lock_);
+  std::string uri_ GUARDED_BY(lock_);
+  ave::base::unique_fd fd_ GUARDED_BY(lock_);
+  int64_t offset_ GUARDED_BY(lock_);
+  int64_t length_ GUARDED_BY(lock_);
+  std::shared_ptr<ave::DataSource> data_source_ GUARDED_BY(lock_);
+  std::shared_ptr<MediaFormat> source_format_ GUARDED_BY(lock_);
+  int64_t duration_us_ GUARDED_BY(lock_);
+  int64_t bitrate_ GUARDED_BY(lock_);
 
-  std::string mUri;
-  unique_fd mFd;
-  int64_t mOffset;
-  int64_t mLength;
-  std::shared_ptr<DataSource> mDataSource;
-  std::unique_ptr<DemuxerFactory> mDemuxerFactory;
-  std::shared_ptr<MetaData> mSourceMeta;
-  std::shared_ptr<Demuxer> mDemuxer;
+  std::unique_ptr<DemuxerFactory> demuxer_factory_;
+  std::shared_ptr<Demuxer> demuxer_;
 
-  int64_t mDurationUs;
-  int32_t mBitrate;
+  std::vector<std::shared_ptr<MediaSource>> sources_ GUARDED_BY(lock_);
+  Track audio_track_ GUARDED_BY(lock_);
+  Track video_track_ GUARDED_BY(lock_);
+  Track subtitle_track_ GUARDED_BY(lock_);
+  Track timed_text_track_ GUARDED_BY(lock_);
 
-  mutable std::mutex mLock;
-  std::shared_ptr<Looper> mLooper;
+  int64_t audio_last_dequeue_time_us_ GUARDED_BY(lock_);
+  int64_t video_last_dequeue_time_us_ GUARDED_BY(lock_);
+  uint64_t pending_read_buffer_types_ GUARDED_BY(lock_);
+
+  bool preparing_;
+  bool started_;
+  bool is_streaming_;
+
+  mutable std::mutex lock_;
+  std::shared_ptr<ave::media::Looper> looper_;
 };
 
 }  // namespace avp
