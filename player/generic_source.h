@@ -65,7 +65,7 @@ class GenericSource : public Handler, public ContentSource {
 
   std::shared_ptr<MediaFormat> GetTrackInfo(size_t track_index) const override;
 
-  status_t SelectTrack(size_t track_index, bool select) const override;
+  status_t SelectTrack(size_t track_index, bool select) override;
 
  protected:
   void onMessageReceived(const std::shared_ptr<Message>& message) override;
@@ -102,6 +102,11 @@ class GenericSource : public Handler, public ContentSource {
                   SeekMode seek_mode = SeekMode::SEEK_PREVIOUS_SYNC,
                   int64_t* actual_time_us = nullptr) REQUIRES(lock_);
   status_t DoSeek(int64_t seek_time_us, SeekMode mode) REQUIRES(lock_);
+
+  void SchedulePollBuffering() REQUIRES(lock_);
+  void OnPollBuffering() REQUIRES(lock_);
+
+  void NotifyBuffering(int32_t percentage) REQUIRES(lock_);
 
   struct Track {
     size_t index;

@@ -11,19 +11,24 @@
 
 namespace avp {
 
-PacketSource::PacketSource(media_track_type track_type)
-    : track_type_(track_type) {}
+PacketSource::PacketSource(std::shared_ptr<MediaFormat> format)
+    : format_(std::move(format)) {}
 
 PacketSource::~PacketSource() = default;
 
 status_t PacketSource::Start() {
   return ave::OK;
 }
+
 status_t PacketSource::Stop() {
   return ave::OK;
 }
 
 void PacketSource::Clear() {}
+
+void PacketSource::SetFormat(std::shared_ptr<MediaFormat> format) {
+  format_ = std::move(format);
+}
 
 bool PacketSource::HasBufferAvailable(status_t* result) {
   std::unique_lock<std::mutex> l(lock_);

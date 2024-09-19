@@ -9,29 +9,34 @@
 #define PACKET_SOURCE_H
 
 #include <condition_variable>
-#include <list>
 #include <memory>
 #include <mutex>
 
 #include "api/player_interface.h"
 #include "base/constructor_magic.h"
+#include "media/foundation/media_format.h"
 #include "media/foundation/media_packet.h"
+#include "media/foundation/media_utils.h"
 
 namespace avp {
 
+using ave::media::MediaFormat;
 using ave::media::MediaPacket;
+using ave::media::MediaType;
 
 class PacketSource {
  public:
-  PacketSource(media_track_type track_type = MEDIA_TRACK_TYPE_UNKNOWN);
+  explicit PacketSource(std::shared_ptr<MediaFormat> format);
   ~PacketSource();
 
-  media_track_type type() const { return track_type_; }
+  MediaType type() const { return format_->stream_type(); }
 
   status_t Start();
   status_t Stop();
 
   void Clear();
+
+  void SetFormat(std::shared_ptr<MediaFormat> format);
 
   bool HasBufferAvailable(status_t* result);
   size_t GetAvailableBufferCount(status_t* result);
@@ -40,7 +45,7 @@ class PacketSource {
   status_t DequeueAccessUnit(std::shared_ptr<MediaPacket>& packet);
 
  private:
-  media_track_type track_type_;
+  std::shared_ptr<MediaFormat> format_;
   std::queue<std::shared_ptr<MediaPacket>> packets_;
   std::mutex lock_;
   std::condition_variable condition_;
