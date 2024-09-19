@@ -80,10 +80,10 @@ class ContentSource {
 
     /**
      * @brief Called when data needs to be fetched for a specific track.
-     * @param track_index The index of the track for which data needs to be
+     * @param stream_type The type of the track for which data needs to be
      * fetched.
      */
-    virtual void OnFetchData(size_t track_index) = 0;
+    virtual void OnFetchData(MediaType stream_type) = 0;
   };
 
   ContentSource() = default;
@@ -178,7 +178,7 @@ class ContentSource {
    * @return The status of the operation.
    */
   virtual status_t SelectTrack(size_t /* track_index */, bool /* select */
-  ) const {
+  ) {
     return ave::INVALID_OPERATION;
   }
 

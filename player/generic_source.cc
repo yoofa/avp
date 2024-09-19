@@ -22,6 +22,10 @@
 
 namespace avp {
 
+namespace {
+const int32_t kDefaultPollBufferingIntervalUs = 1000000;
+}  // namespace
+
 using ave::DataSource;
 using ave::FileSource;
 using ave::media::Looper;
@@ -153,7 +157,8 @@ status_t GenericSource::SeekTo(int64_t seek_time_us, SeekMode mode) {
 }
 
 std::shared_ptr<MediaFormat> GenericSource::GetFormat() {
-  return nullptr;
+  std::lock_guard<std::mutex> lock(lock_);
+  return source_format_;
 }
 
 std::shared_ptr<MediaFormat> GenericSource::GetTrackInfo(
@@ -238,9 +243,98 @@ size_t GenericSource::GetTrackCount() const {
   return sources_.size();
 }
 
-status_t GenericSource::SelectTrack(size_t track_index, bool select) const {
+status_t GenericSource::SelectTrack(size_t track_index, bool select) {
   std::lock_guard<std::mutex> lock(lock_);
-  return ave::OK;
+  if (track_index >= sources_.size()) {
+    return ave::INVALID_OPERATION;
+  }
+
+  if (!select) {
+    // only subtitile and timed text track can be deselected
+    Track* track = nullptr;
+    if (subtitle_track_.source != nullptr &&
+        subtitle_track_.index == track_index) {
+      track = &subtitle_track_;
+    } else if (timed_text_track_.source != nullptr &&
+               timed_text_track_.index == track_index) {
+      track = &timed_text_track_;
+    }
+    if (track != nullptr) {
+      AVE_LOG(LS_ERROR) << "Cannot deselect track " << track;
+      return ave::INVALID_OPERATION;
+    }
+
+    track->source->Stop();
+    track->source.reset();
+    track->packet_source->Clear();
+  }
+
+  const auto source = sources_[track_index];
+  auto meta = source->GetFormat();
+  auto stream_type = meta->stream_type();
+
+  switch (stream_type) {
+    case MediaType::AUDIO:
+    case MediaType::VIDEO: {
+      Track* track =
+          stream_type == MediaType::AUDIO ? &audio_track_ : &video_track_;
+
+      if (track->source != nullptr && track->index == track_index) {
+        return ave::OK;
+      }
+
+      auto msg =
+          std::make_shared<Message>(kWhatChangeAVSource, shared_from_this());
+      msg->setInt32("track_index", static_cast<int32_t>(track_index));
+      msg->post();
+      return ave::OK;
+    }
+
+    case MediaType::SUBTITLE:
+    case MediaType::TIMED_TEXT: {
+      Track* track = stream_type == MediaType::SUBTITLE ? &subtitle_track_
+                                                        : &timed_text_track_;
+      if (track->source != nullptr && track->index == track_index) {
+        return ave::OK;
+      }
+
+      track->index = track_index;
+      if (track->source != nullptr) {
+        track->source->Stop();
+        track->source.reset();
+        track->packet_source->Clear();
+      }
+
+      track->source = sources_[track_index];
+      track->source->Start(nullptr);
+      if (track->packet_source == nullptr) {
+        track->packet_source = std::make_shared<PacketSource>(meta);
+      } else {
+        track->packet_source->SetFormat(meta);
+      }
+
+      status_t ret = ave::OK;
+
+      if (subtitle_track_.source != nullptr &&
+          !subtitle_track_.packet_source->HasBufferAvailable(&ret)) {
+        auto msg = std::make_shared<Message>(kWhatFetchSubtitleData,
+                                             shared_from_this());
+        msg->post();
+      }
+
+      if (timed_text_track_.source != nullptr &&
+          !timed_text_track_.packet_source->HasBufferAvailable(&ret)) {
+        auto msg = std::make_shared<Message>(kWhatFetchSubtitleData,
+                                             shared_from_this());
+        msg->post();
+      }
+
+      return ave::OK;
+    }
+    default: {
+      return ave::INVALID_OPERATION;
+    }
+  }
 }
 
 /***************************************/
@@ -281,8 +375,8 @@ status_t GenericSource::InitFromDataSource() {
   int64_t total_bitrate = 0;
 
   for (size_t i = 0; i < num_tracks; i++) {
-    auto track = demuxer_->GetTrack(i);
-    if (track == nullptr) {
+    auto source = demuxer_->GetTrack(i);
+    if (source == nullptr) {
       continue;
     }
 
@@ -293,20 +387,20 @@ status_t GenericSource::InitFromDataSource() {
       AVE_LOG(LS_ERROR) << "no metadata for track " << i;
       return ave::UNKNOWN_ERROR;
     }
-    sources_.push_back(track);
+    sources_.push_back(source);
 
-    if (format->stream_type() == MediaType::AUDIO &&
-        audio_track_.source == nullptr) {
-      audio_track_.index = i;
-      audio_track_.source = track;
-      audio_track_.packet_source =
-          std::make_shared<PacketSource>(format->stream_type());
-    } else if (format->stream_type() == MediaType::VIDEO &&
-               video_track_.source == nullptr) {
-      video_track_.index = i;
-      video_track_.source = track;
-      video_track_.packet_source =
-          std::make_shared<PacketSource>(format->stream_type());
+    Track* track = nullptr;
+
+    if (format->stream_type() == MediaType::AUDIO) {
+      track = &audio_track_;
+    } else if (format->stream_type() == MediaType::VIDEO) {
+      track = &video_track_;
+    }
+
+    if (track != nullptr) {
+      track->index = i;
+      track->source = source;
+      track->packet_source = std::make_shared<PacketSource>(format);
     }
 
     AVE_LOG(LS_VERBOSE) << "InitFrodata_source_ track[" << i << "]: ";
@@ -418,7 +512,17 @@ void GenericSource::NotifyPreparedAndCleanup(status_t err) {
   // NotifyPrepared(err);
 }
 
-// with Lock
+void GenericSource::SchedulePollBuffering() {
+  auto msg = std::make_shared<Message>(kWhatPollBuffering, shared_from_this());
+  msg->post(kDefaultPollBufferingIntervalUs);
+}
+
+void GenericSource::OnPollBuffering() {
+  // TODO: finish buffering and notify prepared
+
+  SchedulePollBuffering();
+}
+
 void GenericSource::PostReadBuffer(MediaType track_type) {
   if ((pending_read_buffer_types_ & (1 << static_cast<uint32_t>(track_type))) ==
       0) {
@@ -587,6 +691,13 @@ void GenericSource::onMessageReceived(const std::shared_ptr<Message>& message) {
 
       break;
     }
+  }
+}
+
+void GenericSource::NotifyBuffering(int32_t percentage) {
+  auto notify = notify_.lock();
+  if (notify != nullptr) {
+    notify->OnBufferingUpdate(percentage);
   }
 }
 
