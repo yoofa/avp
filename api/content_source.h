@@ -22,9 +22,9 @@ namespace avp {
 using ave::media::MediaFormat;
 using ave::media::MediaType;
 
-class ContentSource {
+class ContentSource : public ave::media::MessageObject {
  public:
-  enum class Flags {
+  enum Flags : int32_t {
     FLAG_CAN_PAUSE = 1,
     FLAG_CAN_SEEK_BACKWARD = 2,  // the "10 sec back button"
     FLAG_CAN_SEEK_FORWARD = 4,   // the "10 sec forward button"
@@ -44,7 +44,17 @@ class ContentSource {
      * @brief Called when the content source is prepared and ready to start
      * playback.
      */
-    virtual void OnPrepared() = 0;
+    virtual void OnPrepared(status_t err) = 0;
+
+    /**
+     *
+     */
+    virtual void OnFlagsChanged(int32_t flags) = 0;
+
+    /**
+     *
+     */
+    virtual void OnVideoSizeChanged(std::shared_ptr<MediaFormat>& format) = 0;
 
     /**
      * @brief Called when a seek operation is completed.
@@ -87,7 +97,7 @@ class ContentSource {
   };
 
   ContentSource() = default;
-  virtual ~ContentSource() = default;
+  ~ContentSource() override = default;
 
   /**
    * @brief Sets the notify object for the content source.

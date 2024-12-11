@@ -17,6 +17,7 @@
 #include "media/codec/codec_factory.h"
 
 #include "content_source.h"
+#include "content_source_factory.h"
 #include "player_interface.h"
 
 namespace avp {
@@ -41,6 +42,16 @@ class Player {
      * @brief Destroys the Builder object.
      */
     ~Builder() = default;
+
+    /**
+     * @brief Sets the content source factory for the player.
+     * @param content_source_factory The content source factory to set.
+     */
+    Builder& setContentSourceFactory(
+        std::unique_ptr<ContentSourceFactory>&& content_source_factory) {
+      content_source_factory_ = std::move(content_source_factory);
+      return *this;
+    }
 
     /**
      * @brief Sets the codec factory for the player.
@@ -72,6 +83,7 @@ class Player {
     std::shared_ptr<Player> build();
 
    private:
+    std::unique_ptr<ContentSourceFactory> content_source_factory_;
     std::unique_ptr<ave::media::CodecFactory> codec_factory_;
     std::unique_ptr<ave::media::AudioDeviceFactory> audio_device_factory_;
   };
