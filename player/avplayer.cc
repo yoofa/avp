@@ -6,49 +6,19 @@
  */
 #include "avplayer.h"
 
-#include <iostream>
-
 #include "base/checks.h"
 #include "base/errors.h"
 #include "base/logging.h"
-#include "media/message.h"
-#include "player/default_Audio_decoder_factory.h"
-#include "player/default_video_decoder_factory.h"
+#include "media/foundation/message_object.h"
 
 #include "generic_source.h"
 
 namespace avp {
 
-AvPlayer::AvPlayer()
-    : mPlayerLooper(std::make_shared<Looper>()),
-      mMediaClock(std::make_shared<MediaClock>()),
-      mStarted(false),
-      mPrepared(false),
-      mPaused(false),
-      mSourceStarted(false),
-      mScanSourcesPendding(false) {
-  mPlayerLooper->setName("AvPlayer");
-  mMediaClock->init();
-}
+using ave::media::MessageObject;
 
-AvPlayer::~AvPlayer() {
-  mPlayerLooper->unregisterHandler(id());
-  mPlayerLooper->stop();
-}
-
-status_t AvPlayer::setListener(const std::shared_ptr<Listener>& listener) {
-  mListener = listener;
-  return 0;
-}
-
-status_t AvPlayer::init() {
-  mPlayerLooper->start();
-  mPlayerLooper->registerHandler(shared_from_this());
-
-  return 0;
-}
-
-static bool IsHTTPLiveURL(const char* url) {
+namespace {
+bool IsHTTPLiveURL(const char* url) {
   if (!strncasecmp("http://", url, 7) || !strncasecmp("https://", url, 8) ||
       !strncasecmp("file://", url, 7)) {
     size_t len = strlen(url);
@@ -64,7 +34,7 @@ static bool IsHTTPLiveURL(const char* url) {
   return false;
 }
 
-static bool IsRTSPURL(const char* url) {
+bool IsRTSPURL(const char* url) {
   if (!strncasecmp(url, "rtsp://", 7)) {
     return true;
   }
@@ -98,7 +68,44 @@ static bool IsDASHUrl(const char* url) {
   return false;
 }
 
-status_t AvPlayer::setDataSource(const char* url) {
+}  // namespace
+
+AvPlayer::AvPlayer(std::unique_ptr<ContentSourceFactory> content_source_factory,
+                   std::unique_ptr<CodecFactory> codec_factory,
+                   std::unique_ptr<AudioDeviceFactory> audio_device)
+    : content_source_factory_(std::move(content_source_factory)),
+      codec_factory_(std::move(codec_factory)),
+      audio_device_factory_(std::move(audio_device)),
+      player_looper_(std::make_shared<Looper>()),
+      media_clock_(std::make_shared<MediaClock>()),
+      started_(false),
+      prepared_(false),
+      paused_(false),
+      source_started_(false),
+      scan_sources_pending_(false) {
+  player_looper_->setName("AvPlayer");
+}
+
+AvPlayer::~AvPlayer() {
+  player_looper_->unregisterHandler(id());
+  player_looper_->stop();
+}
+
+status_t AvPlayer::SetListener(std::shared_ptr<Listener> listener) {
+  listener_ = std::move(listener);
+  return ave::OK;
+}
+
+status_t AvPlayer::Init() {
+  player_looper_->start();
+  player_looper_->registerHandler(shared_from_this());
+
+  return 0;
+}
+
+status_t AvPlayer::SetDataSource(
+    const char* url,
+    const std::unordered_map<std::string, std::string>& headers) {
   std::shared_ptr<ContentSource> source;
   if (IsHTTPLiveURL(url)) {
     // httplive
@@ -108,194 +115,188 @@ status_t AvPlayer::setDataSource(const char* url) {
     // dash
   } else {
     // generic
-    std::shared_ptr<GenericSource> genericSource(
+    std::shared_ptr<GenericSource> generic_source(
         std::make_shared<GenericSource>());
-    status_t err = genericSource->setDataSource(url);
-    if (err == OK) {
-      source = std::move(genericSource);
+    status_t err = generic_source->SetDataSource(url);
+    if (err == ave::OK) {
+      source = std::move(generic_source);
     } else {
       AVE_LOG(LS_ERROR) << "setDataSource (" << url << ") error";
     }
   }
 
-  return setDataSource(source);
+  return SetDataSource(source);
 }
 
-status_t AvPlayer::setDataSource(int fd, int64_t offset, int64_t length) {
+status_t AvPlayer::SetDataSource(int fd, int64_t offset, int64_t length) {
   std::shared_ptr<ContentSource> source;
   {
-    std::shared_ptr<GenericSource> genericSource(
+    std::shared_ptr<GenericSource> generic_source(
         std::make_shared<GenericSource>());
-    genericSource->setDataSource(fd, offset, length);
-    source = std::move(genericSource);
+    generic_source->SetDataSource(fd, offset, length);
+    source = std::move(generic_source);
   }
 
-  return setDataSource(source);
+  return SetDataSource(source);
+}
+status_t AvPlayer::SetDataSource(std::shared_ptr<ave::DataSource> data_source) {
+  std::shared_ptr<ContentSource> source;
+  return SetDataSource(source);
 }
 
-status_t AvPlayer::setDataSource(const std::shared_ptr<ContentSource>& source) {
+status_t AvPlayer::SetDataSource(std::shared_ptr<ContentSource> source) {
   auto msg = std::make_shared<Message>(kWhatSetDataSource, shared_from_this());
-  auto notify =
-      std::make_shared<Message>(kWhatSourceNotify, shared_from_this());
-  source->setNotifier(notify);
+  source->SetNotify(shared_from_this());
 
   msg->setObject("source", std::static_pointer_cast<MessageObject>(source));
   msg->post();
-  return OK;
+  return ave::OK;
 }
 
-status_t AvPlayer::setAudioSink(std::shared_ptr<AudioSink> sink) {
-  auto msg = std::make_shared<Message>(kWhatSetAudioSink, shared_from_this());
-  msg->setObject("audioSink", std::move(sink));
-  msg->post();
-  return OK;
-}
-
-status_t AvPlayer::setVideoSink(std::shared_ptr<VideoSink> sink) {
+status_t AvPlayer::SetVideoSink(std::shared_ptr<VideoSink> sink) {
   auto msg = std::make_shared<Message>(kWhatSetVideoSink, shared_from_this());
   msg->setObject("videoSink", std::move(sink));
   msg->post();
-  return OK;
+  return ave::OK;
 }
 
-status_t AvPlayer::prepare() {
+status_t AvPlayer::Prepare() {
   auto msg = std::make_shared<Message>(kWhatPrepare, shared_from_this());
   msg->post();
-  return OK;
+  return ave::OK;
 }
 
-status_t AvPlayer::start() {
+status_t AvPlayer::Start() {
   auto msg = std::make_shared<Message>(kWhatStart, shared_from_this());
   msg->post();
-  return OK;
+  return ave::OK;
 }
 
-status_t AvPlayer::stop() {
-  return OK;
+status_t AvPlayer::Stop() {
+  return ave::OK;
 }
 
-status_t AvPlayer::pause() {
+status_t AvPlayer::Pause() {
   auto msg = std::make_shared<Message>(kWhatPause, shared_from_this());
   msg->post();
-  return OK;
+  return ave::OK;
 }
 
-status_t AvPlayer::resume() {
+status_t AvPlayer::Resume() {
   auto msg = std::make_shared<Message>(kWhatResume, shared_from_this());
   msg->post();
-  return OK;
+  return ave::OK;
 }
 
-status_t AvPlayer::seekTo(int msec, SeekMode seekMode) {
-  return OK;
+status_t AvPlayer::SeekTo(int msec, SeekMode seekMode) {
+  return ave::OK;
 }
 
-status_t AvPlayer::reset() {
+status_t AvPlayer::Reset() {
   auto msg = std::make_shared<Message>(kWhatReset, shared_from_this());
   msg->post(0);
-  return OK;
+  return ave::OK;
 }
 
 ///////////////////////////////////////////
 
-void AvPlayer::postScanSources() {
-  if (mScanSourcesPendding) {
+void AvPlayer::PostScanSources() {
+  if (scan_sources_pending_) {
     return;
   }
   auto msg = std::make_shared<Message>(kWhatScanSources, shared_from_this());
   msg->post();
-  mScanSourcesPendding = true;
+  scan_sources_pending_ = true;
 }
 
-status_t AvPlayer::instantiateDecoder(bool audio,
+status_t AvPlayer::InstantiateDecoder(bool audio,
                                       std::shared_ptr<AvpDecoder>& decoder) {
   if (decoder.get() != nullptr) {
-    return OK;
+    return ave::OK;
   }
 
-  auto format = mSource->getFormat(audio);
+  auto format = source_->GetTrackInfo(audio);
 
   if (format.get() == nullptr) {
-    return UNKNOWN_ERROR;
+    return ave::UNKNOWN_ERROR;
   }
 
-  std::string mime;
-  AVE_CHECK(format->findString("mime", mime));
+  std::string mime = format->mime();
   AVE_LOG(LS_INFO) << "instantiateDecoder mime: " << mime;
 
   if (audio) {
     auto notify =
         std::make_shared<Message>(kWhatAudioNotify, shared_from_this());
-    decoder = std::make_shared<AvpDecoder>(notify, mSource, mRender);
+    decoder = std::make_shared<AvpDecoder>(notify, source_, sync_render_);
   } else {
     auto notify =
         std::make_shared<Message>(kWhatVideoNotify, shared_from_this());
     decoder =
-        std::make_shared<AvpDecoder>(notify, mSource, mRender, mVideoSink);
+        std::make_shared<AvpDecoder>(notify, source_, sync_render_, mVideoSink);
   }
 
-  decoder->init();
+  decoder->Init();
 
-  decoder->configure(format);
+  decoder->Configure(format);
 
-  decoder->start();
+  decoder->Start();
 
-  return OK;
+  return ave::OK;
 }
 
 ///////////////////////////////////////////
 
-void AvPlayer::onStart(int64_t startUs, SeekMode seekMode) {
+void AvPlayer::OnStart(int64_t startUs, SeekMode seekMode) {
   AVE_LOG(LS_INFO) << "onStart";
-  if (!mSourceStarted) {
-    mSource->start();
-    mSourceStarted = true;
+  if (!source_started_) {
+    source_->Start();
+    source_started_ = true;
   }
   if (startUs > 0) {
     // TODO(youfa) performSeek
   }
 
-  mStarted = true;
-  mPaused = true;
+  started_ = true;
+  paused_ = true;
 
   auto renderNotify(
       std::make_shared<Message>(kWhatRendererNotify, shared_from_this()));
-  mRender = std::make_shared<AvpRenderSynchronizer>(renderNotify, mPlayerLooper,
-                                                    mMediaClock);
-  mRender->init();
+  sync_render_ = std::make_shared<AvpRenderSynchronizer>(
+      renderNotify, player_looper_, media_clock_);
+  sync_render_->init();
 
-  mRender->setAudioSink(mAudioSink);
-  mRender->setVideoSink(mVideoSink);
+  sync_render_->setAudioSink(mAudioSink);
+  sync_render_->setVideoSink(mVideoSink);
 
-  postScanSources();
+  PostScanSources();
 }
 
-void AvPlayer::onStop() {}
+void AvPlayer::OnStop() {}
 
-void AvPlayer::onPause() {}
+void AvPlayer::OnPause() {}
 
-void AvPlayer::onResume() {}
+void AvPlayer::OnResume() {}
 
-void AvPlayer::onSeek() {}
+void AvPlayer::OnSeek() {}
 
-void AvPlayer::performReset() {
-  mSource.reset();
+void AvPlayer::PerformReset() {
+  source_.reset();
 }
 
-void AvPlayer::onSourceNotify(const std::shared_ptr<Message>& msg) {
+void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
   int32_t what;
   AVE_CHECK(msg->findInt32("what", &what));
   switch (what) {
     case ContentSource::kWhatPrepared: {
-      AVE_LOG(LS_INFO) << "source prepared: " << mSource.get();
-      if (mSource.get() == nullptr) {
+      AVE_LOG(LS_INFO) << "source prepared: " << source_.get();
+      if (source_.get() == nullptr) {
         return;
       }
       int32_t err;
       AVE_CHECK(msg->findInt32("err", &err));
-      if (err != OK) {
+      if (err != ave::OK) {
       } else {
-        mPrepared = true;
+        prepared_ = true;
       }
 
       // TODO(youfa) new msg here
@@ -307,6 +308,7 @@ void AvPlayer::onSourceNotify(const std::shared_ptr<Message>& msg) {
       break;
   }
 }
+
 void AvPlayer::onDecoderNotify(const std::shared_ptr<Message>& msg) {
   int32_t what;
   AVE_CHECK(msg->findInt32("what", &what));
@@ -346,7 +348,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
     case kWhatSetDataSource: {
       std::shared_ptr<MessageObject> obj;
       message->findObject("source", obj);
-      mSource = std::dynamic_pointer_cast<ContentSource>(obj);
+      source_ = std::dynamic_pointer_cast<ContentSource>(obj);
       notifyListner(kWhatSetDataSourceCompleted, std::make_shared<Message>());
       break;
     }
@@ -357,6 +359,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
       mAudioSink = std::dynamic_pointer_cast<AudioSink>(obj);
       break;
     }
+
     case kWhatSetVideoSink: {
       std::shared_ptr<MessageObject> obj;
       message->findObject("videoSink", obj);
@@ -368,7 +371,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
     }
 
     case kWhatPrepare: {
-      mSource->prepare();
+      source_->Prepare();
       break;
     }
 
@@ -379,7 +382,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
 
     case kWhatScanSources: {
       AVE_LOG(LS_INFO) << "kWhatScanSources";
-      mScanSourcesPendding = false;
+      scan_sources_pending_ = false;
 
       bool rescan = false;
       if (mVideoSink.get() != nullptr && mVideoDecoder.get() == nullptr) {
@@ -396,7 +399,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
 
       if (rescan) {
         message->post(1000000LL);
-        mScanSourcesPendding = true;
+        scan_sources_pending_ = true;
       }
       break;
     }
