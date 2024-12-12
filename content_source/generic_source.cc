@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 
+#include "api/content_source.h"
 #include "base/checks.h"
 #include "base/errors.h"
 #include "base/logging.h"
@@ -461,7 +462,18 @@ void GenericSource::OnPrepare() {
     return;
   }
 
+  if (video_track_.source != nullptr) {
+    auto format = video_track_.source->GetFormat();
+    NotifyVideoSizeChanged(format);
+  }
+
+  // FIXME: how to confirm can seek ?
+  NotifyFlagsChanged(FLAG_CAN_PAUSE | FLAG_CAN_SEEK | FLAG_CAN_SEEK_BACKWARD |
+                     FLAG_CAN_SEEK_FORWARD);
+
   FinishPrepare();
+
+  AVE_LOG(LS_VERBOSE) << "OnPrepare Done";
 }
 
 void GenericSource::FinishPrepare() {
@@ -472,8 +484,11 @@ void GenericSource::FinishPrepare() {
     return;
   }
 
-  // TODO(yofua) when streaming, notify until buffering done
-  // NotifyPrepared();
+  if (is_streaming_) {
+    // TODO: (yofua) when streaming, notify until buffering done
+  } else {
+    NotifyPrepared();
+  }
 
   if (video_track_.source != nullptr) {
     PostReadBuffer(MediaType::VIDEO);
@@ -507,9 +522,9 @@ status_t GenericSource::StartSources() {
 void GenericSource::NotifyPreparedAndCleanup(status_t err) {
   if (err != ave::OK) {
     // TODO(youfa) reset data source
+    ResetDataSource();
   }
-  // FIXME: notify prepared
-  // NotifyPrepared(err);
+  NotifyPrepared(err);
 }
 
 void GenericSource::SchedulePollBuffering() {
@@ -691,6 +706,28 @@ void GenericSource::onMessageReceived(const std::shared_ptr<Message>& message) {
 
       break;
     }
+  }
+}
+
+void GenericSource::NotifyPrepared(status_t err) {
+  auto notify = notify_.lock();
+  if (notify != nullptr) {
+    notify->OnPrepared(err);
+  }
+}
+
+void GenericSource::NotifyFlagsChanged(int32_t flags) {
+  auto notify = notify_.lock();
+  if (notify != nullptr) {
+    notify->OnFlagsChanged(flags);
+  }
+}
+
+void GenericSource::NotifyVideoSizeChanged(
+    std::shared_ptr<MediaFormat>& format) {
+  auto notify = notify_.lock();
+  if (notify != nullptr) {
+    notify->OnVideoSizeChanged(format);
   }
 }
 

@@ -106,6 +106,10 @@ class GenericSource : public Handler, public ContentSource {
   void SchedulePollBuffering() REQUIRES(lock_);
   void OnPollBuffering() REQUIRES(lock_);
 
+  void NotifyPrepared(status_t err = ave::OK) REQUIRES(lock_);
+  void NotifyFlagsChanged(int32_t flags) REQUIRES(lock_);
+  void NotifyVideoSizeChanged(std::shared_ptr<MediaFormat>& format)
+      REQUIRES(lock_);
   void NotifyBuffering(int32_t percentage) REQUIRES(lock_);
 
   struct Track {
