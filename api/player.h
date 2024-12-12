@@ -16,9 +16,10 @@
 #include "media/audio/audio_device_factory.h"
 #include "media/codec/codec_factory.h"
 
-#include "content_source.h"
-#include "content_source_factory.h"
-#include "player_interface.h"
+#include "api/content_source.h"
+#include "api/content_source_factory.h"
+#include "api/demuxer/demuxer_factory.h"
+#include "api/player_interface.h"
 
 namespace avp {
 using ave::status_t;
@@ -54,6 +55,16 @@ class Player {
     }
 
     /**
+     * @brief Sets the demuxer factory for the player.
+     * @param demuxer_factory The demuxer factory to set.
+     */
+    Builder& setDemuxerFactory(
+        std::unique_ptr<DemuxerFactory>&& demuxer_factory) {
+      demuxer_factory_ = std::move(demuxer_factory);
+      return *this;
+    }
+
+    /**
      * @brief Sets the codec factory for the player.
      * @param codec_factory The codec factory to set.
      * @return A reference to the Builder object.
@@ -84,6 +95,7 @@ class Player {
 
    private:
     std::unique_ptr<ContentSourceFactory> content_source_factory_;
+    std::unique_ptr<DemuxerFactory> demuxer_factory_;
     std::unique_ptr<ave::media::CodecFactory> codec_factory_;
     std::unique_ptr<ave::media::AudioDeviceFactory> audio_device_factory_;
   };

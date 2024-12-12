@@ -41,6 +41,7 @@ AVE_EXPORT class AvPlayer : public Player,
  public:
   explicit AvPlayer(
       std::unique_ptr<ContentSourceFactory> content_source_factory,
+      std::unique_ptr<DemuxerFactory> demuxer_factory,
       std::unique_ptr<CodecFactory> codec_factory,
       std::unique_ptr<AudioDeviceFactory> audio_device_factory);
 
@@ -116,6 +117,7 @@ AVE_EXPORT class AvPlayer : public Player,
   };
 
   std::unique_ptr<ContentSourceFactory> content_source_factory_;
+  std::unique_ptr<DemuxerFactory> demuxer_factory_;
   std::unique_ptr<CodecFactory> codec_factory_;
   std::unique_ptr<AudioDeviceFactory> audio_device_factory_;
 
