@@ -73,11 +73,11 @@ static bool IsDASHUrl(const char* url) {
 AvPlayer::AvPlayer(std::unique_ptr<ContentSourceFactory> content_source_factory,
                    std::unique_ptr<DemuxerFactory> demuxer_factory,
                    std::unique_ptr<CodecFactory> codec_factory,
-                   std::unique_ptr<AudioDeviceFactory> audio_device)
+                   std::shared_ptr<AudioDeviceModule> audio_device_module)
     : content_source_factory_(std::move(content_source_factory)),
       demuxer_factory_(std::move(demuxer_factory)),
       codec_factory_(std::move(codec_factory)),
-      audio_device_factory_(std::move(audio_device)),
+      audio_device_module_(std::move(audio_device_module)),
       player_looper_(std::make_shared<Looper>()),
       media_clock_(std::make_shared<MediaClock>()),
       started_(false),

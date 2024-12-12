@@ -13,7 +13,7 @@
 
 #include "base/system/ave_export.h"
 
-#include "media/audio/audio_device_factory.h"
+#include "media/audio/audio_device_module.h"
 #include "media/codec/codec_factory.h"
 #include "media/foundation/av_synchronize_render.h"
 #include "media/foundation/handler.h"
@@ -27,7 +27,7 @@
 
 namespace avp {
 
-using ave::media::AudioDeviceFactory;
+using ave::media::AudioDeviceModule;
 using ave::media::AVSynchronizeRender;
 using ave::media::CodecFactory;
 using ave::media::Handler;
@@ -43,7 +43,7 @@ AVE_EXPORT class AvPlayer : public Player,
       std::unique_ptr<ContentSourceFactory> content_source_factory,
       std::unique_ptr<DemuxerFactory> demuxer_factory,
       std::unique_ptr<CodecFactory> codec_factory,
-      std::unique_ptr<AudioDeviceFactory> audio_device_factory);
+      std::shared_ptr<AudioDeviceModule> audio_device_module);
 
   ~AvPlayer() override;
 
@@ -119,7 +119,7 @@ AVE_EXPORT class AvPlayer : public Player,
   std::unique_ptr<ContentSourceFactory> content_source_factory_;
   std::unique_ptr<DemuxerFactory> demuxer_factory_;
   std::unique_ptr<CodecFactory> codec_factory_;
-  std::unique_ptr<AudioDeviceFactory> audio_device_factory_;
+  std::shared_ptr<AudioDeviceModule> audio_device_module_;
 
   std::shared_ptr<AvpDecoder> audio_decoder_;
   std::shared_ptr<AvpDecoder> video_decoder_;
