@@ -12,8 +12,7 @@
 
 #include "base/data_source/data_source.h"
 #include "base/errors.h"
-
-#include "media/audio/audio_device_factory.h"
+#include "media/audio/audio_device_module.h"
 #include "media/codec/codec_factory.h"
 
 #include "api/content_source.h"
@@ -81,9 +80,8 @@ class Player {
      * @return A reference to the Builder object.
      */
     Builder& setAudioDeviceFactory(
-        std::unique_ptr<ave::media::AudioDeviceFactory>&&
-            audio_device_factory) {
-      audio_device_factory_ = std::move(audio_device_factory);
+        std::shared_ptr<ave::media::AudioDeviceModule> audio_device_module) {
+      audio_device_module_ = std::move(audio_device_module);
       return *this;
     }
 
@@ -97,7 +95,7 @@ class Player {
     std::unique_ptr<ContentSourceFactory> content_source_factory_;
     std::unique_ptr<DemuxerFactory> demuxer_factory_;
     std::unique_ptr<ave::media::CodecFactory> codec_factory_;
-    std::unique_ptr<ave::media::AudioDeviceFactory> audio_device_factory_;
+    std::shared_ptr<ave::media::AudioDeviceModule> audio_device_module_;
   };
 
   /**
