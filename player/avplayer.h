@@ -40,9 +40,9 @@ AVE_EXPORT class AvPlayer : public Player,
                             public ContentSource::Notify {
  public:
   explicit AvPlayer(
-      std::unique_ptr<ContentSourceFactory> content_source_factory,
-      std::unique_ptr<DemuxerFactory> demuxer_factory,
-      std::unique_ptr<CodecFactory> codec_factory,
+      std::shared_ptr<ContentSourceFactory> content_source_factory,
+      std::shared_ptr<DemuxerFactory> demuxer_factory,
+      std::shared_ptr<CodecFactory> codec_factory,
       std::shared_ptr<AudioDeviceModule> audio_device_module);
 
   ~AvPlayer() override;
@@ -116,9 +116,9 @@ AVE_EXPORT class AvPlayer : public Player,
     kWhatMediaClockNotify = 'mckN',
   };
 
-  std::unique_ptr<ContentSourceFactory> content_source_factory_;
-  std::unique_ptr<DemuxerFactory> demuxer_factory_;
-  std::unique_ptr<CodecFactory> codec_factory_;
+  std::shared_ptr<ContentSourceFactory> content_source_factory_;
+  std::shared_ptr<DemuxerFactory> demuxer_factory_;
+  std::shared_ptr<CodecFactory> codec_factory_;
   std::shared_ptr<AudioDeviceModule> audio_device_module_;
 
   std::shared_ptr<AvpDecoder> audio_decoder_;
