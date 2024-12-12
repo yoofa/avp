@@ -48,7 +48,7 @@ class Player {
      * @param content_source_factory The content source factory to set.
      */
     Builder& setContentSourceFactory(
-        std::unique_ptr<ContentSourceFactory>&& content_source_factory) {
+        std::shared_ptr<ContentSourceFactory> content_source_factory) {
       content_source_factory_ = std::move(content_source_factory);
       return *this;
     }
@@ -58,7 +58,7 @@ class Player {
      * @param demuxer_factory The demuxer factory to set.
      */
     Builder& setDemuxerFactory(
-        std::unique_ptr<DemuxerFactory>&& demuxer_factory) {
+        std::shared_ptr<DemuxerFactory> demuxer_factory) {
       demuxer_factory_ = std::move(demuxer_factory);
       return *this;
     }
@@ -69,7 +69,7 @@ class Player {
      * @return A reference to the Builder object.
      */
     Builder& setCodecFactory(
-        std::unique_ptr<ave::media::CodecFactory>&& codec_factory) {
+        std::shared_ptr<ave::media::CodecFactory> codec_factory) {
       codec_factory_ = std::move(codec_factory);
       return *this;
     }
@@ -92,9 +92,9 @@ class Player {
     std::shared_ptr<Player> build();
 
    private:
-    std::unique_ptr<ContentSourceFactory> content_source_factory_;
-    std::unique_ptr<DemuxerFactory> demuxer_factory_;
-    std::unique_ptr<ave::media::CodecFactory> codec_factory_;
+    std::shared_ptr<ContentSourceFactory> content_source_factory_;
+    std::shared_ptr<DemuxerFactory> demuxer_factory_;
+    std::shared_ptr<ave::media::CodecFactory> codec_factory_;
     std::shared_ptr<ave::media::AudioDeviceModule> audio_device_module_;
   };
 

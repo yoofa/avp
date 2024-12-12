@@ -70,9 +70,9 @@ static bool IsDASHUrl(const char* url) {
 
 }  // namespace
 
-AvPlayer::AvPlayer(std::unique_ptr<ContentSourceFactory> content_source_factory,
-                   std::unique_ptr<DemuxerFactory> demuxer_factory,
-                   std::unique_ptr<CodecFactory> codec_factory,
+AvPlayer::AvPlayer(std::shared_ptr<ContentSourceFactory> content_source_factory,
+                   std::shared_ptr<DemuxerFactory> demuxer_factory,
+                   std::shared_ptr<CodecFactory> codec_factory,
                    std::shared_ptr<AudioDeviceModule> audio_device_module)
     : content_source_factory_(std::move(content_source_factory)),
       demuxer_factory_(std::move(demuxer_factory)),
