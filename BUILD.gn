@@ -64,6 +64,7 @@ config("common_config") {
 }
 
 ave_static_library("avp") {
+  testonly = true
   sources = []
 
   complete_static_lib = true
