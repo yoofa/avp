@@ -7,6 +7,8 @@
 
 #include "default_content_source_factory.h"
 
+#include "content_source/generic_source.h"
+
 namespace avp {
 
 std::shared_ptr<ContentSource> DefaultContentSourceFactory::CreateContentSource(
@@ -19,12 +21,16 @@ std::shared_ptr<ContentSource> DefaultContentSourceFactory::CreateContentSource(
     int fd,
     int64_t offset,
     int64_t length) {
-  return nullptr;
+  auto source = std::make_shared<GenericSource>();
+  source->SetDataSource(fd, offset, length);
+  return source;
 }
 
 std::shared_ptr<ContentSource> DefaultContentSourceFactory::CreateContentSource(
     std::shared_ptr<ave::DataSource> data_source) {
-  return nullptr;
+  auto source = std::make_shared<GenericSource>();
+  source->SetDataSource(data_source);
+  return source;
 }
 
 }  // namespace avp

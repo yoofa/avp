@@ -9,7 +9,7 @@
 #include <memory>
 #include <string>
 
-#include "api/content_source.h"
+#include "api/content_source/content_source.h"
 #include "base/checks.h"
 #include "base/errors.h"
 #include "base/logging.h"

@@ -15,7 +15,7 @@
 #include "media/foundation/media_format.h"
 #include "media/foundation/media_packet.h"
 
-#include "player_interface.h"
+#include "api/player_interface.h"
 
 namespace avp {
 

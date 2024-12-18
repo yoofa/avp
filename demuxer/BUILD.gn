@@ -3,7 +3,10 @@ import("//avp.gni")
 group("demuxer") {
 }
 
-ave_library("ffmpeg_demuxer") {
+ave_library("ave_demuxer_factory") {
+}
+
+ave_library("ffmpeg_demuxer_factory") {
   sources = [
     "ffmpeg_demuxer.cc",
     "ffmpeg_demuxer.h",
@@ -11,10 +14,10 @@ ave_library("ffmpeg_demuxer") {
     "ffmpeg_demuxer_factory.h",
   ]
   deps = [
+    "../api:player_interface",
     "../base:logging",
     "../base:utils",
     "../modules/ffmpeg:ffmpeg_helper",
-    "../player:player_interface",
     "//third_party/ffmpeg",
   ]
 }

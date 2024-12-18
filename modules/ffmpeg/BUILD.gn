@@ -7,7 +7,7 @@ ave_library("ffmpeg_helper") {
   ]
 
   deps = [
-    "//player:player_interface",
+    "//api:player_interface",
     "//third_party/ffmpeg",
   ]
 }
