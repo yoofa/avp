@@ -1,14 +1,59 @@
 import("//base/build/ave.gni")
 
 group("api") {
-  deps = [ ":player_interface" ]
+  deps = [
+    ":default_content_source_factory",
+
+    # ffmpeg demuxer not ok
+    #":default_demuxer_factory",
+    ":player_interface",
+  ]
+}
+
+ave_source_set("api_content_source") {
+  sources = [
+    "content_source/content_source.h",
+    "content_source/content_source_factory.h",
+  ]
+}
+
+ave_library("default_content_source_factory") {
+  sources = [
+    "content_source/default_content_source_factory.cc",
+    "content_source/default_content_source_factory.h",
+  ]
+  deps = [
+    ":api_content_source",
+    "//content_source:generic_content_source",
+  ]
+}
+
+ave_source_set("api_demuxer") {
+  sources = [
+    "demuxer/demuxer.h",
+    "demuxer/demuxer_factory.h",
+  ]
+}
+
+ave_library("default_demuxer_factory") {
+  sources = [
+    "demuxer/default_demuxer_factory.cc",
+    "demuxer/default_demuxer_factory.h",
+  ]
+  deps = [
+    ":api_demuxer",
+    "//demuxer:ave_demuxer_factory",
+    "//demuxer:ffmpeg_demuxer_factory",
+  ]
 }
 
 ave_library("player_interface") {
   sources = [
-    "content_source.h",
-    "content_source_factory.h",
     "player.h",
     "player_interface.h",
+  ]
+  deps = [
+    ":api_content_source",
+    ":api_demuxer",
   ]
 }

@@ -8,13 +8,13 @@
 #ifndef DEFAULT_CONTENT_SOURCE_FACTORY_H
 #define DEFAULT_CONTENT_SOURCE_FACTORY_H
 
-#include "api/content_source_factory.h"
+#include "api/content_source/content_source_factory.h"
 
 namespace avp {
 
 class DefaultContentSourceFactory : public ContentSourceFactory {
  public:
-  ~DefaultContentSourceFactory() = default;
+  ~DefaultContentSourceFactory() override = default;
 
   std::shared_ptr<ContentSource> CreateContentSource(
       const char* url,

@@ -8,7 +8,8 @@
 #ifndef AVP_DECODER_H
 #define AVP_DECODER_H
 
-#include "api/content_source.h"
+#include "api/content_source/content_source.h"
+#include "api/player_interface.h"
 #include "media/codec/codec.h"
 #include "media/codec/codec_factory.h"
 #include "media/foundation/av_synchronize_render.h"

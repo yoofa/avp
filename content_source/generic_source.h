@@ -11,7 +11,7 @@
 #include <memory>
 #include <vector>
 
-#include "api/content_source.h"
+#include "api/content_source/content_source.h"
 #include "api/demuxer/demuxer.h"
 #include "api/demuxer/demuxer_factory.h"
 
