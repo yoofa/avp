@@ -9,7 +9,8 @@
 
 #include "content_source/generic_source.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 std::shared_ptr<ContentSource> DefaultContentSourceFactory::CreateContentSource(
     const char* url,
@@ -33,4 +34,5 @@ std::shared_ptr<ContentSource> DefaultContentSourceFactory::CreateContentSource(
   return source;
 }
 
-}  // namespace avp
+}  // namespace player
+}  // namespace ave

@@ -14,7 +14,8 @@
 
 #include "content_source.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 class ContentSourceFactory {
  public:
@@ -31,6 +32,7 @@ class ContentSourceFactory {
       std::shared_ptr<ave::DataSource> data_source) = 0;
 };
 
-}  // namespace avp
+}  // namespace player
+}  // namespace ave
 
 #endif /* !CONTENT_SOURCE_FACTORY_H */

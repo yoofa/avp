@@ -14,7 +14,9 @@
 #include "player/demuxer.h"
 #include "player/demuxer_factory.h"
 
-namespace avp {
+namespace ave {
+namespace player {
+
 class FFmpegDemuxerFactory : public DemuxerFactory {
  public:
   FFmpegDemuxerFactory();
@@ -25,6 +27,8 @@ class FFmpegDemuxerFactory : public DemuxerFactory {
  private:
   std::shared_ptr<Demuxer> mFFmpegDemuxer;
 };
-} /* namespace avp */
+
+}  // namespace player
+}  // namespace ave
 
 #endif /* !FFMPEG_DEMUXER_FACTORY_H */

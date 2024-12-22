@@ -10,7 +10,8 @@
 
 #include "player/video_sink.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 class VideoFileRender : public VideoSink {
  public:
@@ -22,6 +23,7 @@ class VideoFileRender : public VideoSink {
   int mFd;
 };
 
-} /* namespace avp */
+}  // namespace player
+}  // namespace ave
 
 #endif /* !VIDEOFILERENDER_H */

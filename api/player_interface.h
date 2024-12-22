@@ -11,18 +11,8 @@
 #include <cstdint>
 #include "base/errors.h"
 
-namespace avp {
-
-using status_t = ave::status_t;
-
-enum media_track_type {
-  MEDIA_TRACK_TYPE_UNKNOWN = 0,
-  MEDIA_TRACK_TYPE_VIDEO = 1,
-  MEDIA_TRACK_TYPE_AUDIO = 2,
-  MEDIA_TRACK_TYPE_TIMEDTEXT = 3,
-  MEDIA_TRACK_TYPE_SUBTITLE = 4,
-  MEDIA_TRACK_TYPE_METADATA = 5,
-};
+namespace ave {
+namespace player {
 
 enum SeekMode : int32_t {
   SEEK_PREVIOUS_SYNC = 0,
@@ -33,6 +23,8 @@ enum SeekMode : int32_t {
   SEEK = 8,
   NONBLOCKING = 16,
 };
-}  // namespace avp
+
+}  // namespace player
+}  // namespace ave
 
 #endif /* !PLAYER_INTERFACE_H */

@@ -18,7 +18,8 @@
 #include "media/foundation/media_packet.h"
 #include "media/foundation/media_utils.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 using ave::media::MediaFormat;
 using ave::media::MediaPacket;
@@ -52,6 +53,8 @@ class PacketSource {
 
   AVE_DISALLOW_COPY_AND_ASSIGN(PacketSource);
 };
-} /* namespace avp */
+
+}  // namespace player
+}  // namespace ave
 
 #endif /* !PACKET_SOURCE_H */

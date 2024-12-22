@@ -13,7 +13,8 @@
 #include "api/demuxer/demuxer.h"
 #include "base/data_source/data_source.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 class DemuxerFactory {
  public:
@@ -24,6 +25,7 @@ class DemuxerFactory {
       std::shared_ptr<ave::DataSource> dataSource) = 0;
 };
 
-} /* namespace avp */
+}  // namespace player
+}  // namespace ave
 
 #endif /* !DEMUXER_FACTORY_H */
