@@ -21,7 +21,8 @@
 #include "media/foundation/media_utils.h"
 #include "media/foundation/message.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 namespace {
 const int32_t kDefaultPollBufferingIntervalUs = 1000000;
@@ -738,4 +739,5 @@ void GenericSource::NotifyBuffering(int32_t percentage) {
   }
 }
 
-}  // namespace avp
+}  // namespace player
+}  // namespace ave

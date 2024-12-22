@@ -17,7 +17,8 @@ extern "C" {
 #include "third_party/ffmpeg/libavutil/avutil.h"
 }
 
-namespace avp {
+namespace ave {
+namespace player {
 
 struct FFmpegSource;
 
@@ -68,6 +69,7 @@ class FFmpegDemuxer : public Demuxer {
   std::vector<TrackInfo> mTracks;
 };
 
-} /* namespace avp */
+}  // namespace player
+}  // namespace ave
 
 #endif /* !FFMPEG_DEMUXER_H */

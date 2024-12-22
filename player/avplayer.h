@@ -25,7 +25,8 @@
 #include "api/player.h"
 #include "player/avp_decoder.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 using ave::media::AudioDeviceModule;
 using ave::media::AVSynchronizeRender;
@@ -138,6 +139,7 @@ AVE_EXPORT class AvPlayer : public Player,
   std::weak_ptr<Listener> listener_;
 };
 
-}  // namespace avp
+}  // namespace player
+}  // namespace ave
 
 #endif /* !AVP_AVPLAYER_H */

@@ -9,7 +9,9 @@
 
 #include "ffmpeg_demuxer.h"
 
-namespace avp {
+namespace ave {
+namespace player {
+
 FFmpegDemuxerFactory::FFmpegDemuxerFactory() {}
 FFmpegDemuxerFactory::~FFmpegDemuxerFactory() {}
 
@@ -21,4 +23,5 @@ std::shared_ptr<Demuxer> FFmpegDemuxerFactory::createDemuxer(
   return ffmpegDemuxer;
 }
 
-} /* namespace avp */
+}  // namespace player
+}  // namespace ave

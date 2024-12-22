@@ -20,7 +20,8 @@
 #include "api/demuxer/demuxer_factory.h"
 #include "api/player_interface.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 using ave::status_t;
 
 /**
@@ -239,6 +240,7 @@ class Player {
   // std::weak_ptr<Listener> listener_;
 };
 
-}  // namespace avp
+}  // namespace player
+}  // namespace ave
 
 #endif /* !PLAYER_H */

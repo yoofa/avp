@@ -17,7 +17,8 @@
 
 #include "api/player_interface.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 using ave::media::MediaFormat;
 using ave::media::MediaType;
@@ -203,6 +204,7 @@ class ContentSource : public ave::media::MessageObject {
   }
 };
 
-}  // namespace avp
+}  // namespace player
+}  // namespace ave
 
 #endif /* !CONTENT_SOURCE_H */

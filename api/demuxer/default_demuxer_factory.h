@@ -10,7 +10,8 @@
 
 #include "demuxer_factory.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 class DefaultDemuxerFactory : public DemuxerFactory {
  public:
@@ -21,6 +22,7 @@ class DefaultDemuxerFactory : public DemuxerFactory {
       std::shared_ptr<ave::DataSource> dataSource) override;
 };
 
-}  // namespace avp
+}  // namespace player
+}  // namespace ave
 
 #endif /* !DEFAULT_DEMUXER_FACTORY_H */

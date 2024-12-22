@@ -7,11 +7,13 @@
 
 #include "default_demuxer_factory.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 std::shared_ptr<Demuxer> CreateDemuxer(
     std::shared_ptr<ave::DataSource> dataSource) {
   return nullptr;
 }
 
-}  // namespace avp
+}  // namespace player
+}  // namespace ave

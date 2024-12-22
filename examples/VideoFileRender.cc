@@ -19,7 +19,8 @@
 
 #include "media/buffer.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 VideoFileRender::VideoFileRender(const char* file) : mFd(-1) {
   mFd = open(file, O_LARGEFILE | O_RDWR | O_CREAT);
@@ -47,4 +48,5 @@ void VideoFileRender::onFrame(std::shared_ptr<Buffer>& frame) {
   ::write(mFd, frame->data(), frame->size());
 }
 
-} /* namespace avp */
+}  // namespace player
+}  // namespace ave
