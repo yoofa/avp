@@ -12,7 +12,9 @@
 #include "base/checks.h"
 #include "base/hexdump.h"
 #include "base/logging.h"
-#include "common/utils.h"
+
+#include "media/utils.h"
+
 #include "player/data_source.h"
 #include "player/media_source.h"
 
@@ -94,7 +96,7 @@ status_t FFmpegSource::read(std::shared_ptr<Buffer>& buffer,
 }
 
 std::shared_ptr<MetaData> FFmpegSource::getMeta() {
-  LOG(LS_INFO) << "getMeta:" << mMeta->toString();
+  AVE_LOG(LS_INFO) << "getMeta:" << mMeta->toString();
   return mMeta;
 }
 
@@ -153,11 +155,11 @@ status_t FFmpegDemuxer::init() {
   ret = avformat_find_stream_info(mFormatContext, nullptr);
   mMeta = std::make_shared<MetaData>();
 
-  LOG(LS_VERBOSE) << "init, streams: " << mFormatContext->nb_streams;
+  AVE_LOG(LS_VERBOSE) << "init, streams: " << mFormatContext->nb_streams;
 
   mMeta->setInt64(kKeyDuration, mFormatContext->duration);
   mMeta->setInt64(kKeyBitRate, mFormatContext->bit_rate);
-  LOG(LS_VERBOSE) << " demuxer meta <" << mMeta->toString() << ">";
+  AVE_LOG(LS_VERBOSE) << " demuxer meta <" << mMeta->toString() << ">";
 
   for (size_t i = 0; i < mFormatContext->nb_streams; i++) {
     const AVStream* avStream = mFormatContext->streams[i];
@@ -195,7 +197,7 @@ std::shared_ptr<MetaData> createMetaFromAVStream(const AVStream* avStream) {
   const char* mime;
   meta->findCString(kKeyMIMEType, &mime);
 
-  LOG(LS_VERBOSE) << "avStream.meta: " << meta->toString();
+  AVE_LOG(LS_VERBOSE) << "avStream.meta: " << meta->toString();
 
   return meta;
 }
@@ -203,7 +205,7 @@ std::shared_ptr<MetaData> createMetaFromAVStream(const AVStream* avStream) {
 status_t FFmpegDemuxer::addTrack(const AVStream* avStream, size_t index) {
   std::shared_ptr<MetaData> meta = createMetaFromAVStream(avStream);
   // if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-  LOG(LS_INFO) << "dump(" << avStream->codecpar->codec_type << "):";
+  AVE_LOG(LS_INFO) << "dump(" << avStream->codecpar->codec_type << "):";
   hexdump(avStream->codecpar->extradata, avStream->codecpar->extradata_size);
   //}
 
@@ -254,16 +256,14 @@ status_t FFmpegDemuxer::readAnAvPacket(size_t index) {
     DCHECK_LT(static_cast<size_t>(pkt.stream_index), mTracks.size());
 
     if (pkt.stream_index == 0) {
-      LOG(LS_INFO) << "readAnAvPacket, index:" << pkt.stream_index
-                   << "time_base:"
-                   << mFormatContext->streams[pkt.stream_index]->time_base.num
-                   << "/"
-                   << mFormatContext->streams[pkt.stream_index]->time_base.den
-                   << ", pts:" << pkt.pts << ",time_us:"
-                   << ConvertFromTimeBase(
-                          mFormatContext->streams[pkt.stream_index]->time_base,
-                          pkt.pts)
-                   << ", diff:" << (pkt.pts - lastVideoTimeUs);
+      AVE_LOG(LS_INFO)
+          << "readAnAvPacket, index:" << pkt.stream_index << "time_base:"
+          << mFormatContext->streams[pkt.stream_index]->time_base.num << "/"
+          << mFormatContext->streams[pkt.stream_index]->time_base.den
+          << ", pts:" << pkt.pts << ",time_us:"
+          << ConvertFromTimeBase(
+                 mFormatContext->streams[pkt.stream_index]->time_base, pkt.pts)
+          << ", diff:" << (pkt.pts - lastVideoTimeUs);
 
       lastVideoTimeUs = pkt.pts;
     }

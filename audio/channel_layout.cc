@@ -185,7 +185,7 @@ ChannelLayout GuessChannelLayout(int channels) {
     case 8:
       return CHANNEL_LAYOUT_7_1;
     default:
-      LOG(LS_WARNING) << "Unsupported channel count: " << channels;
+      AVE_LOG(LS_WARNING) << "Unsupported channel count: " << channels;
   }
   return CHANNEL_LAYOUT_UNSUPPORTED;
 }

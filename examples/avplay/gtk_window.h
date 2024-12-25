@@ -12,8 +12,8 @@
 
 #include <gtk/gtk.h>
 
-#include "common/buffer.h"
-#include "common/message.h"
+#include "media/buffer.h"
+#include "media/foundation/message.h"
 #include "player/video_sink.h"
 
 class GtkWnd {
@@ -22,7 +22,7 @@ class GtkWnd {
    public:
     GtkVideoRender(GtkWnd* window);
     virtual ~GtkVideoRender();
-    void onFrame(std::shared_ptr<avp::Buffer>& frame) override;
+    void onFrame(std::shared_ptr<ave::Buffer>& frame) override;
     const uint8_t* image() const { return mImage.get(); }
 
     int width() const { return mWidth; }

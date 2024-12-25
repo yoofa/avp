@@ -9,7 +9,7 @@
 
 #include "base/checks.h"
 #include "base/logging.h"
-#include "common/media_errors.h"
+#include "media/media_errors.h"
 
 namespace avp {
 
@@ -29,7 +29,7 @@ status_t FFmpegAudioDecoder::configure(std::shared_ptr<Message> format) {
   void* iterate_data = nullptr;
   const AVCodec* tCodec = av_codec_iterate(&iterate_data);
   while (tCodec != nullptr) {
-    LOG(LS_INFO) << "##### tCodec.name:" << tCodec->name;
+    AVE_LOG(LS_INFO) << "##### tCodec.name:" << tCodec->name;
     tCodec = av_codec_iterate(&iterate_data);
   }
 #endif
@@ -46,20 +46,20 @@ status_t FFmpegAudioDecoder::configure(std::shared_ptr<Message> format) {
 
   const AVCodec* codec = avcodec_find_decoder(mCodecContext->codec_id);
   if (!codec) {
-    LOG(LS_INFO) << "unsupported";
+    AVE_LOG(LS_INFO) << "unsupported";
     return ERROR_UNSUPPORTED;
   }
 
   int32_t err = avcodec_open2(mCodecContext, codec, nullptr);
   if (err < 0) {
-    LOG(LS_ERROR) << "avcodec open failed :" << err;
+    AVE_LOG(LS_ERROR) << "avcodec open failed :" << err;
     return UNKNOWN_ERROR;
   }
   avcodec_flush_buffers(mCodecContext);
 
   mAvFrame = av_frame_alloc();
 
-  LOG(LS_INFO) << "codec open success";
+  AVE_LOG(LS_INFO) << "codec open success";
 
   return OK;
 }
@@ -73,7 +73,7 @@ status_t FFmpegAudioDecoder::DecodeToBuffers(
     std::vector<std::shared_ptr<Buffer>>& out) {
   int64_t timeUs;
 
-  CHECK(in->meta()->findInt64("timeUs", &timeUs));
+  AVE_CHECK(in->meta()->findInt64("timeUs", &timeUs));
 
   AVPacket packet;
   packet.buf = nullptr;

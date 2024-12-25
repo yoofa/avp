@@ -9,42 +9,48 @@
 #define PACKET_SOURCE_H
 
 #include <condition_variable>
-#include <list>
 #include <memory>
 #include <mutex>
 
+#include "api/player_interface.h"
 #include "base/constructor_magic.h"
-#include "base/types.h"
-#include "common/buffer.h"
-#include "player/player_interface.h"
+#include "media/foundation/media_format.h"
+#include "media/foundation/media_packet.h"
+#include "media/foundation/media_utils.h"
 
 namespace avp {
 
+using ave::media::MediaFormat;
+using ave::media::MediaPacket;
+using ave::media::MediaType;
+
 class PacketSource {
  public:
-  PacketSource();
+  explicit PacketSource(std::shared_ptr<MediaFormat> format);
   ~PacketSource();
 
-  PlayerBase::media_track_type type() const { return mTrackType; }
+  MediaType type() const { return format_->stream_type(); }
 
-  status_t start();
-  status_t stop();
+  status_t Start();
+  status_t Stop();
 
-  void clear();
+  void Clear();
 
-  bool hasBufferAvailable(status_t* result);
-  size_t getAvailableBufferCount(status_t* result);
+  void SetFormat(std::shared_ptr<MediaFormat> format);
 
-  status_t queueAccessunit(std::shared_ptr<Buffer> buffer);
-  status_t dequeueAccessUnit(std::shared_ptr<Buffer>& buffer);
+  bool HasBufferAvailable(status_t* result);
+  size_t GetAvailableBufferCount(status_t* result);
+
+  status_t QueueAccessunit(std::shared_ptr<MediaPacket> packet);
+  status_t DequeueAccessUnit(std::shared_ptr<MediaPacket>& packet);
 
  private:
-  PlayerBase::media_track_type mTrackType;
-  std::queue<std::shared_ptr<Buffer>> mBuffers;
-  std::mutex mLock;
-  std::condition_variable mCondition;
+  std::shared_ptr<MediaFormat> format_;
+  std::queue<std::shared_ptr<MediaPacket>> packets_;
+  std::mutex lock_;
+  std::condition_variable condition_;
 
-  AVP_DISALLOW_COPY_AND_ASSIGN(PacketSource);
+  AVE_DISALLOW_COPY_AND_ASSIGN(PacketSource);
 };
 } /* namespace avp */
 

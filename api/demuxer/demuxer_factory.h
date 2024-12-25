@@ -10,18 +10,20 @@
 
 #include <memory>
 
-#include "player/data_source.h"
-#include "player/demuxer.h"
+#include "api/demuxer/demuxer.h"
+#include "base/data_source/data_source.h"
 
 namespace avp {
+
 class DemuxerFactory {
  public:
   DemuxerFactory() = default;
   virtual ~DemuxerFactory() = default;
 
-  virtual std::shared_ptr<Demuxer> createDemuxer(
-      std::shared_ptr<DataSource> dataSource) = 0;
+  virtual std::shared_ptr<Demuxer> CreateDemuxer(
+      std::shared_ptr<ave::DataSource> dataSource) = 0;
 };
+
 } /* namespace avp */
 
 #endif /* !DEMUXER_FACTORY_H */

@@ -51,11 +51,11 @@ class ExListener : public AvPlayer::Listener {
               << std::endl;
     switch (what) {
       case avp::PlayerBase::kWhatSetDataSourceCompleted: {
-        LOG(avp::LS_INFO) << "kWhatSetDataSourceCompleted";
+        AVE_LOG(ave::LS_INFO) << "kWhatSetDataSourceCompleted";
         break;
       }
       case avp::PlayerBase::kWhatPrepared: {
-        LOG(avp::LS_INFO) << "avplayer prepared";
+        AVE_LOG(ave::LS_INFO) << "avplayer prepared";
         mCondition.notify_all();
         break;
       }

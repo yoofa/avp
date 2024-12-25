@@ -1,6 +1,9 @@
 # dependencies file
 
 gclient_gn_args_file = 'src/build/config/gclient_args.gni'
+gclient_gn_args = [
+  'generate_location_tags',
+]
 
 vars = {
   # By default, we should check out everything needed to run on the main
@@ -8,24 +11,34 @@ vars = {
   'checkout_configuration': 'default',
   'checkout_instrumented_libraries': 'checkout_linux and checkout_configuration == "default"',
   'chromium_revision': '4559b6b576fc5bd8f36ad7cde13bcf5215bec9dc',
+
+  # Keep the Chromium default of generating location tags.
+  'generate_location_tags': True,
+
+  # reclient CIPD package version
+  'reclient_version': 're_client_version:0.113.0.8b45b89-gomaip',
+
+  # ninja CIPD package version
+  # https://chrome-infra-packages.appspot.com/p/infra/3pp/tools/ninja
+  'ninja_version': 'version:2@1.11.1.chromium.6',
 }
 
 deps = {
   # ave module
   'src/base':
-    'https://github.com/yoofa/base.git@3f69082763375f50f401a19416cb3945ba21311b',
+    'https://github.com/yoofa/base.git',
   'src/media':
-    'https://github.com/yoofa/media_common.git@28f186f35d78a75a32069cfe03bb5cecf1ec3c4c',
+    'https://github.com/yoofa/media_common.git',
 
   'src/build':
-    'https://github.com/vsyf/chromium-build.git@cd64fac308aa1c466ab1f91bbe7fdb92f04d7822',
+    'https://chromium.googlesource.com/chromium/src/build@bc10f9ffb962f14c3ed18a6cd9c2f5114d9b0b59',
   'src/buildtools':
-    'https://chromium.googlesource.com/chromium/src/buildtools@6302c1175607a436e18947a5abe9df2209e845fc',
-    'src/buildtools/linux64': {
+    'https://chromium.googlesource.com/chromium/src/buildtools@50c348906cbd450e031bc3123b657f833f8455b7',
+  'src/buildtools/linux64': {
     'packages': [
       {
-        'package': 'gn/gn/linux-amd64',
-        'version': 'git_revision:53d92014bf94c3893886470a1c7c1289f8818db0',
+        'package': 'gn/gn/linux-${{arch}}',
+        'version': 'git_revision:991530ce394efb58fcd848195469022fa17ae126',
       }
     ],
     'dep_type': 'cipd',
@@ -34,8 +47,8 @@ deps = {
   'src/buildtools/mac': {
     'packages': [
       {
-        'package': 'gn/gn/mac-amd64',
-        'version': 'git_revision:53d92014bf94c3893886470a1c7c1289f8818db0',
+        'package': 'gn/gn/mac-${{arch}}',
+        'version': 'git_revision:991530ce394efb58fcd848195469022fa17ae126',
       }
     ],
     'dep_type': 'cipd',
@@ -45,27 +58,55 @@ deps = {
     'packages': [
       {
         'package': 'gn/gn/windows-amd64',
-        'version': 'git_revision:53d92014bf94c3893886470a1c7c1289f8818db0',
+        'version': 'git_revision:991530ce394efb58fcd848195469022fa17ae126',
       }
     ],
     'dep_type': 'cipd',
     'condition': 'checkout_win',
   },
+  'src/buildtools/reclient': {
+    'packages': [
+      {
+         # https://chrome-infra-packages.appspot.com/p/infra/rbe/client/
+        'package': 'infra/rbe/client/${{platform}}',
+        'version': Var('reclient_version'),
+      }
+    ],
+    'dep_type': 'cipd',
+    # Reclient doesn't have linux-arm64 package.
+    'condition': 'not (host_os == "linux" and host_cpu == "arm64")',
+  },
 
-  'src/buildtools/clang_format/script':
-    'https://chromium.googlesource.com/chromium/llvm-project/cfe/tools/clang-format.git@96636aa0e9f047f17447f2d45a094d0b59ed7917',
-  'src/buildtools/third_party/libc++/trunk':
-    'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libcxx.git@d9040c75cfea5928c804ab7c235fed06a63f743a',
-  'src/buildtools/third_party/libc++abi/trunk':
-    'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libcxxabi.git@196ba1aaa8ac285d94f4ea8d9836390a45360533',
-  'src/buildtools/third_party/libunwind/trunk':
-    'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libunwind.git@d999d54f4bca789543a2eb6c995af2d9b5a1f3ed',
+  'src/third_party/clang-format/script':
+    'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git@e5337933f2951cacd3aeacd238ce4578163ca0b9',
+  'src/third_party/libc++/src':
+    'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libcxx.git@7cf98622abaf832e2d4784889ebc69d5b6fde4d8',
+  'src/third_party/libc++abi/src':
+    'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libcxxabi.git@e8e4eb8f1c413ea4365256b2b83a6093c95d2d86',
+  'src/third_party/libunwind/src':
+    'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libunwind.git@43e5a34c5b7066a7ee15c74f09dc37b4b9b5630e',
+
+  'src/third_party/ninja': {
+    'packages': [
+      {
+        'package': 'infra/3pp/tools/ninja/${{platform}}',
+        'version': Var('ninja_version'),
+      }
+    ],
+    'dep_type': 'cipd',
+  },
+
   'src/testing':
-    'https://chromium.googlesource.com/chromium/src/testing@112ad8ea2684f8ffe734ef80acfc8874364ea680',
-  'src/third_party/googletest/src':
-    'https://chromium.googlesource.com/external/github.com/google/googletest.git@4fe018038f87675c083d0cfb6a6b57c274fb1753',
+    'https://chromium.googlesource.com/chromium/src/testing@074ff55a07fb690e769eda906375f8e7cb6b39b8',
   'src/third_party/depot_tools':
-    'https://chromium.googlesource.com/chromium/tools/depot_tools.git@dc7b108da629de39f923d510fc76ea2f58efa521',
+    'https://chromium.googlesource.com/chromium/tools/depot_tools.git@90a30a5b5357636fa05bb315c393275be7ca705c',
+
+  'src/third_party/googletest/src':
+    'https://chromium.googlesource.com/external/github.com/google/googletest.git@af29db7ec28d6df1c7f0f745186884091e602e07',
+  'src/third_party/google_benchmark/src': {
+    'url': 'https://chromium.googlesource.com/external/github.com/google/benchmark.git@344117638c8ff7e239044fd0fa7085839fc03021',
+  },
+
   'src/tools/clang/dsymutil': {
     'packages': [
       {
@@ -76,8 +117,13 @@ deps = {
     'condition': 'checkout_mac',
     'dep_type': 'cipd',
   },
+
+  # third_party
+  'src/third_party/catapult':
+    'https://chromium.googlesource.com/catapult.git@4f81c1e295978227d83f1b42ceff40b4f9b5b08c',
+
   'src/tools':
-    'https://chromium.googlesource.com/chromium/src/tools@2a1184f6a084142fedae1f0b9e44ae1ec4431fc3',
+    'https://chromium.googlesource.com/chromium/src/tools@33a950a48cf447a6b1c0262e9955446e6d129d34',
   'src/tools/swarming_client':
     'https://chromium.googlesource.com/infra/luci/client-py.git@d46ea7635f2911208268170512cb611412488fd8',
   'src/third_party/libjpeg_turbo':
@@ -85,11 +131,11 @@ deps = {
 
   # used by ffmpeg
   'src/third_party/nasm': {
-      'url': 'https://chromium.googlesource.com/chromium/deps/nasm.git@e9be5fd6d723a435ca2da162f9e0ffcb688747c1'
+      'url': 'https://chromium.googlesource.com/chromium/deps/nasm.git@7fc833e889d1afda72c06220e5bed8fb43b2e5ce'
   },
 
   'src/third_party/ffmpeg':
-    'https://chromium.googlesource.com/chromium/third_party/ffmpeg.git@14e1145ddd3d5f3ba478a19b4ae8822679d83a6c',
+    'https://chromium.googlesource.com/chromium/third_party/ffmpeg.git@e1ca3f06adec15150a171bc38f550058b4bbb23b',
   'src/third_party/libyuv':
     'https://chromium.googlesource.com/libyuv/libyuv.git@49ebc996aa8c4bdf89c1b5ea461eb677234c61cc',
 }
@@ -213,5 +259,12 @@ hooks = [
                 '--bucket', 'chromium-clang-format',
                 '-s', 'src/buildtools/linux64/clang-format.sha1',
     ],
+  },
+  {
+    # Update LASTCHANGE.
+    'name': 'lastchange',
+    'pattern': '.',
+    'action': ['python', 'src/build/util/lastchange.py',
+               '-o', 'src/build/util/LASTCHANGE'],
   },
 ]

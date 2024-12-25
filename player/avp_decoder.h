@@ -8,15 +8,28 @@
 #ifndef AVP_DECODER_H
 #define AVP_DECODER_H
 
-#include "common/handler.h"
-#include "player/avp_render_synchronizer.h"
-#include "player/decoder.h"
-#include "player/decoder_factory.h"
-#include "player/media_source.h"
+#include "api/content_source/content_source.h"
+#include "api/player_interface.h"
+#include "media/codec/codec.h"
+#include "media/codec/codec_factory.h"
+#include "media/foundation/av_synchronize_render.h"
+#include "media/foundation/handler.h"
+#include "media/foundation/video_sink.h"
 
 namespace avp {
 
-class AvpDecoder : public Handler, public Decoder::DecoderCallback {
+using ave::media::AVSynchronizeRender;
+using ave::media::Codec;
+using ave::media::CodecBuffer;
+using ave::media::CodecCallback;
+using ave::media::CodecFactory;
+using ave::media::Handler;
+using ave::media::Looper;
+using ave::media::MediaPacket;
+using ave::media::Message;
+using ave::media::VideoSink;
+
+class AvpDecoder : public Handler, public CodecCallback {
  public:
   enum {
     kWhatInputDiscontinuity = 'inDi',
@@ -34,25 +47,25 @@ class AvpDecoder : public Handler, public Decoder::DecoderCallback {
   };
 
   explicit AvpDecoder(std::shared_ptr<Message> notify,
-                      std::shared_ptr<PlayerBase::ContentSource> source,
-                      std::shared_ptr<AvpRenderSynchronizer> render = nullptr,
+                      std::shared_ptr<ContentSource> source,
+                      std::shared_ptr<AVSynchronizeRender> render = nullptr,
                       std::shared_ptr<VideoSink> videoSink = nullptr);
-  virtual ~AvpDecoder();
+  ~AvpDecoder() override;
 
-  virtual void init();
+  void Init();
 
-  void configure(const std::shared_ptr<Message>& format);
-  void setParameters(const std::shared_ptr<Message>& parameters);
-  void setRender(const std::shared_ptr<AvpRenderSynchronizer> render);
-  void setVideoSink(const std::shared_ptr<VideoSink> sink);
-  void start();
-  void pause();
-  void resume();
-  void flush();
-  void shutdown();
+  void Configure(const std::shared_ptr<Message>& format);
+  void SetParameters(const std::shared_ptr<Message>& parameters);
+  void SetRender(const std::shared_ptr<AVSynchronizeRender> render);
+  void SetVideoSink(const std::shared_ptr<VideoSink> sink);
+  void Start();
+  void Pause();
+  void Resume();
+  void Flush();
+  void Shutdown();
 
  private:
-  friend DecoderCallback;
+  friend class CodecCallback;
   enum {
     kWhatConfigure = 'conf',
     kWhatSetParameters = 'setP',
@@ -72,43 +85,46 @@ class AvpDecoder : public Handler, public Decoder::DecoderCallback {
     kWhatDecodingError = 'ddEr',
   };
 
-  void handleAnInputBuffer();
-  void handleAnOutputBuffer();
+  void HandleAnInputBuffer(size_t index);
+  void HandleAnOutputBuffer(size_t index);
 
-  status_t fetchInputBuffer(std::shared_ptr<Message>& message);
-  bool doRequestInputBuffers();
-  void handleError(status_t err);
+  status_t FetchInputBuffer(std::shared_ptr<Message>& message);
+  bool DoRequestInputBuffers();
+  void HandleError(status_t err);
 
-  void onConfigure(const std::shared_ptr<Message>& format);
-  void onSetParameters(const std::shared_ptr<Message>& params);
-  void onStart();
-  void onPause();
-  void onResume();
-  void onFlush();
-  void onShutdown();
+  void OnConfigure(const std::shared_ptr<Message>& format);
+  void OnSetParameters(const std::shared_ptr<Message>& params);
+  void OnStart();
+  void OnPause();
+  void OnResume();
+  void OnFlush();
+  void OnShutdown();
+
+  bool IsSated();
+  // return message consumed
+  bool OnInputBufferFetched(const std::shared_ptr<MediaPacket>& packet);
+  void OnRequestInputBuffers();
+
+  // CodecCallback
+  void OnInputBufferAvailable(size_t index) override;
+  void OnOutputBufferAvailable(size_t index) override;
+  void OnOutputFormatChanged(const std::shared_ptr<Message>& format) override;
+  void OnError(status_t err) override;
+  void OnFrameRendered(std::shared_ptr<Message> notify) override;
+
+  // Handler
   void onMessageReceived(const std::shared_ptr<Message>& message) override;
 
-  bool isSated();
-  // return message consumed
-  bool onInputBufferFetched(const std::shared_ptr<Message>& message);
-  void onRequestInputBuffers();
-
-  // DecoderCallback
-  void onInputBufferAvailable() override;
-  void onOutputBufferAvailable() override;
-  void onFormatChange(std::shared_ptr<Message> format) override;
-  void onError(status_t err) override;
-
-  std::shared_ptr<Looper> mLooper;
-  std::shared_ptr<Message> mNotify;
-  bool mRequestInputBuffersPending;
-  std::shared_ptr<PlayerBase::ContentSource> mSource;
-  std::shared_ptr<AvpRenderSynchronizer> mRender;
-  std::shared_ptr<VideoSink> mVideoSink;
-  std::unique_ptr<DecoderFactory> mDecoderFactory;
-  std::shared_ptr<Decoder> mDecoder;
-  bool mIsAudio;
-  std::vector<std::shared_ptr<Message>> mInputBufferMessageQueue;
+  std::shared_ptr<Looper> looper_;
+  std::shared_ptr<Message> notify_;
+  bool request_input_buffers_pending_;
+  std::shared_ptr<ContentSource> source_;
+  std::shared_ptr<AVSynchronizeRender> render_;
+  std::shared_ptr<VideoSink> video_sink_;
+  std::shared_ptr<CodecFactory> codec_factory_;
+  std::shared_ptr<Codec> decoder_;
+  bool is_audio_;
+  std::vector<std::shared_ptr<MediaPacket>> input_packet_queue_;
 };
 } /* namespace avp */
 

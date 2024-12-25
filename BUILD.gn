@@ -3,8 +3,14 @@ import("avp.gni")
 group("default") {
   testonly = true
   deps = [ ":avp" ]
-  deps += [ "examples" ]
-  deps += [ "test" ]
+
+  if (ave_include_test) {
+    deps += [
+      "base:base_unittests",
+      "media:media_unittests",
+      "test",
+    ]
+  }
 }
 
 config("library_impl_config") {
@@ -58,7 +64,8 @@ config("common_config") {
   defines = []
 }
 
-avp_static_library("avp") {
+ave_static_library("avp") {
+  testonly = true
   sources = []
 
   complete_static_lib = true
@@ -67,10 +74,13 @@ avp_static_library("avp") {
   deps = []
 
   deps += [
+    "api",
     "base",
-    "common",
-    "player",
+
+    #"media",
+
+    #"player",
   ]
 
-  deps += [ "demuxer" ]
+  #deps += [ "demuxer" ]
 }

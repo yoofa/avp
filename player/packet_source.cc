@@ -10,62 +10,65 @@
 #include "base/types.h"
 
 namespace avp {
-PacketSource::PacketSource() {}
 
-PacketSource::~PacketSource() {}
+PacketSource::PacketSource(std::shared_ptr<MediaFormat> format)
+    : format_(std::move(format)) {}
 
-status_t PacketSource::start() {
-  return OK;
-}
-status_t PacketSource::stop() {
-  return OK;
-}
+PacketSource::~PacketSource() = default;
 
-void PacketSource::clear() {}
-
-bool PacketSource::hasBufferAvailable(status_t* result) {
-  std::unique_lock<std::mutex> l(mLock);
-  *result = OK;
-
-  if (!mBuffers.empty()) {
-    return true;
-  }
-
-  return false;
+status_t PacketSource::Start() {
+  return ave::OK;
 }
 
-size_t PacketSource::getAvailableBufferCount(status_t* result) {
-  std::unique_lock<std::mutex> l(mLock);
-  *result = OK;
+status_t PacketSource::Stop() {
+  return ave::OK;
+}
 
-  if (!mBuffers.empty()) {
-    return mBuffers.size();
+void PacketSource::Clear() {}
+
+void PacketSource::SetFormat(std::shared_ptr<MediaFormat> format) {
+  format_ = std::move(format);
+}
+
+bool PacketSource::HasBufferAvailable(status_t* result) {
+  std::unique_lock<std::mutex> l(lock_);
+  *result = ave::OK;
+
+  return !packets_.empty();
+}
+
+size_t PacketSource::GetAvailableBufferCount(status_t* result) {
+  std::unique_lock<std::mutex> l(lock_);
+  *result = ave::OK;
+
+  if (!packets_.empty()) {
+    return packets_.size();
   }
 
   return 0;
 }
 
-status_t PacketSource::queueAccessunit(std::shared_ptr<Buffer> buffer) {
-  std::unique_lock<std::mutex> l(mLock);
-  mBuffers.push(buffer);
-  return OK;
+status_t PacketSource::QueueAccessunit(std::shared_ptr<MediaPacket> packet) {
+  std::unique_lock<std::mutex> l(lock_);
+  packets_.push(std::move(packet));
+  return ave::OK;
 }
 
-status_t PacketSource::dequeueAccessUnit(std::shared_ptr<Buffer>& buffer) {
-  buffer.reset();
+status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaPacket>& packet) {
+  packet.reset();
 
-  std::unique_lock<std::mutex> l(mLock);
+  std::unique_lock<std::mutex> l(lock_);
 
-  while (!mBuffers.size()) {
-    mCondition.wait(l);
+  while (!packets_.size()) {
+    condition_.wait(l);
   }
 
-  if (mBuffers.size()) {
-    buffer = mBuffers.front();
-    mBuffers.pop();
+  if (packets_.size()) {
+    packet = packets_.front();
+    packets_.pop();
   }
 
-  return OK;
+  return ave::OK;
 }
 
 } /* namespace avp */

@@ -1,0 +1,9 @@
+import("//base/build/ave.gni")
+
+ave_library("generic_content_source") {
+  sources = [
+    "generic_source.cc",
+    "generic_source.h",
+  ]
+  deps = [ "//api:api_content_source" ]
+}

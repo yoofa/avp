@@ -10,10 +10,10 @@
 
 #include <memory>
 
-#include "common/buffer.h"
-#include "common/media_defs.h"
-#include "common/meta_data.h"
 #include "libavutil/rational.h"
+#include "media/buffer.h"
+#include "media/media_defs.h"
+#include "media/meta_data.h"
 
 extern "C" {
 #include "third_party/ffmpeg/libavcodec/avcodec.h"

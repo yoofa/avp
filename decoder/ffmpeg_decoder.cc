@@ -9,8 +9,8 @@
 #include "base/checks.h"
 #include "base/hexdump.h"
 #include "base/logging.h"
-#include "common/media_errors.h"
-#include "common/utils.h"
+#include "media/media_errors.h"
+#include "media/utils.h"
 #include "modules/ffmpeg/ffmpeg_helper.h"
 
 namespace avp {
@@ -24,7 +24,7 @@ FFmpegDecoder::FFmpegDecoder(bool audio, CodecType codecType)
       time_base_({1, 1000000}),
       mInputPenddingCount(0) {
   mLooper->setName("FFmpegDecoder");
-  LOG(LS_INFO) << "is audio:" << mAudio << ", type:" << mCodecType;
+  AVE_LOG(LS_INFO) << "is audio:" << mAudio << ", type:" << mCodecType;
 }
 
 FFmpegDecoder::~FFmpegDecoder() {
@@ -73,8 +73,8 @@ void FFmpegDecoder::setCallback(DecoderCallback* callback) {
 
 status_t FFmpegDecoder::queueInputBuffer(std::shared_ptr<Buffer> buffer) {
   // int64_t timeUs;
-  // CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
-  // LOG(LS_INFO) << "queueInputBuffer[" << (mAudio ? "a" : "v")
+  // AVE_CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
+  // AVE_LOG(LS_INFO) << "queueInputBuffer[" << (mAudio ? "a" : "v")
   //             << "], pts:" << timeUs;
   std::lock_guard<std::mutex> lock(mLock);
   if (mInputPenddingCount > 5) {
@@ -111,7 +111,7 @@ status_t FFmpegDecoder::releaseOutputBuffer(std::shared_ptr<Buffer> buffer) {
 void FFmpegDecoder::Decode(std::shared_ptr<Buffer>& buffer) {
   {
     std::lock_guard<std::mutex> lock(mLock);
-    CHECK(mInputPenddingCount > 0);
+    AVE_CHECK(mInputPenddingCount > 0);
     mInputPenddingCount--;
     if (mInputPenddingCount < 2) {
       auto msg = std::make_shared<Message>(kWhatNotifyInputBufferAvailable,
@@ -124,14 +124,14 @@ void FFmpegDecoder::Decode(std::shared_ptr<Buffer>& buffer) {
 
   status_t err = DecodeToBuffers(buffer, frames);
   if (err < 0) {
-    LOG(LS_ERROR) << "decoing err:" << err;
+    AVE_LOG(LS_ERROR) << "decoing err:" << err;
     return;
   }
 
   {
     std::lock_guard<std::mutex> lock(mLock);
     size_t count = frames.size();
-    // LOG(LS_INFO) << "decoding cout:" << count;
+    // AVE_LOG(LS_INFO) << "decoding cout:" << count;
 
     for (size_t i = 0; i < count; i++) {
       auto frame = frames[i];
@@ -149,7 +149,7 @@ void FFmpegDecoder::Decode(std::shared_ptr<Buffer>& buffer) {
 //                                       std::shared_ptr<Buffer>& out) {
 //  int64_t timeUs;
 //
-//  CHECK(in->meta()->findInt64("timeUs", &timeUs));
+//  AVE_CHECK(in->meta()->findInt64("timeUs", &timeUs));
 //  std::shared_ptr<Buffer> nalBuffer = std::make_shared<Buffer>(in->size() +
 //  4); memcpy(nalBuffer->data(), "\x00\x00\x00\x01", 4);
 //  memcpy(nalBuffer->data() + 4, in->data(), in->size());
@@ -180,7 +180,8 @@ void FFmpegDecoder::Decode(std::shared_ptr<Buffer>& buffer) {
 //  }
 //
 //  if (ret < 0) {
-//    LOG(LS_INFO) << "error decoding a video frame with timestamp " << timeUs;
+//    AVE_LOG(LS_INFO) << "error decoding a video frame with timestamp " <<
+//    timeUs;
 //  }
 //
 //  if (!gotFrame) {
@@ -188,18 +189,18 @@ void FFmpegDecoder::Decode(std::shared_ptr<Buffer>& buffer) {
 //  }
 //
 //  if (!mAvFrame->data[0] || !mAvFrame->data[1] || !mAvFrame->data[2]) {
-//    LOG(LS_ERROR)
+//    AVE_LOG(LS_ERROR)
 //        << "Video frame was produced yet has invalid frame data. and err:"
 //        << ret;
 //    return ret;
 //  }
 //
 //  // if (!mAvFrame->opaque) {
-//  //  LOG(LS_ERROR) << "VideoFrame object associated with frame data not
+//  //  AVE_LOG(LS_ERROR) << "VideoFrame object associated with frame data not
 //  set.";
 //  //  return ret;
 //  //}
-//  // LOG(LS_INFO) << "#################### got frame, res: [" <<
+//  // AVE_LOG(LS_INFO) << "#################### got frame, res: [" <<
 //  mAvFrame->width
 //  //             << "x" << mAvFrame->height << "], pts:" << mAvFrame->pts
 //  //             << ", size: " << mAvFrame->pkt_size;
@@ -237,7 +238,7 @@ void FFmpegDecoder::onMessageReceived(const std::shared_ptr<Message>& msg) {
   switch (msg->what()) {
     case kWhatQueueInputBuffer: {
       std::shared_ptr<Buffer> buffer;
-      CHECK(msg->findBuffer("buffer", buffer));
+      AVE_CHECK(msg->findBuffer("buffer", buffer));
       Decode(buffer);
       break;
     }

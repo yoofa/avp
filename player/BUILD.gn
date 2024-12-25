@@ -1,63 +1,32 @@
-import("//avp.gni")
+import("//base/build/ave.gni")
 
 group("player") {
   deps = [ ":avplayer" ]
 }
 
-avp_library("player_interface") {
-  sources = [
-    "audio_frame.cc",
-    "audio_frame.h",
-    "audio_sink.h",
-    "data_source.h",
-    "decoder.h",
-    "decoder_factory.h",
-    "demuxer.h",
-    "demuxer_factory.h",
-    "media_source.cc",
-    "media_source.h",
-    "player_base.cc",
-    "player_interface.h",
-    "video_frame.cc",
-    "video_frame.h",
-    "video_sink.h",
+ave_library("avplayer_builder") {
+  sources = [ "avp_builder.cc" ]
+  deps = [
+    ":avplayer",
+    "//api:player_interface",
   ]
-  deps = [ "../base:utils" ]
 }
 
-avp_library("avplayer") {
+ave_library("avplayer") {
   sources = [
     "avp_decoder.cc",
     "avp_decoder.h",
-    "avp_render_synchronizer.cc",
-    "avp_render_synchronizer.h",
     "avplayer.cc",
     "avplayer.h",
-    "default_decoder_factory.cc",
-    "default_decoder_factory.h",
-    "default_demuxer_factory.cc",
-    "default_demuxer_factory.h",
-    "file_source.cc",
-    "file_source.h",
-    "generic_source.cc",
-    "generic_source.h",
-    "media_clock.cc",
-    "media_clock.h",
-    "packet_source.cc",
-    "packet_source.h",
   ]
 
   deps = [
-    ":player_interface",
-    "../base:logging",
-    "../base:utils",
-    "../base/system:avp_export",
-    "../common:foundation",
+    "//api:player_interface",
+    "//base:logging",
+    "//base:utils",
+    "//base/system:ave_export",
+    "//media/foundation:foundation",
   ]
-
-  deps += [ "../demuxer:ffmpeg_demuxer" ]
-  deps += [ "../decoder:ffmpeg_decoder" ]
-  deps += [ "../modules/ffmpeg:ffmpeg_helper" ]
 
   cflags = [ "-Wno-multichar" ]
 }

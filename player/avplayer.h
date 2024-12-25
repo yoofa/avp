@@ -9,69 +9,76 @@
 #define AVP_AVPLAYER_H
 
 #include <memory>
+#include <unordered_map>
 
-#include "common/handler.h"
-#include "common/looper.h"
-#include "common/message.h"
+#include "base/system/ave_export.h"
 
-#include "base/system/avp_export.h"
-#include "player/audio_decoder.h"
-#include "player/audio_decoder_factory.h"
-#include "player/audio_sink.h"
+#include "media/audio/audio_device_module.h"
+#include "media/codec/codec_factory.h"
+#include "media/foundation/av_synchronize_render.h"
+#include "media/foundation/handler.h"
+#include "media/foundation/looper.h"
+#include "media/foundation/media_clock.h"
+#include "media/foundation/message.h"
+
+#include "api/content_source.h"
+#include "api/player.h"
 #include "player/avp_decoder.h"
-#include "player/avp_render_synchronizer.h"
-#include "player/default_Audio_decoder_factory.h"
-#include "player/default_video_decoder_factory.h"
-#include "player/media_clock.h"
-#include "player/player_interface.h"
-#include "player/video_decoder.h"
-#include "player/video_decoder_factory.h"
-#include "player/video_sink.h"
 
 namespace avp {
-AVP_EXPORT class AvPlayer : public PlayerBase, public Handler {
+
+using ave::media::AudioDeviceModule;
+using ave::media::AVSynchronizeRender;
+using ave::media::CodecFactory;
+using ave::media::Handler;
+using ave::media::Looper;
+using ave::media::MediaClock;
+using ave::media::Message;
+
+AVE_EXPORT class AvPlayer : public Player,
+                            public Handler,
+                            public ContentSource::Notify {
  public:
-  AvPlayer();
-  virtual ~AvPlayer() override;
+  explicit AvPlayer(
+      std::shared_ptr<ContentSourceFactory> content_source_factory,
+      std::shared_ptr<DemuxerFactory> demuxer_factory,
+      std::shared_ptr<CodecFactory> codec_factory,
+      std::shared_ptr<AudioDeviceModule> audio_device_module);
 
-  virtual status_t setListener(
-      const std::shared_ptr<Listener>& listener) override;
-  virtual status_t init() override;
-  status_t setDataSource(const char* url) override;
-  virtual status_t setDataSource(int fd,
-                                 int64_t offset,
-                                 int64_t length) override;
-  virtual status_t setDataSource(
-      const std::shared_ptr<ContentSource>& source) override;
+  ~AvPlayer() override;
 
-  virtual status_t setAudioSink(std::shared_ptr<AudioSink> sink) override;
-  virtual status_t setVideoSink(std::shared_ptr<VideoSink> sink) override;
+  status_t SetListener(std::shared_ptr<Listener> listener) override;
+  status_t Init() override;
+  status_t SetDataSource(
+      const char* url,
+      const std::unordered_map<std::string, std::string>& headers) override;
+  status_t SetDataSource(int fd, int64_t offset, int64_t length) override;
+  status_t SetDataSource(std::shared_ptr<ave::DataSource> data_source) override;
+  status_t SetDataSource(std::shared_ptr<ContentSource> source) override;
 
-  virtual status_t prepare() override;
-  virtual status_t start() override;
-  virtual status_t stop() override;
-  virtual status_t pause() override;
-  virtual status_t resume() override;
-  virtual status_t seekTo(
-      int msec,
-      SeekMode mode = SeekMode::SEEK_PREVIOUS_SYNC) override;
-  virtual status_t reset() override;
+  status_t Prepare() override;
+  status_t Start() override;
+  status_t Stop() override;
+  status_t Pause() override;
+  status_t Resume() override;
+  status_t SeekTo(int msec, SeekMode mode) override;
+  status_t Reset() override;
 
  private:
-  void postScanSources();
-  status_t instantiateDecoder(bool audio, std::shared_ptr<AvpDecoder>& decoder);
-  void performReset();
+  void PostScanSources();
+  status_t InstantiateDecoder(bool audio, std::shared_ptr<AvpDecoder>& decoder);
+  void PerformReset();
 
-  void onStart(int64_t startUs = -1,
+  void OnStart(int64_t startUs = -1,
                SeekMode seekMode = SeekMode::SEEK_PREVIOUS_SYNC);
-  void onStop();
-  void onPause();
-  void onResume();
-  void onSeek();
+  void OnStop();
+  void OnPause();
+  void OnResume();
+  void OnSeek();
 
-  void onSourceNotify(const std::shared_ptr<Message>& msg);
-  void onDecoderNotify(const std::shared_ptr<Message>& msg);
-  void onRenderNotify(const std::shared_ptr<Message>& msg);
+  void OnSourceNotify(const std::shared_ptr<Message>& msg);
+  void OnDecoderNotify(const std::shared_ptr<Message>& msg);
+  void OnRenderNotify(const std::shared_ptr<Message>& msg);
 
   void onMessageReceived(const std::shared_ptr<Message>& message) override;
 
@@ -109,21 +116,26 @@ AVP_EXPORT class AvPlayer : public PlayerBase, public Handler {
     kWhatMediaClockNotify = 'mckN',
   };
 
-  std::shared_ptr<AvpDecoder> mAudioDecoder;
-  std::shared_ptr<AvpDecoder> mVideoDecoder;
-  std::shared_ptr<Looper> mPlayerLooper;
+  std::shared_ptr<ContentSourceFactory> content_source_factory_;
+  std::shared_ptr<DemuxerFactory> demuxer_factory_;
+  std::shared_ptr<CodecFactory> codec_factory_;
+  std::shared_ptr<AudioDeviceModule> audio_device_module_;
 
-  std::shared_ptr<MediaClock> mMediaClock;
-  std::shared_ptr<AudioSink> mAudioSink;
-  std::shared_ptr<VideoSink> mVideoSink;
-  std::shared_ptr<ContentSource> mSource;
-  std::shared_ptr<AvpRenderSynchronizer> mRender;
+  std::shared_ptr<AvpDecoder> audio_decoder_;
+  std::shared_ptr<AvpDecoder> video_decoder_;
+  std::shared_ptr<Looper> player_looper_;
 
-  bool mStarted;
-  bool mPrepared;
-  bool mPaused;
-  bool mSourceStarted;
-  bool mScanSourcesPendding;
+  std::shared_ptr<MediaClock> media_clock_;
+  std::shared_ptr<ContentSource> source_;
+  std::shared_ptr<AVSynchronizeRender> render_;
+
+  bool started_;
+  bool prepared_;
+  bool paused_;
+  bool source_started_;
+  bool scan_sources_pending_;
+
+  std::weak_ptr<Listener> listener_;
 };
 
 }  // namespace avp

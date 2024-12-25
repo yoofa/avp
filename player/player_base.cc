@@ -6,7 +6,7 @@
  */
 
 #include "base/logging.h"
-#include "common/utils.h"
+#include "media/utils.h"
 #include "player/player_interface.h"
 
 namespace avp {
@@ -41,7 +41,7 @@ void PlayerBase::ContentSource::notifyVideoSizeChanged(
 }
 
 void PlayerBase::ContentSource::notifyPrepared(status_t err) {
-  LOG(LS_VERBOSE) << "Source::notifyPrepared " << err;
+  AVE_LOG(LS_VERBOSE) << "Source::notifyPrepared " << err;
   std::shared_ptr<Message> notify = dupNotify();
   notify->setInt32("what", kWhatPrepared);
   notify->setInt32("err", err);

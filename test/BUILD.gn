@@ -39,10 +39,20 @@ source_set("test_support") {
   ]
 }
 
+static_library("test_main") {
+  testonly = true
+  sources = [
+    "test_main.cc",
+    "test_main_lib.cc",
+    "test_main_lib.h",
+  ]
+  deps = [ ":test_support" ]
+}
+
 executable("gtest_demo") {
   testonly = true
 
-  sources = [ "gtest_demo.cpp" ]
+  sources = [ "gtest_demo.cc" ]
 
   deps = [ ":test_support" ]
 }

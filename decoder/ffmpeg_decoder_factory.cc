@@ -25,7 +25,7 @@ static bool codecSupported(CodecType codecType) {
 std::shared_ptr<Decoder> FFmpegDecoderFactory::createDecoder(
     bool audio,
     CodecType codecType) {
-  LOG(LS_INFO) << "createDecoder " << codecType;
+  AVE_LOG(LS_INFO) << "createDecoder " << codecType;
   if (!codecSupported(codecType)) {
     return nullptr;
   }

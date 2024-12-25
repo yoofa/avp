@@ -3,7 +3,7 @@ import("//avp.gni")
 group("decoder") {
 }
 
-avp_library("ffmpeg_decoder") {
+ave_library("ffmpeg_decoder") {
   sources = [
     "ffmpeg_audio_decoder.cc",
     "ffmpeg_audio_decoder.h",
