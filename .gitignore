@@ -49,3 +49,7 @@
 /tools
 /base
 /media
+
+# for gclient files isnore
+.cipd
+.gclient_*
