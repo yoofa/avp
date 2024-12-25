@@ -1,6 +1,6 @@
 # dependencies file
 
-gclient_gn_args_file = 'src/build/config/gclient_args.gni'
+gclient_gn_args_file = 'build/config/gclient_args.gni'
 gclient_gn_args = [
   'generate_location_tags',
 ]
@@ -25,16 +25,16 @@ vars = {
 
 deps = {
   # ave module
-  'src/base':
+  'base':
     'https://github.com/yoofa/base.git',
-  'src/media':
+  'media':
     'https://github.com/yoofa/media_common.git',
 
-  'src/build':
+  'build':
     'https://chromium.googlesource.com/chromium/src/build@bc10f9ffb962f14c3ed18a6cd9c2f5114d9b0b59',
-  'src/buildtools':
+  'buildtools':
     'https://chromium.googlesource.com/chromium/src/buildtools@50c348906cbd450e031bc3123b657f833f8455b7',
-  'src/buildtools/linux64': {
+  'buildtools/linux64': {
     'packages': [
       {
         'package': 'gn/gn/linux-${{arch}}',
@@ -44,7 +44,7 @@ deps = {
     'dep_type': 'cipd',
     'condition': 'checkout_linux',
   },
-  'src/buildtools/mac': {
+  'buildtools/mac': {
     'packages': [
       {
         'package': 'gn/gn/mac-${{arch}}',
@@ -54,7 +54,7 @@ deps = {
     'dep_type': 'cipd',
     'condition': 'checkout_mac',
   },
-  'src/buildtools/win': {
+  'buildtools/win': {
     'packages': [
       {
         'package': 'gn/gn/windows-amd64',
@@ -64,7 +64,7 @@ deps = {
     'dep_type': 'cipd',
     'condition': 'checkout_win',
   },
-  'src/buildtools/reclient': {
+  'buildtools/reclient': {
     'packages': [
       {
          # https://chrome-infra-packages.appspot.com/p/infra/rbe/client/
@@ -77,16 +77,16 @@ deps = {
     'condition': 'not (host_os == "linux" and host_cpu == "arm64")',
   },
 
-  'src/third_party/clang-format/script':
+  'third_party/clang-format/script':
     'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git@e5337933f2951cacd3aeacd238ce4578163ca0b9',
-  'src/third_party/libc++/src':
+  'third_party/libc++/src':
     'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libcxx.git@7cf98622abaf832e2d4784889ebc69d5b6fde4d8',
-  'src/third_party/libc++abi/src':
+  'third_party/libc++abi/src':
     'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libcxxabi.git@e8e4eb8f1c413ea4365256b2b83a6093c95d2d86',
-  'src/third_party/libunwind/src':
+  'third_party/libunwind/src':
     'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libunwind.git@43e5a34c5b7066a7ee15c74f09dc37b4b9b5630e',
 
-  'src/third_party/ninja': {
+  'third_party/ninja': {
     'packages': [
       {
         'package': 'infra/3pp/tools/ninja/${{platform}}',
@@ -96,18 +96,18 @@ deps = {
     'dep_type': 'cipd',
   },
 
-  'src/testing':
+  'testing':
     'https://chromium.googlesource.com/chromium/src/testing@074ff55a07fb690e769eda906375f8e7cb6b39b8',
-  'src/third_party/depot_tools':
+  'third_party/depot_tools':
     'https://chromium.googlesource.com/chromium/tools/depot_tools.git@90a30a5b5357636fa05bb315c393275be7ca705c',
 
-  'src/third_party/googletest/src':
+  'third_party/googletest/src':
     'https://chromium.googlesource.com/external/github.com/google/googletest.git@af29db7ec28d6df1c7f0f745186884091e602e07',
-  'src/third_party/google_benchmark/src': {
+  'third_party/google_benchmark/src': {
     'url': 'https://chromium.googlesource.com/external/github.com/google/benchmark.git@344117638c8ff7e239044fd0fa7085839fc03021',
   },
 
-  'src/tools/clang/dsymutil': {
+  'tools/clang/dsymutil': {
     'packages': [
       {
         'package': 'chromium/llvm-build-tools/dsymutil',
@@ -119,24 +119,24 @@ deps = {
   },
 
   # third_party
-  'src/third_party/catapult':
+  'third_party/catapult':
     'https://chromium.googlesource.com/catapult.git@4f81c1e295978227d83f1b42ceff40b4f9b5b08c',
 
-  'src/tools':
+  'tools':
     'https://chromium.googlesource.com/chromium/src/tools@33a950a48cf447a6b1c0262e9955446e6d129d34',
-  'src/tools/swarming_client':
+  'tools/swarming_client':
     'https://chromium.googlesource.com/infra/luci/client-py.git@d46ea7635f2911208268170512cb611412488fd8',
-  'src/third_party/libjpeg_turbo':
+  'third_party/libjpeg_turbo':
     'https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git@ff19e5b2e176c61d552f68768e0e051867745321',
 
   # used by ffmpeg
-  'src/third_party/nasm': {
+  'third_party/nasm': {
       'url': 'https://chromium.googlesource.com/chromium/deps/nasm.git@7fc833e889d1afda72c06220e5bed8fb43b2e5ce'
   },
 
-  'src/third_party/ffmpeg':
+  'third_party/ffmpeg':
     'https://chromium.googlesource.com/chromium/third_party/ffmpeg.git@e1ca3f06adec15150a171bc38f550058b4bbb23b',
-  'src/third_party/libyuv':
+  'third_party/libyuv':
     'https://chromium.googlesource.com/libyuv/libyuv.git@49ebc996aa8c4bdf89c1b5ea461eb677234c61cc',
 }
 
@@ -148,7 +148,7 @@ hooks = [
     'pattern': '.',
     'action': [
         'python',
-        'src/third_party/depot_tools/update_depot_tools_toggle.py',
+        'third_party/depot_tools/update_depot_tools_toggle.py',
         '--disable',
     ],
   },
@@ -156,14 +156,14 @@ hooks = [
     'name': 'sysroot_arm',
     'pattern': '.',
     'condition': 'checkout_linux and checkout_arm',
-    'action': ['python', 'src/build/linux/sysroot_scripts/install-sysroot.py',
+    'action': ['python', 'build/linux/sysroot_scripts/install-sysroot.py',
                '--arch=arm'],
   },
   {
     'name': 'sysroot_arm64',
     'pattern': '.',
     'condition': 'checkout_linux and checkout_arm64',
-    'action': ['python', 'src/build/linux/sysroot_scripts/install-sysroot.py',
+    'action': ['python', 'build/linux/sysroot_scripts/install-sysroot.py',
                '--arch=arm64'],
   },
   {
@@ -171,7 +171,7 @@ hooks = [
     'pattern': '.',
     'condition': 'checkout_linux and (checkout_x86 or checkout_x64)',
     # TODO(mbonadei): change to --arch=x86.
-    'action': ['python', 'src/build/linux/sysroot_scripts/install-sysroot.py',
+    'action': ['python', 'build/linux/sysroot_scripts/install-sysroot.py',
                '--arch=i386'],
   },
   {
@@ -179,7 +179,7 @@ hooks = [
     'pattern': '.',
     'condition': 'checkout_linux and checkout_mips',
     # TODO(mbonadei): change to --arch=mips.
-    'action': ['python', 'src/build/linux/sysroot_scripts/install-sysroot.py',
+    'action': ['python', 'build/linux/sysroot_scripts/install-sysroot.py',
                '--arch=mipsel'],
   },
   {
@@ -187,7 +187,7 @@ hooks = [
     'pattern': '.',
     'condition': 'checkout_linux and checkout_x64',
     # TODO(mbonadei): change to --arch=x64.
-    'action': ['python', 'src/build/linux/sysroot_scripts/install-sysroot.py',
+    'action': ['python', 'build/linux/sysroot_scripts/install-sysroot.py',
                '--arch=amd64'],
   },
   {
@@ -196,11 +196,11 @@ hooks = [
     'pattern': '.',
     'condition': 'checkout_win and host_os == "linux"',
     'action': [ 'python',
-                'src/third_party/depot_tools/download_from_google_storage.py',
+                'third_party/depot_tools/download_from_google_storage.py',
                 '--no_resume',
                 '--no_auth',
                 '--bucket', 'chromium-browser-clang/ciopfs',
-                '-s', 'src/build/ciopfs.sha1',
+                '-s', 'build/ciopfs.sha1',
     ]
   },
   {
@@ -208,20 +208,20 @@ hooks = [
     'name': 'win_toolchain',
     'pattern': '.',
     'condition': 'checkout_win',
-    'action': ['python', 'src/build/vs_toolchain.py', 'update', '--force'],
+    'action': ['python', 'build/vs_toolchain.py', 'update', '--force'],
   },
   {
     # Update the Mac toolchain if necessary.
     'name': 'mac_toolchain',
     'pattern': '.',
     'condition': 'checkout_mac',
-    'action': ['python', 'src/build/mac_toolchain.py'],
+    'action': ['python', 'build/mac_toolchain.py'],
   },
   {
     # Note: On Win, this should run after win_toolchain, as it may use it.
     'name': 'clang',
     'pattern': '.',
-    'action': ['python', 'src/tools/clang/scripts/update.py'],
+    'action': ['python', 'tools/clang/scripts/update.py'],
   },
   # Pull clang-format binaries using checked-in hashes.
   {
@@ -233,7 +233,7 @@ hooks = [
                 '--platform=win32',
                 '--no_auth',
                 '--bucket', 'chromium-clang-format',
-                '-s', 'src/buildtools/win/clang-format.exe.sha1',
+                '-s', 'buildtools/win/clang-format.exe.sha1',
     ],
   },
   {
@@ -245,7 +245,7 @@ hooks = [
                 '--platform=darwin',
                 '--no_auth',
                 '--bucket', 'chromium-clang-format',
-                '-s', 'src/buildtools/mac/clang-format.sha1',
+                '-s', 'buildtools/mac/clang-format.sha1',
     ],
   },
   {
@@ -257,14 +257,14 @@ hooks = [
                 '--platform=linux*',
                 '--no_auth',
                 '--bucket', 'chromium-clang-format',
-                '-s', 'src/buildtools/linux64/clang-format.sha1',
+                '-s', 'buildtools/linux64/clang-format.sha1',
     ],
   },
   {
     # Update LASTCHANGE.
     'name': 'lastchange',
     'pattern': '.',
-    'action': ['python', 'src/build/util/lastchange.py',
-               '-o', 'src/build/util/LASTCHANGE'],
+    'action': ['python', 'build/util/lastchange.py',
+               '-o', 'build/util/LASTCHANGE'],
   },
 ]
