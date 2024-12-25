@@ -1,0 +1,6 @@
+[submodule "base"]
+	path = base
+	url = https://github.com/yoofa/base.git
+[submodule "media"]
+	path = media
+	url = https://github.com/yoofa/media.git
