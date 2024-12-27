@@ -7,3 +7,4 @@ solutions = [
     "custom_vars": {},
   },
 ]
+target_os = ["android", "unix"]
