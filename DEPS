@@ -29,6 +29,8 @@ deps = {
     'https://github.com/yoofa/base.git',
   'media':
     'https://github.com/yoofa/media_common.git',
+  'third_party':
+    'https://github.com/yoofa/ave_third_party.git',
 
   'build':
     'https://chromium.googlesource.com/chromium/src/build@bc10f9ffb962f14c3ed18a6cd9c2f5114d9b0b59',

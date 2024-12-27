@@ -4,3 +4,6 @@
 [submodule "media"]
 	path = media
 	url = https://github.com/yoofa/media.git
+[submodule "ave_third_party"]
+  path = third_party
+  url = https://github.com/yoofa/ave_third_party.git
