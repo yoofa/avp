@@ -21,7 +21,7 @@ exec_script_whitelist = build_dotfile_settings.exec_script_whitelist +
                         [ "//build_overrides/build.gni" ]
 
 default_args = {
-  is_component_build = true
+  is_component_build = false
   clang_use_chrome_plugins = false
 
   #  ffmpeg_branding = "Chrome"
