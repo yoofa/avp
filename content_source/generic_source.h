@@ -11,19 +11,18 @@
 #include <memory>
 #include <vector>
 
-#include "api/content_source/content_source.h"
-#include "api/demuxer/demuxer.h"
-#include "api/demuxer/demuxer_factory.h"
-
 #include "base/data_source/data_source.h"
 #include "base/thread_annotation.h"
 #include "base/unique_fd.h"
-
 #include "media/foundation/handler.h"
 #include "media/foundation/looper.h"
 #include "media/foundation/media_packet.h"
 #include "media/foundation/media_source.h"
 #include "media/foundation/message.h"
+
+#include "api/content_source/content_source.h"
+#include "api/demuxer/demuxer.h"
+#include "api/demuxer/demuxer_factory.h"
 #include "player/packet_source.h"
 
 namespace ave {
