@@ -10,7 +10,8 @@
 
 #include "api/content_source/content_source_factory.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 class DefaultContentSourceFactory : public ContentSourceFactory {
  public:
@@ -28,6 +29,7 @@ class DefaultContentSourceFactory : public ContentSourceFactory {
       std::shared_ptr<ave::DataSource> data_source) override;
 };
 
-}  // namespace avp
+}  // namespace player
+}  // namespace ave
 
 #endif /* !DEFAULT_CONTENT_SOURCE_FACTORY_H */

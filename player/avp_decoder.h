@@ -16,7 +16,8 @@
 #include "media/foundation/handler.h"
 #include "media/foundation/video_sink.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 using ave::media::AVSynchronizeRender;
 using ave::media::Codec;
@@ -126,6 +127,8 @@ class AvpDecoder : public Handler, public CodecCallback {
   bool is_audio_;
   std::vector<std::shared_ptr<MediaPacket>> input_packet_queue_;
 };
-} /* namespace avp */
+
+}  // namespace player
+}  // namespace ave
 
 #endif /* !AVP_DECODER_H */

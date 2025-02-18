@@ -18,7 +18,8 @@
 #include "base/utils.h"
 #include "media/buffer.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 AudioFileRender::AudioFileRender(const char* file) : mFd(-1) {
   mFd = ::open(file, O_LARGEFILE | O_RDWR | O_CREAT);
@@ -46,4 +47,5 @@ void AudioFileRender::onFrame(std::shared_ptr<Buffer>& frame) {
   ::write(mFd, frame->data(), frame->size());
 }
 
-} /* namespace avp */
+}  // namespace player
+}  // namespace ave

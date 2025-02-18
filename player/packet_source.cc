@@ -9,7 +9,8 @@
 
 #include "base/types.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 PacketSource::PacketSource(std::shared_ptr<MediaFormat> format)
     : format_(std::move(format)) {}
@@ -71,4 +72,5 @@ status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaPacket>& packet) {
   return ave::OK;
 }
 
-} /* namespace avp */
+}  // namespace player
+}  // namespace ave

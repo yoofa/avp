@@ -14,7 +14,8 @@
 #include "media/foundation/media_format.h"
 #include "media/foundation/media_source.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 using ave::media::MediaFormat;
 using ave::media::MediaSource;
@@ -35,6 +36,8 @@ class Demuxer {
 
   virtual const char* name() = 0;
 };
-} /* namespace avp */
+
+}  // namespace player
+}  // namespace ave
 
 #endif /* !DEMUXER_H */

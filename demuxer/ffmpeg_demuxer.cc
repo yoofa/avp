@@ -20,7 +20,8 @@
 
 #include "modules/ffmpeg/ffmpeg_helper.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 enum { kBufferSize = 32 * 1024 };
 int lastVideoTimeUs = 0;
@@ -303,4 +304,5 @@ const char* FFmpegDemuxer::name() {
   return "FFmpeg-Demuxer";
 }
 
-} /* namespace avp */
+}  // namespace player
+}  // namespace ave

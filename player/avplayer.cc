@@ -13,7 +13,8 @@
 
 #include "generic_source.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 using ave::media::MessageObject;
 
@@ -441,4 +442,5 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
   }
 }
 
-}  // namespace avp
+}  // namespace player
+}  // namespace ave

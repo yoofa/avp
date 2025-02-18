@@ -26,7 +26,8 @@
 #include "media/foundation/message.h"
 #include "player/packet_source.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 using ave::media::Buffer;
 using ave::media::Handler;
@@ -150,6 +151,7 @@ class GenericSource : public Handler, public ContentSource {
   std::shared_ptr<ave::media::Looper> looper_;
 };
 
-}  // namespace avp
+}  // namespace player
+}  // namespace ave
 
 #endif /* !AVP_GENERIC_SOURCE_H */

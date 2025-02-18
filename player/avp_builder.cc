@@ -8,7 +8,8 @@
 #include "api/player.h"
 #include "player/avplayer.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 std::shared_ptr<Player> Player::Builder::build() {
   // Create AvPlayer instance and cast it to Player
@@ -18,4 +19,5 @@ std::shared_ptr<Player> Player::Builder::build() {
   return std::static_pointer_cast<Player>(player);
 }
 
-}  // namespace avp
+}  // namespace player
+}  // namespace ave

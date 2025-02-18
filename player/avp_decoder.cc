@@ -14,7 +14,8 @@
 #include "media/foundation/media_errors.h"
 #include "media/foundation/message.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 using ave::media::CodecId;
 
@@ -402,4 +403,5 @@ void AvpDecoder::onMessageReceived(const std::shared_ptr<Message>& msg) {
   }
 }
 
-} /* namespace avp */
+}  // namespace player
+}  // namespace ave

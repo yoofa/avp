@@ -25,7 +25,7 @@
 #include "examples/avplay/gtk_window.h"
 #include "player/avplayer.h"
 
-using namespace avp;
+using namespace ave;
 
 void printHelp() {
   std::cout << "help:\n"

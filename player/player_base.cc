@@ -9,7 +9,8 @@
 #include "media/utils.h"
 #include "player/player_interface.h"
 
-namespace avp {
+namespace ave {
+namespace player {
 
 std::shared_ptr<Message> PlayerBase::ContentSource::getFormat(bool audio) {
   std::shared_ptr<MetaData> meta = getMeta(audio);
@@ -48,4 +49,5 @@ void PlayerBase::ContentSource::notifyPrepared(status_t err) {
   notify->post(0);
 }
 
-} /* namespace avp */
+}  // namespace player
+}  // namespace ave

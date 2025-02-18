@@ -10,7 +10,9 @@
 
 #include "player/audio_sink.h"
 
-namespace avp {
+namespace ave {
+namespace player {
+
 class AudioFileRender : public AudioSink {
  public:
   AudioFileRender(const char* file);
@@ -20,6 +22,8 @@ class AudioFileRender : public AudioSink {
  protected:
   int mFd;
 };
-} /* namespace avp */
+
+}  // namespace player
+}  // namespace ave
 
 #endif /* !AUDIOFILERENDER_H */
