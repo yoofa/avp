@@ -10,58 +10,9 @@ group("default") {
       "media:media_unittests",
       "test",
     ]
+
+    deps += [ "media/audio:yplay" ]
   }
-}
-
-config("library_impl_config") {
-  defines = [ "AVP_LIBRARY_IMPL" ]
-}
-
-config("common_inherited_config") {
-  defines = []
-  configs = []
-  ldflags = []
-
-  if (avp_enable_ffmpeg) {
-    defines += [ "AVP_FFMPEG" ]
-  }
-
-  if (avp_enable_ffmpeg_demuxer) {
-    defines += [ "AVP_FFMPEG_DEMUXER" ]
-  }
-
-  if (avp_enable_ffmpeg_decoder) {
-    defines += [ "AVP_FFMPEG_DECODER" ]
-  }
-}
-
-config("no_exit_time_destructors") {
-  if (is_clang) {
-    cflags = [ "-Wno-exit-time-destructors" ]
-  }
-}
-
-config("no_global_constructors") {
-  if (is_clang) {
-    cflags = [ "-Wno-global-constructors" ]
-  }
-}
-
-config("avp_prod_config") {
-  if (is_clang) {
-    cflags = [
-      "-Wexit-time-destructors",
-      "-Wglobal-constructors",
-    ]
-  }
-}
-
-config("common_config") {
-  cflags = []
-  cflags_c = []
-  cflags_cc = []
-  cflags_objc = []
-  defines = []
 }
 
 ave_static_library("avp") {
