@@ -9,7 +9,6 @@
 #define PLAYER_INTERFACE_H
 
 #include <cstdint>
-#include "base/errors.h"
 
 namespace ave {
 namespace player {

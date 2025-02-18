@@ -12,17 +12,16 @@
 
 #include "base/data_source/data_source.h"
 #include "base/errors.h"
-#include "media/audio/audio_device_module.h"
+#include "media/audio/audio_device.h"
 #include "media/codec/codec_factory.h"
 
-#include "api/content_source.h"
-#include "api/content_source_factory.h"
+#include "api/content_source/content_source.h"
+#include "api/content_source/content_source_factory.h"
 #include "api/demuxer/demuxer_factory.h"
 #include "api/player_interface.h"
 
 namespace ave {
 namespace player {
-using ave::status_t;
 
 /**
  * @brief The Player class represents a media player.
@@ -81,7 +80,7 @@ class Player {
      * @return A reference to the Builder object.
      */
     Builder& setAudioDeviceFactory(
-        std::shared_ptr<ave::media::AudioDeviceModule> audio_device_module) {
+        std::shared_ptr<ave::media::AudioDevice> audio_device_module) {
       audio_device_module_ = std::move(audio_device_module);
       return *this;
     }
@@ -96,7 +95,7 @@ class Player {
     std::shared_ptr<ContentSourceFactory> content_source_factory_;
     std::shared_ptr<DemuxerFactory> demuxer_factory_;
     std::shared_ptr<ave::media::CodecFactory> codec_factory_;
-    std::shared_ptr<ave::media::AudioDeviceModule> audio_device_module_;
+    std::shared_ptr<ave::media::AudioDevice> audio_device_module_;
   };
 
   /**
