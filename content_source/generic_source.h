@@ -40,7 +40,7 @@ class GenericSource : public Handler, public ContentSource {
   GenericSource();
   ~GenericSource() override;
 
-  void SetNotify(std::shared_ptr<Notify> notify) override;
+  void SetNotify(Notify* notify) override;
 
   status_t SetDataSource(const char* url /*, http_downloader*/);
   status_t SetDataSource(int fd, int64_t offset, int64_t length);
@@ -119,7 +119,7 @@ class GenericSource : public Handler, public ContentSource {
     std::shared_ptr<PacketSource> packet_source;
   };
 
-  std::weak_ptr<Notify> notify_ GUARDED_BY(lock_);
+  Notify* notify_ GUARDED_BY(lock_);
   std::string uri_ GUARDED_BY(lock_);
   ave::base::unique_fd fd_ GUARDED_BY(lock_);
   int64_t offset_ GUARDED_BY(lock_);
