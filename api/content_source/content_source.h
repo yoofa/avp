@@ -108,7 +108,7 @@ class ContentSource : public ave::media::MessageObject {
    *
    * @param notify A shared pointer to the Notify object.
    */
-  virtual void SetNotify(std::shared_ptr<Notify> notify) = 0;
+  virtual void SetNotify(Notify* notify) = 0;
 
   /**
    * @brief Prepare the content source for playback.
@@ -207,4 +207,4 @@ class ContentSource : public ave::media::MessageObject {
 }  // namespace player
 }  // namespace ave
 
-#endif /* !CONTENT_SOURCE_H */
+#endif  // CONTENT_SOURCE_H
