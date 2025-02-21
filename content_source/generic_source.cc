@@ -34,7 +34,8 @@ using ave::media::MediaSource;
 using ave::media::ReplyToken;
 
 GenericSource::GenericSource()
-    : fd_(-1),
+    : notify_(nullptr),
+      fd_(-1),
       offset_(-1),
       length_(-1),
       duration_us_(-1LL),
@@ -48,7 +49,7 @@ GenericSource::GenericSource()
 
 GenericSource::~GenericSource() = default;
 
-void GenericSource::SetNotify(std::shared_ptr<Notify> notify) {
+void GenericSource::SetNotify(Notify* notify) {
   std::lock_guard<std::mutex> lock(lock_);
   notify_ = notify;
 }
@@ -710,31 +711,27 @@ void GenericSource::onMessageReceived(const std::shared_ptr<Message>& message) {
 }
 
 void GenericSource::NotifyPrepared(status_t err) {
-  auto notify = notify_.lock();
-  if (notify != nullptr) {
-    notify->OnPrepared(err);
+  if (notify_ != nullptr) {
+    notify_->OnPrepared(err);
   }
 }
 
 void GenericSource::NotifyFlagsChanged(int32_t flags) {
-  auto notify = notify_.lock();
-  if (notify != nullptr) {
-    notify->OnFlagsChanged(flags);
+  if (notify_ != nullptr) {
+    notify_->OnFlagsChanged(flags);
   }
 }
 
 void GenericSource::NotifyVideoSizeChanged(
     std::shared_ptr<MediaFormat>& format) {
-  auto notify = notify_.lock();
-  if (notify != nullptr) {
-    notify->OnVideoSizeChanged(format);
+  if (notify_ != nullptr) {
+    notify_->OnVideoSizeChanged(format);
   }
 }
 
 void GenericSource::NotifyBuffering(int32_t percentage) {
-  auto notify = notify_.lock();
-  if (notify != nullptr) {
-    notify->OnBufferingUpdate(percentage);
+  if (notify_ != nullptr) {
+    notify_->OnBufferingUpdate(percentage);
   }
 }
 
