@@ -14,6 +14,7 @@
 #include "base/errors.h"
 #include "media/audio/audio_device.h"
 #include "media/codec/codec_factory.h"
+#include "media/video/video_render.h"
 
 #include "api/content_source/content_source.h"
 #include "api/content_source/content_source_factory.h"
@@ -173,6 +174,14 @@ class Player {
    * @return The status of the operation.
    */
   virtual status_t SetDataSource(std::shared_ptr<ContentSource> source) = 0;
+
+  /**
+   * @brief Sets the video render for the player.
+   * @param video_render The video render to set.
+   * @return The status of the operation.
+   */
+  virtual status_t SetVideoRender(
+      std::shared_ptr<ave::media::VideoRender> video_render) = 0;
 
   /**
    * @brief Prepares the player for playback.
