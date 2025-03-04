@@ -12,13 +12,23 @@ ave_library("avplayer_builder") {
   ]
 }
 
+ave_library("packet_source") {
+  sources = [
+    "packet_source.cc",
+    "packet_source.h",
+  ]
+  deps = [ "//media/foundation:foundation" ]
+}
+
 ave_library("avplayer") {
   sources = [
     "avp_decoder.cc",
     "avp_decoder.h",
     "avplayer.cc",
     "avplayer.h",
+    "message_def.h",
   ]
+  configs += [ "//build/config/compiler:rtti" ]
 
   deps = [
     "//api:player_interface",
