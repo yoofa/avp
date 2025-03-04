@@ -12,8 +12,8 @@
 #include <memory>
 #include <mutex>
 
-#include "api/player_interface.h"
 #include "base/constructor_magic.h"
+#include "base/thread_annotation.h"
 #include "media/foundation/media_format.h"
 #include "media/foundation/media_packet.h"
 #include "media/foundation/media_utils.h"
@@ -30,7 +30,10 @@ class PacketSource {
   explicit PacketSource(std::shared_ptr<MediaFormat> format);
   ~PacketSource();
 
-  MediaType type() const { return format_->stream_type(); }
+  MediaType type() const {
+    std::lock_guard<std::mutex> l(lock_);
+    return format_->stream_type();
+  }
 
   status_t Start();
   status_t Stop();
@@ -46,10 +49,10 @@ class PacketSource {
   status_t DequeueAccessUnit(std::shared_ptr<MediaPacket>& packet);
 
  private:
-  std::shared_ptr<MediaFormat> format_;
-  std::queue<std::shared_ptr<MediaPacket>> packets_;
-  std::mutex lock_;
+  mutable std::mutex lock_;
   std::condition_variable condition_;
+  std::shared_ptr<MediaFormat> format_ GUARDED_BY(lock_);
+  std::queue<std::shared_ptr<MediaPacket>> packets_ GUARDED_BY(lock_);
 
   AVE_DISALLOW_COPY_AND_ASSIGN(PacketSource);
 };

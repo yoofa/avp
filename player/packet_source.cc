@@ -28,18 +28,19 @@ status_t PacketSource::Stop() {
 void PacketSource::Clear() {}
 
 void PacketSource::SetFormat(std::shared_ptr<MediaFormat> format) {
+  std::lock_guard<std::mutex> l(lock_);
   format_ = std::move(format);
 }
 
 bool PacketSource::HasBufferAvailable(status_t* result) {
-  std::unique_lock<std::mutex> l(lock_);
+  std::lock_guard<std::mutex> l(lock_);
   *result = ave::OK;
 
   return !packets_.empty();
 }
 
 size_t PacketSource::GetAvailableBufferCount(status_t* result) {
-  std::unique_lock<std::mutex> l(lock_);
+  std::lock_guard<std::mutex> l(lock_);
   *result = ave::OK;
 
   if (!packets_.empty()) {
@@ -50,16 +51,14 @@ size_t PacketSource::GetAvailableBufferCount(status_t* result) {
 }
 
 status_t PacketSource::QueueAccessunit(std::shared_ptr<MediaPacket> packet) {
-  std::unique_lock<std::mutex> l(lock_);
+  std::lock_guard<std::mutex> l(lock_);
   packets_.push(std::move(packet));
   return ave::OK;
 }
 
 status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaPacket>& packet) {
   packet.reset();
-
   std::unique_lock<std::mutex> l(lock_);
-
   while (!packets_.size()) {
     condition_.wait(l);
   }
