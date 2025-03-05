@@ -202,6 +202,18 @@ class ContentSource : public ave::media::MessageObject {
   virtual status_t SeekTo(int64_t /* seek_time_us */, SeekMode /* mode */) {
     return ave::INVALID_OPERATION;
   }
+
+  /**
+   * @brief Checks if the content source is streaming.
+   * @return True if the content source is streaming, false otherwise.
+   */
+  virtual bool IsStreaming() const { return false; }
+
+  /**
+   * @brief Feeds more ES data to the content source.
+   * @return The status of the operation.
+   */
+  virtual status_t FeedMoreESData() { return ave::INVALID_OPERATION; }
 };
 
 }  // namespace player
