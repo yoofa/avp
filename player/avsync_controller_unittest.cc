@@ -12,6 +12,7 @@
 namespace ave {
 namespace player {
 
+namespace {
 /**
  * @brief Mock AVSyncController for testing with controlled time progression.
  */
@@ -37,6 +38,7 @@ class MockAVSyncController : public AVSyncControllerImpl {
  private:
   int64_t current_time_us_;
 };
+}  // namespace
 
 class AVSyncControllerTest : public ::testing::Test {
  protected:
