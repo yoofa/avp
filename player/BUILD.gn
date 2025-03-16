@@ -40,3 +40,56 @@ ave_library("avplayer") {
 
   cflags = [ "-Wno-multichar" ]
 }
+
+ave_library("avsync_controller") {
+  sources = [
+    "avsync_controller.cc",
+    "avsync_controller.h",
+  ]
+  deps = [
+    "//api:player_interface",
+    "//base:timeutils",
+  ]
+}
+
+ave_library("avsync_controller_unittest") {
+  testonly = true
+  sources = [ "avsync_controller_unittest.cc" ]
+  deps = [
+    ":avsync_controller",
+    "//test:test_support",
+  ]
+}
+
+ave_library("avp_render") {
+  sources = [
+    "avp_render.cc",
+    "avp_render.h",
+  ]
+  deps = [
+    "//api:player_interface",
+    "//base:logging",
+    "//base:task_util",
+    "//media/foundation:foundation",
+  ]
+}
+
+ave_library("avp_render_unittest") {
+  testonly = true
+  sources = [ "avp_render_unittest.cc" ]
+  deps = [
+    ":avp_render",
+    "//base/test:mock_task_runner_factory",
+    "//test:test_support",
+  ]
+}
+
+executable("player_unittests") {
+  testonly = true
+  deps = [
+    ":avp_render_unittest",
+    ":avsync_controller_unittest",
+    "//test:test_main",
+    "//test:test_support",
+  ]
+}
