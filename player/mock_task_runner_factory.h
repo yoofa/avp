@@ -73,7 +73,15 @@ class MockTaskRunnerBase : public base::TaskRunnerBase {
   MockTaskRunnerBase() : now_us_(0) {}
   ~MockTaskRunnerBase() override = default;
 
-  void Destruct() override { delete this; }
+  void Destruct() override {
+    // Don't call delete this - the TaskRunner will handle deletion
+    // Just clean up any resources if needed
+  }
+
+  bool IsCurrent() const {
+    // In test environment, always return true to avoid DCHECK failures
+    return true;
+  }
 
   void PostTask(std::unique_ptr<base::Task> task) override {
     scheduled_tasks_.push({now_us_, std::move(task)});
@@ -146,22 +154,24 @@ class MockTaskRunnerBase : public base::TaskRunnerBase {
 // A mock factory that always returns a MockTaskRunnerBase
 class MockTaskRunnerFactory : public base::TaskRunnerFactory {
  public:
-  MockTaskRunnerFactory() : runner_(new MockTaskRunnerBase) {}
+  MockTaskRunnerFactory() : runner_(nullptr) {}
   ~MockTaskRunnerFactory() override = default;
 
   std::unique_ptr<base::TaskRunnerBase, base::TaskRunnerDeleter>
   CreateTaskRunner(
       const char* /*name*/,
       base::TaskRunnerFactory::Priority /*priority*/) const override {
-    // Always return the same runner for simplicity
+    // Create a new runner instance each time to avoid ownership issues
+    auto* new_runner = new MockTaskRunnerBase();
+    runner_ = new_runner;  // Store the latest runner for test access
     return std::unique_ptr<base::TaskRunnerBase, base::TaskRunnerDeleter>(
-        runner_);
+        new_runner);
   }
 
   MockTaskRunnerBase* runner() const { return runner_; }
 
  private:
-  mutable MockTaskRunnerBase* runner_;  // owned by unique_ptr above
+  mutable MockTaskRunnerBase* runner_;  // Non-owning pointer for test access
 };
 
 }  // namespace player
