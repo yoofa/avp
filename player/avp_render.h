@@ -12,8 +12,10 @@
 #include <queue>
 
 #include "api/player_interface.h"
+#include "base/sequence_checker.h"
 #include "base/task_util/task_runner.h"
 #include "base/task_util/task_runner_factory.h"
+#include "base/thread_annotation.h"
 #include "media/foundation/media_frame.h"
 
 namespace ave {
@@ -39,38 +41,38 @@ class AVPRender {
    * @brief Renders a media frame with proper timing.
    * @param frame The media frame to render.
    */
-  void RenderFrame(std::shared_ptr<media::MediaFrame> frame);
+  void RenderFrame(std::shared_ptr<media::MediaFrame> frame) EXCLUDES(mutex_);
 
   /**
    * @brief Gets the current timestamp.
    * @return Current timestamp in microseconds.
    */
-  int64_t GetCurrentTimeStamp() const;
+  int64_t GetCurrentTimeStamp() const EXCLUDES(mutex_);
 
   /**
    * @brief Starts the renderer.
    */
-  virtual void Start();
+  virtual void Start() EXCLUDES(mutex_);
 
   /**
    * @brief Stops the renderer.
    */
-  virtual void Stop();
+  virtual void Stop() EXCLUDES(mutex_);
 
   /**
    * @brief Pauses the renderer.
    */
-  virtual void Pause();
+  virtual void Pause() EXCLUDES(mutex_);
 
   /**
    * @brief Resumes the renderer.
    */
-  virtual void Resume();
+  virtual void Resume() EXCLUDES(mutex_);
 
   /**
    * @brief Flushes all pending frames.
    */
-  virtual void Flush();
+  virtual void Flush() EXCLUDES(mutex_);
 
  protected:
   /**
@@ -82,28 +84,36 @@ class AVPRender {
                                    bool render) = 0;
 
   /**
-   * @brief Gets the task runner.
-   * @return Pointer to the task runner.
-   */
-  base::TaskRunner* GetTaskRunner() const { return task_runner_.get(); }
-
-  /**
    * @brief Gets the AV sync controller.
    * @return Pointer to the AV sync controller.
    */
-  IAVSyncController* GetAVSyncController() const { return avsync_controller_; }
+  IAVSyncController* GetAVSyncController() const REQUIRES(mutex_) {
+    return avsync_controller_;
+  }
 
   /**
    * @brief Checks if the renderer is running.
    * @return True if running, false otherwise.
    */
-  bool IsRunning() const { return running_; }
+  bool IsRunning() const EXCLUDES(mutex_) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return running_;
+  }
 
   /**
    * @brief Checks if the renderer is paused.
    * @return True if paused, false otherwise.
    */
-  bool IsPaused() const { return paused_; }
+  bool IsPaused() const EXCLUDES(mutex_) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return paused_;
+  }
+
+  mutable std::mutex mutex_;
+  std::unique_ptr<base::TaskRunner> task_runner_;
+  // Frame queue management
+  std::queue<std::shared_ptr<media::MediaFrame>> frame_queue_
+      GUARDED_BY(mutex_);
 
  private:
   /**
@@ -115,25 +125,21 @@ class AVPRender {
    * @brief Handles the scheduled render task.
    * @param update_generation The generation when the task was scheduled.
    */
-  void OnRenderTask(int64_t update_generation);
+  void OnRenderTask(int64_t update_generation) EXCLUDES(mutex_);
 
   /**
    * @brief Calculates render delay for a frame.
    * @param frame The media frame to calculate delay for.
    * @return Delay in microseconds.
    */
-  int64_t CalculateRenderDelay(const std::shared_ptr<media::MediaFrame>& frame);
+  int64_t CalculateRenderDelay(const std::shared_ptr<media::MediaFrame>& frame)
+      REQUIRES(mutex_);
 
-  mutable std::mutex mutex_;
-  std::unique_ptr<base::TaskRunner> task_runner_;
-  IAVSyncController* avsync_controller_;
+  IAVSyncController* avsync_controller_ GUARDED_BY(mutex_);
   int64_t update_generation_ GUARDED_BY(mutex_);
-  bool running_;
-  bool paused_;
+  bool running_ GUARDED_BY(mutex_);
+  bool paused_ GUARDED_BY(mutex_);
 
-  // Frame queue management
-  std::queue<std::shared_ptr<media::MediaFrame>> frame_queue_
-      GUARDED_BY(mutex_);
   static constexpr size_t kMaxQueueSize = 100;  // Prevent memory overflow
 };
 

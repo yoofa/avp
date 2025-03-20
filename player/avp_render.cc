@@ -31,6 +31,8 @@ AVPRender::~AVPRender() {
 }
 
 void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame) {
+  std::lock_guard<std::mutex> lock(mutex_);
+
   if (!running_) {
     AVE_LOG(LS_VERBOSE) << "Renderer not running, dropping frame";
     return;
@@ -40,8 +42,6 @@ void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame) {
     AVE_LOG(LS_WARNING) << "Received null frame";
     return;
   }
-
-  std::lock_guard<std::mutex> lock(mutex_);
 
   // Check queue size to prevent memory overflow
   if (frame_queue_.size() >= kMaxQueueSize) {
@@ -59,6 +59,7 @@ void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame) {
 }
 
 int64_t AVPRender::GetCurrentTimeStamp() const {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (avsync_controller_) {
     return avsync_controller_->GetMasterClock();
   }
@@ -143,6 +144,9 @@ void AVPRender::ScheduleNextFrame() {
   // Schedule the task with delay
   task_runner_->PostDelayedTask(
       [this, update_generation = update_generation_]() {
+        // TODO: Fix for test environment
+        // AVE_DCHECK_RUN_ON(task_runner_.get());
+
         OnRenderTask(update_generation);
       },
       delay_us);
@@ -164,7 +168,10 @@ int64_t AVPRender::CalculateRenderDelay(
     }
   }
 
-  int64_t current_timestamp_us = GetCurrentTimeStamp();
+  int64_t current_timestamp_us = 0;
+  if (avsync_controller_) {
+    current_timestamp_us = avsync_controller_->GetMasterClock();
+  }
   int64_t delay_us = frame_pts_us - current_timestamp_us;
 
   return delay_us;
@@ -190,7 +197,25 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
 
   auto frame = frame_queue_.front();
 
-  auto delay_us = CalculateRenderDelay(frame);
+  // Calculate delay within mutex lock
+  int64_t delay_us = 0;
+  if (avsync_controller_) {
+    int64_t frame_pts_us = 0;
+    if (frame->GetMediaType() == media::MediaType::AUDIO) {
+      auto* audio_info = frame->audio_info();
+      if (audio_info) {
+        frame_pts_us = audio_info->pts.us();
+      }
+    } else if (frame->GetMediaType() == media::MediaType::VIDEO) {
+      auto* video_info = frame->video_info();
+      if (video_info) {
+        frame_pts_us = video_info->pts.us();
+      }
+    }
+
+    int64_t current_timestamp_us = avsync_controller_->GetMasterClock();
+    delay_us = frame_pts_us - current_timestamp_us;
+  }
 
   // delay < -40ms, too late, drop the frame
   if (delay_us < -40000) {
