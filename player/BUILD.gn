@@ -74,6 +74,22 @@ ave_library("avp_render") {
   ]
 }
 
+ave_library("avp_audio_render") {
+  sources = [
+    "avp_audio_render.cc",
+    "avp_audio_render.h",
+  ]
+  deps = [
+    ":avp_render",
+    "//base:checks",
+    "//base:logging",
+    "//base:timeutils",
+    "//base:utils",
+    "//media/audio:audio",
+    "//media/foundation:foundation",
+  ]
+}
+
 ave_library("avp_render_unittest") {
   testonly = true
   sources = [ "avp_render_unittest.cc" ]
@@ -84,9 +100,20 @@ ave_library("avp_render_unittest") {
   ]
 }
 
+ave_library("avp_audio_render_unittest") {
+  testonly = true
+  sources = [ "avp_audio_render_unittest.cc" ]
+  deps = [
+    ":avp_audio_render",
+    "//base/test:mock_task_runner_factory",
+    "//test:test_support",
+  ]
+}
+
 executable("player_unittests") {
   testonly = true
   deps = [
+    ":avp_audio_render_unittest",
     ":avp_render_unittest",
     ":avsync_controller_unittest",
     "//test:test_main",
