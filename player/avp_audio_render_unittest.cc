@@ -286,11 +286,10 @@ TEST_F(AVPAudioRenderTest, RenderAudioFrame) {
       CreateTestAudioFrame(1000);  // Use smaller PTS (1ms instead of 1s)
   audio_render_->RenderFrame(frame);
 
-  // Trigger task execution multiple times to handle re-scheduling
-  for (int i = 0; i < 3; i++) {
-    mock_task_runner_factory_->runner()->AdvanceTimeUs(1000);
-    mock_task_runner_factory_->runner()->RunDueTasks();
-  }
+  // For audio frames, they are scheduled immediately (delay=0)
+  // So we only need to advance time once and run tasks
+  mock_task_runner_factory_->runner()->AdvanceTimeUs(1000);
+  mock_task_runner_factory_->runner()->RunDueTasks();
 
   // Check that the sync controller was updated (since this is a master stream)
   EXPECT_GT(mock_avsync_controller_->GetUpdateCount(), 0);
@@ -307,10 +306,11 @@ TEST_F(AVPAudioRenderTest, NonMasterStream) {
   non_master_render->OpenAudioSink(config);
   non_master_render->Start();
 
-  auto frame = CreateTestAudioFrame(1000000);
+  auto frame = CreateTestAudioFrame(1000);
   non_master_render->RenderFrame(frame);
 
-  // Trigger task execution
+  // For audio frames, they are scheduled immediately (delay=0)
+  mock_task_runner_factory_->runner()->AdvanceTimeUs(1000);
   mock_task_runner_factory_->runner()->RunDueTasks();
 
   // Check that the sync controller was NOT updated (since this is not a master
@@ -326,19 +326,15 @@ TEST_F(AVPAudioRenderTest, FormatChangeDetection) {
   // First frame with PCM format
   auto frame1 = CreateTestAudioFrame(1000);  // Use smaller PTS
   audio_render_->RenderFrame(frame1);
-  for (int i = 0; i < 3; i++) {
-    mock_task_runner_factory_->runner()->AdvanceTimeUs(1000);
-    mock_task_runner_factory_->runner()->RunDueTasks();
-  }
+  mock_task_runner_factory_->runner()->AdvanceTimeUs(1000);
+  mock_task_runner_factory_->runner()->RunDueTasks();
 
   // Second frame with different format (this would require a real format
   // change) For now, we just test that the renderer handles multiple frames
   auto frame2 = CreateTestAudioFrame(2000);  // Use smaller PTS
   audio_render_->RenderFrame(frame2);
-  for (int i = 0; i < 3; i++) {
-    mock_task_runner_factory_->runner()->AdvanceTimeUs(1000);
-    mock_task_runner_factory_->runner()->RunDueTasks();
-  }
+  mock_task_runner_factory_->runner()->AdvanceTimeUs(1000);
+  mock_task_runner_factory_->runner()->RunDueTasks();
 
   // Both frames should be processed
   EXPECT_GT(mock_avsync_controller_->GetUpdateCount(), 0);

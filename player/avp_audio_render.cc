@@ -166,23 +166,23 @@ void AVPAudioRender::Flush() {
   AVPRender::Flush();
 }
 
-void AVPAudioRender::RenderFrameInternal(
+uint64_t AVPAudioRender::RenderFrameInternal(
     std::shared_ptr<media::MediaFrame> frame,
     bool render) {
   if (!frame || frame->GetMediaType() != media::MediaType::AUDIO) {
     AVE_LOG(LS_WARNING) << "Invalid audio frame";
-    return;
+    return 0;
   }
 
   if (!audio_sink_ready_ || !audio_track_) {
     AVE_LOG(LS_WARNING) << "Audio sink not ready, dropping frame";
-    return;
+    return 0;
   }
 
   auto* audio_info = frame->audio_info();
   if (!audio_info) {
     AVE_LOG(LS_WARNING) << "No audio info in frame";
-    return;
+    return 0;
   }
 
   // Check for format changes
@@ -193,7 +193,7 @@ void AVPAudioRender::RenderFrameInternal(
     status_t result = CreateAudioTrack();
     if (result != OK) {
       AVE_LOG(LS_ERROR) << "Failed to recreate audio track after format change";
-      return;
+      return 0;
     }
   }
 
@@ -209,13 +209,21 @@ void AVPAudioRender::RenderFrameInternal(
       if (master_stream_) {
         UpdateSyncAnchor(frame);
       }
+
+      // Calculate next frame delay based on real playback latency
+      // This should be based on the audio track's buffer state and sample rate
+      int64_t next_delay_us = CalculateNextAudioFrameDelay();
+      last_audio_pts_us_ = audio_info->pts.us();
+      return next_delay_us;
     } else {
       AVE_LOG(LS_WARNING) << "Failed to write audio data, error: "
                           << bytes_written;
+      return 0;
     }
   }
 
   last_audio_pts_us_ = audio_info->pts.us();
+  return 0;
 }
 
 status_t AVPAudioRender::CreateAudioTrack() {
@@ -445,6 +453,46 @@ void AVPAudioRender::ApplyPlaybackRate() {
 
   // If the audio track doesn't support rate changes, we would need to implement
   // software-based rate changing (e.g., resampling) as a fallback
+}
+
+int64_t AVPAudioRender::CalculateNextAudioFrameDelay() {
+  if (!audio_track_) {
+    return 0;
+  }
+
+  // Get current buffer state from audio track
+  uint32_t frames_written = 0;
+  audio_track_->GetFramesWritten(&frames_written);
+
+  // Calculate how much audio data is in the buffer
+  int64_t buffer_duration_us = audio_track_->GetBufferDurationInUs();
+
+  // Get the latency of the audio track
+  uint32_t latency_ms = audio_track_->latency();
+  int64_t latency_us = latency_ms * 1000LL;
+
+  // Calculate time per frame
+  float msecs_per_frame = audio_track_->msecsPerFrame();
+  int64_t frame_duration_us = static_cast<int64_t>(msecs_per_frame * 1000.0f);
+
+  // If buffer is nearly full, we need to wait longer
+  // If buffer is nearly empty, we can write more data
+  // For now, use a simple approach: schedule next frame after one frame
+  // duration In a real implementation, you'd want to maintain a target buffer
+  // level
+
+  int64_t next_delay_us = frame_duration_us;
+
+  // Adjust based on buffer state
+  if (buffer_duration_us > latency_us * 0.8) {
+    // Buffer is getting full, wait longer
+    next_delay_us = frame_duration_us * 2;
+  } else if (buffer_duration_us < latency_us * 0.2) {
+    // Buffer is getting empty, write more frequently
+    next_delay_us = frame_duration_us / 2;
+  }
+
+  return next_delay_us;
 }
 
 }  // namespace player

@@ -123,7 +123,7 @@ void AVPRender::Flush() {
   }
 }
 
-void AVPRender::ScheduleNextFrame() {
+void AVPRender::ScheduleNextFrame(uint32_t delay_us) {
   if (!task_runner_) {
     AVE_LOG(LS_ERROR) << "Task runner not available";
     return;
@@ -133,26 +133,18 @@ void AVPRender::ScheduleNextFrame() {
     return;
   }
 
-  std::shared_ptr<media::MediaFrame> frame = frame_queue_.front();
-  int64_t delay_us = CalculateRenderDelay(frame);
-
-  if (delay_us < 0) {
-    delay_us = 0;
-  }
-
   update_generation_++;
   // Schedule the task with delay
   task_runner_->PostDelayedTask(
       [this, update_generation = update_generation_]() {
-        // TODO: Fix for test environment
-        // AVE_DCHECK_RUN_ON(task_runner_.get());
-
+        // AVE_DCHECK_RUN_ON(task_runner_.get());  // TODO: Fix for test
+        // environment
         OnRenderTask(update_generation);
       },
       delay_us);
 }
 
-int64_t AVPRender::CalculateRenderDelay(
+int64_t AVPRender::CalculateRenderLateUs(
     const std::shared_ptr<media::MediaFrame>& frame) {
   // Calculate render delay based on frame PTS and current timestamp
   int64_t frame_pts_us = 0;
@@ -172,9 +164,9 @@ int64_t AVPRender::CalculateRenderDelay(
   if (avsync_controller_) {
     current_timestamp_us = avsync_controller_->GetMasterClock();
   }
-  int64_t delay_us = frame_pts_us - current_timestamp_us;
+  int64_t late_us = current_timestamp_us - frame_pts_us;
 
-  return delay_us;
+  return late_us;
 }
 
 void AVPRender::OnRenderTask(int64_t update_generation) {
@@ -195,52 +187,41 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
     return;
   }
 
+  uint64_t next_render_delay_us = 0;
+
   auto frame = frame_queue_.front();
 
-  // Calculate delay within mutex lock
-  int64_t delay_us = 0;
-  if (avsync_controller_) {
-    int64_t frame_pts_us = 0;
-    if (frame->GetMediaType() == media::MediaType::AUDIO) {
-      auto* audio_info = frame->audio_info();
-      if (audio_info) {
-        frame_pts_us = audio_info->pts.us();
-      }
-    } else if (frame->GetMediaType() == media::MediaType::VIDEO) {
-      auto* video_info = frame->video_info();
-      if (video_info) {
-        frame_pts_us = video_info->pts.us();
-      }
-    }
-
-    int64_t current_timestamp_us = avsync_controller_->GetMasterClock();
-    delay_us = frame_pts_us - current_timestamp_us;
-  }
-
-  // delay < -40ms, too late, drop the frame
-  if (delay_us < -40000) {
-    AVE_LOG(LS_INFO) << "Dropping frame, delay: " << delay_us << "us";
+  if (frame->GetMediaType() == media::MediaType::AUDIO) {
+    // For audio, render immediately and schedule next based on returned delay
     frame_queue_.pop();
-    RenderFrameInternal(frame, false);
-    ScheduleNextFrame();
-    return;
-  }
+    next_render_delay_us = RenderFrameInternal(frame, true);
+  } else {
+    // For video/subtitle, use original logic with drop frame behavior
+    // Calculate delay within mutex lock
+    int64_t late_us = CalculateRenderLateUs(frame);
 
-  // delay < 5ms, render the frame immediately
-  // Call the actual render implementation
-  if (delay_us < 5000) {
-    try {
+    if (late_us > 40000) {
+      // too late, drop the frame
+      AVE_LOG(LS_INFO) << "Dropping frame, delay: " << late_us << "us";
       frame_queue_.pop();
-      RenderFrameInternal(frame, true);
-    } catch (const std::exception& e) {
-      AVE_LOG(LS_ERROR) << "Exception in RenderFrameInternal: " << e.what();
+      RenderFrameInternal(frame, false);
+
+    } else if (late_us > -5000) {
+      // not too early, render the frame
+      try {
+        frame_queue_.pop();
+        RenderFrameInternal(frame, true);
+      } catch (const std::exception& e) {
+        AVE_LOG(LS_ERROR) << "Exception in RenderFrameInternal: " << e.what();
+      }
+    } else {
+      // too early, schedule next frame
+      next_render_delay_us = -late_us;
     }
   }
-
-  // else delay > 20ms, re-schedule the task
   // Schedule next frame if queue is not empty
   if (!frame_queue_.empty()) {
-    ScheduleNextFrame();
+    ScheduleNextFrame(next_render_delay_us);  // TODO: Fix for test environment
   }
 }
 

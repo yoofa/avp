@@ -106,9 +106,10 @@ class AVPAudioRender : public AVPRender {
    * @brief Internal frame rendering method that handles audio data.
    * @param frame The audio frame to render.
    * @param render Whether to actually render the frame.
+   * @return Next frame delay in microseconds.
    */
-  void RenderFrameInternal(std::shared_ptr<media::MediaFrame> frame,
-                           bool render) override REQUIRES(mutex_);
+  uint64_t RenderFrameInternal(std::shared_ptr<media::MediaFrame> frame,
+                               bool render) override REQUIRES(mutex_);
 
  private:
   /**
@@ -163,6 +164,13 @@ class AVPAudioRender : public AVPRender {
    * @brief Applies playback rate to the audio track if supported.
    */
   void ApplyPlaybackRate() REQUIRES(mutex_);
+
+  /**
+   * @brief Calculates the delay for the next audio frame based on real playback
+   * latency.
+   * @return Delay in microseconds for the next audio frame.
+   */
+  int64_t CalculateNextAudioFrameDelay() REQUIRES(mutex_);
 
   std::shared_ptr<media::AudioDevice> audio_device_ GUARDED_BY(mutex_);
   std::shared_ptr<media::AudioTrack> audio_track_ GUARDED_BY(mutex_);

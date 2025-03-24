@@ -79,9 +79,10 @@ class AVPRender {
    * @brief Internal frame rendering method to be implemented by subclasses.
    * @param frame The media frame to render.
    * @param render Whether to render the frame.
+   * @return Next frame delay in microseconds, or 0 if no more frames.
    */
-  virtual void RenderFrameInternal(std::shared_ptr<media::MediaFrame> frame,
-                                   bool render) = 0;
+  virtual uint64_t RenderFrameInternal(std::shared_ptr<media::MediaFrame> frame,
+                                       bool render) = 0;
 
   /**
    * @brief Gets the AV sync controller.
@@ -119,7 +120,7 @@ class AVPRender {
   /**
    * @brief Schedules the next frame from the queue for rendering.
    */
-  void ScheduleNextFrame() REQUIRES(mutex_);
+  void ScheduleNextFrame(uint32_t delay_us = 0) REQUIRES(mutex_);
 
   /**
    * @brief Handles the scheduled render task.
@@ -130,9 +131,9 @@ class AVPRender {
   /**
    * @brief Calculates render delay for a frame.
    * @param frame The media frame to calculate delay for.
-   * @return Delay in microseconds.
+   * @return Late in microseconds.
    */
-  int64_t CalculateRenderDelay(const std::shared_ptr<media::MediaFrame>& frame)
+  int64_t CalculateRenderLateUs(const std::shared_ptr<media::MediaFrame>& frame)
       REQUIRES(mutex_);
 
   IAVSyncController* avsync_controller_ GUARDED_BY(mutex_);
