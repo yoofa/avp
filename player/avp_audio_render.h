@@ -108,8 +108,8 @@ class AVPAudioRender : public AVPRender {
    * @param render Whether to actually render the frame.
    * @return Next frame delay in microseconds.
    */
-  uint64_t RenderFrameInternal(std::shared_ptr<media::MediaFrame> frame,
-                               bool render) override REQUIRES(mutex_);
+  uint64_t RenderFrameInternal(
+      std::shared_ptr<media::MediaFrame>& frame) override REQUIRES(mutex_);
 
  private:
   /**

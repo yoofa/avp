@@ -21,6 +21,34 @@
 namespace ave {
 namespace player {
 
+struct RenderEvent {
+  virtual ~RenderEvent() = default;
+  // rendered is true if the audio frame is rendered to sink or video frame is
+  // too late rendered is false if the video frame need be rendered by source
+  virtual void OnRenderEvent(bool render) = 0;
+};
+
+namespace avp_render_impl {
+
+template <typename Closure>
+class ClosureEvent : public RenderEvent {
+ public:
+  explicit ClosureEvent(Closure&& closure)
+      : closure_(std::forward<Closure>(closure)) {}
+
+ private:
+  void OnRenderEvent(bool render) override { closure_(render); }
+  std::decay_t<Closure> closure_;
+};
+
+template <typename Closure>
+std::unique_ptr<RenderEvent> ToRenderEvent(Closure&& closure) {
+  return std::make_unique<avp_render_impl::ClosureEvent<Closure>>(
+      std::forward<Closure>(closure));
+}
+
+}  // namespace avp_render_impl
+
 /**
  * @brief Base class for AV rendering components (Video, Audio, Subtitle).
  *        Provides timestamp management and frame rendering scheduling.
@@ -40,8 +68,27 @@ class AVPRender {
   /**
    * @brief Renders a media frame with proper timing.
    * @param frame The media frame to render.
+   * @param render_event The event to be called when the frame is rendered.
    */
-  void RenderFrame(std::shared_ptr<media::MediaFrame> frame) EXCLUDES(mutex_);
+  void RenderFrame(std::shared_ptr<media::MediaFrame> frame,
+                   std::unique_ptr<RenderEvent> render_event = nullptr)
+      EXCLUDES(mutex_);
+
+  /**
+   * @brief Renders a media frame with proper timing.
+   * @param frame The media frame to render.
+   * @param closure The closure to be called when the frame is rendered.
+   */
+  template <
+      class Closure,
+      std::enable_if_t<
+          !std::is_convertible_v<Closure, std::unique_ptr<RenderEvent>>>* =
+          nullptr>
+  void RenderFrame(std::shared_ptr<media::MediaFrame> frame,
+                   Closure&& closure) {
+    RenderFrame(std::move(frame),
+                avp_render_impl::ToRenderEvent(std::forward<Closure>(closure)));
+  }
 
   /**
    * @brief Gets the current timestamp.
@@ -75,14 +122,18 @@ class AVPRender {
   virtual void Flush() EXCLUDES(mutex_);
 
  protected:
+  struct QueueEntry {
+    std::shared_ptr<media::MediaFrame> frame;
+    std::unique_ptr<RenderEvent> render_event;
+  };
+
   /**
    * @brief Internal frame rendering method to be implemented by subclasses.
-   * @param frame The media frame to render.
-   * @param render Whether to render the frame.
+   * @param frame The frame to render.
    * @return Next frame delay in microseconds, or 0 if no more frames.
    */
-  virtual uint64_t RenderFrameInternal(std::shared_ptr<media::MediaFrame> frame,
-                                       bool render) = 0;
+  virtual uint64_t RenderFrameInternal(
+      std::shared_ptr<media::MediaFrame>& frame) = 0;
 
   /**
    * @brief Gets the AV sync controller.
@@ -112,9 +163,6 @@ class AVPRender {
 
   mutable std::mutex mutex_;
   std::unique_ptr<base::TaskRunner> task_runner_;
-  // Frame queue management
-  std::queue<std::shared_ptr<media::MediaFrame>> frame_queue_
-      GUARDED_BY(mutex_);
 
  private:
   /**
@@ -127,6 +175,13 @@ class AVPRender {
    * @param update_generation The generation when the task was scheduled.
    */
   void OnRenderTask(int64_t update_generation) EXCLUDES(mutex_);
+
+  /**
+   * @brief Releases a frame from the queue.
+   * @param entry The queue entry to release.
+   * @param render Whether to render the frame.
+   */
+  void ReleaseFrame(QueueEntry& entry, bool render) REQUIRES(mutex_);
 
   /**
    * @brief Calculates render delay for a frame.
@@ -142,6 +197,8 @@ class AVPRender {
   bool paused_ GUARDED_BY(mutex_);
 
   static constexpr size_t kMaxQueueSize = 100;  // Prevent memory overflow
+                                                // Frame queue management
+  std::queue<QueueEntry> frame_queue_ GUARDED_BY(mutex_);
 };
 
 }  // namespace player

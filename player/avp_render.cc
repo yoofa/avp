@@ -30,7 +30,8 @@ AVPRender::~AVPRender() {
   Stop();
 }
 
-void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame) {
+void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame,
+                            std::unique_ptr<RenderEvent> render_event) {
   std::lock_guard<std::mutex> lock(mutex_);
 
   if (!running_) {
@@ -50,7 +51,7 @@ void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame) {
   }
 
   // Add frame to queue
-  frame_queue_.push(frame);
+  frame_queue_.push(QueueEntry{std::move(frame), std::move(render_event)});
 
   // Schedule next frame if not already scheduling and not paused
   if (!paused_) {
@@ -189,12 +190,14 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
 
   uint64_t next_render_delay_us = 0;
 
-  auto frame = frame_queue_.front();
+  auto& entry = frame_queue_.front();
+  auto& frame = entry.frame;
 
   if (frame->GetMediaType() == media::MediaType::AUDIO) {
     // For audio, render immediately and schedule next based on returned delay
+
+    next_render_delay_us = RenderFrameInternal(frame);
     frame_queue_.pop();
-    next_render_delay_us = RenderFrameInternal(frame, true);
   } else {
     // For video/subtitle, use original logic with drop frame behavior
     // Calculate delay within mutex lock
@@ -203,14 +206,14 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
     if (late_us > 40000) {
       // too late, drop the frame
       AVE_LOG(LS_INFO) << "Dropping frame, delay: " << late_us << "us";
+      ReleaseFrame(entry, false);
       frame_queue_.pop();
-      RenderFrameInternal(frame, false);
-
     } else if (late_us > -5000) {
       // not too early, render the frame
       try {
+        RenderFrameInternal(frame);
+        ReleaseFrame(entry, true);
         frame_queue_.pop();
-        RenderFrameInternal(frame, true);
       } catch (const std::exception& e) {
         AVE_LOG(LS_ERROR) << "Exception in RenderFrameInternal: " << e.what();
       }
@@ -222,6 +225,12 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
   // Schedule next frame if queue is not empty
   if (!frame_queue_.empty()) {
     ScheduleNextFrame(next_render_delay_us);  // TODO: Fix for test environment
+  }
+}
+
+void AVPRender::ReleaseFrame(QueueEntry& entry, bool render) {
+  if (entry.render_event) {
+    entry.render_event->OnRenderEvent(render);
   }
 }
 

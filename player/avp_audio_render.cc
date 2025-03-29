@@ -167,8 +167,7 @@ void AVPAudioRender::Flush() {
 }
 
 uint64_t AVPAudioRender::RenderFrameInternal(
-    std::shared_ptr<media::MediaFrame> frame,
-    bool render) {
+    std::shared_ptr<media::MediaFrame>& frame) {
   if (!frame || frame->GetMediaType() != media::MediaType::AUDIO) {
     AVE_LOG(LS_WARNING) << "Invalid audio frame";
     return 0;
@@ -197,7 +196,6 @@ uint64_t AVPAudioRender::RenderFrameInternal(
     }
   }
 
-  if (render) {
     // Write audio data to track
     ssize_t bytes_written = WriteAudioData(frame);
     if (bytes_written > 0) {
@@ -215,11 +213,6 @@ uint64_t AVPAudioRender::RenderFrameInternal(
       int64_t next_delay_us = CalculateNextAudioFrameDelay();
       last_audio_pts_us_ = audio_info->pts.us();
       return next_delay_us;
-    } else {
-      AVE_LOG(LS_WARNING) << "Failed to write audio data, error: "
-                          << bytes_written;
-      return 0;
-    }
   }
 
   last_audio_pts_us_ = audio_info->pts.us();

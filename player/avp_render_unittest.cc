@@ -97,11 +97,9 @@ class TestAVPRender : public AVPRender {
   using AVPRender::IsRunning;
 
  protected:
-  uint64_t RenderFrameInternal(std::shared_ptr<media::MediaFrame> frame,
-                               bool render) override {
-    if (render) {
-      render_count_++;
-    }
+  uint64_t RenderFrameInternal(
+      std::shared_ptr<media::MediaFrame>& frame) override {
+    render_count_++;
     last_frame_ = frame;
     return 0;
   }
