@@ -13,23 +13,24 @@
 
 #include "base/system/ave_export.h"
 
-#include "media/audio/audio_device_module.h"
+#include "media/audio/audio_device.h"
 #include "media/codec/codec_factory.h"
-#include "media/foundation/av_synchronize_render.h"
 #include "media/foundation/handler.h"
 #include "media/foundation/looper.h"
 #include "media/foundation/media_clock.h"
 #include "media/foundation/message.h"
 
-#include "api/content_source.h"
+#include "api/content_source/content_source.h"
 #include "api/player.h"
+#include "player/avp_audio_render.h"
 #include "player/avp_decoder.h"
+#include "player/avp_video_render.h"
+#include "player/avsync_controller.h"
 
 namespace ave {
 namespace player {
 
-using ave::media::AudioDeviceModule;
-using ave::media::AVSynchronizeRender;
+using ave::media::AudioDevice;
 using ave::media::CodecFactory;
 using ave::media::Handler;
 using ave::media::Looper;
@@ -44,7 +45,7 @@ AVE_EXPORT class AvPlayer : public Player,
       std::shared_ptr<ContentSourceFactory> content_source_factory,
       std::shared_ptr<DemuxerFactory> demuxer_factory,
       std::shared_ptr<CodecFactory> codec_factory,
-      std::shared_ptr<AudioDeviceModule> audio_device_module);
+      std::shared_ptr<AudioDevice> audio_device);
 
   ~AvPlayer() override;
 
@@ -56,6 +57,7 @@ AVE_EXPORT class AvPlayer : public Player,
   status_t SetDataSource(int fd, int64_t offset, int64_t length) override;
   status_t SetDataSource(std::shared_ptr<ave::DataSource> data_source) override;
   status_t SetDataSource(std::shared_ptr<ContentSource> source) override;
+  status_t SetVideoRender(std::shared_ptr<VideoRender> video_render) override;
 
   status_t Prepare() override;
   status_t Start() override;
@@ -66,8 +68,20 @@ AVE_EXPORT class AvPlayer : public Player,
   status_t Reset() override;
 
  private:
+  /******* Source Notify *******/
+  void OnPrepared(status_t err) override;
+  void OnFlagsChanged(int32_t flags) override;
+  void OnVideoSizeChanged(std::shared_ptr<MediaFormat>& format) override;
+  void OnSeekComplete() override;
+  void OnBufferingStart() override;
+  void OnBufferingUpdate(int percent) override;
+  void OnBufferingEnd() override;
+  void OnCompletion() override;
+  void OnError(status_t error) override;
+  void OnFetchData(MediaType stream_type) override;
+
   void PostScanSources();
-  status_t InstantiateDecoder(bool audio, std::shared_ptr<AvpDecoder>& decoder);
+  status_t InstantiateDecoder(bool audio, std::shared_ptr<AVPDecoder>& decoder);
   void PerformReset();
 
   void OnStart(int64_t startUs = -1,
@@ -75,7 +89,7 @@ AVE_EXPORT class AvPlayer : public Player,
   void OnStop();
   void OnPause();
   void OnResume();
-  void OnSeek();
+  void OnSeek(int64_t seek_to_us, SeekMode seek_mode);
 
   void OnSourceNotify(const std::shared_ptr<Message>& msg);
   void OnDecoderNotify(const std::shared_ptr<Message>& msg);
@@ -85,14 +99,26 @@ AVE_EXPORT class AvPlayer : public Player,
 
   enum {
     kWhatSetDataSource = '=DaS',
+    kWhatSetVideoRender = '=Vdr',
     kWhatPrepare = 'prep',
-    kWhatSetVideoSink = '=sVS',
-    kWhatSetAudioSink = '=sAS',
     kWhatStart = 'strt',
+    kWhatStop = 'stop',
     kWhatSeek = 'seek',
     kWhatPause = 'paus',
     kWhatResume = 'rsme',
     kWhatReset = 'rset',
+
+    // Source Notify Message
+    kWhatSourcePrepared = 'sPre',
+    kWhatSourceFlagsChanged = 'sFlg',
+    kWhatSourceVideoSizeChanged = 'sVsz',
+    kWhatSourceSeekComplete = 'sSkC',
+    kWhatSourceBufferingStart = 'sBfS',
+    kWhatSourceBufferingUpdate = 'sBfU',
+    kWhatSourceBufferingEnd = 'sBfE',
+    kWhatSourceCompletion = 'sCmp',
+    kWhatSourceError = 'sErr',
+    kWhatSourceFetchData = 'sFch',
 
     kWhatMoreDataQueued = 'more',
     kWhatConfigPlayback = 'cfPB',
@@ -120,21 +146,26 @@ AVE_EXPORT class AvPlayer : public Player,
   std::shared_ptr<ContentSourceFactory> content_source_factory_;
   std::shared_ptr<DemuxerFactory> demuxer_factory_;
   std::shared_ptr<CodecFactory> codec_factory_;
-  std::shared_ptr<AudioDeviceModule> audio_device_module_;
+  std::shared_ptr<AudioDevice> audio_device_;
 
-  std::shared_ptr<AvpDecoder> audio_decoder_;
-  std::shared_ptr<AvpDecoder> video_decoder_;
+  std::shared_ptr<AVPDecoder> audio_decoder_;
+  std::shared_ptr<AVPDecoder> video_decoder_;
+  std::shared_ptr<AVPAudioRender> audio_render_;
+  std::shared_ptr<AVPVideoRender> video_render_;
+  std::shared_ptr<IAVSyncController> sync_controller_;
   std::shared_ptr<Looper> player_looper_;
 
   std::shared_ptr<MediaClock> media_clock_;
   std::shared_ptr<ContentSource> source_;
-  std::shared_ptr<AVSynchronizeRender> render_;
+  std::shared_ptr<VideoRender> video_render_sink_;
 
   bool started_;
   bool prepared_;
   bool paused_;
   bool source_started_;
   bool scan_sources_pending_;
+  bool audio_eos_;
+  bool video_eos_;
 
   std::weak_ptr<Listener> listener_;
 };
