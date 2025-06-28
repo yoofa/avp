@@ -183,6 +183,16 @@ class ContentSource : public ave::media::MessageObject {
   }
 
   /**
+   * @brief Gets the media format of the specified track type.
+   * @param track_type The type of the track.
+   * @return The media format of the track type.
+   */
+  virtual std::shared_ptr<MediaFormat> GetTrackInfo(
+      MediaType /* track_type */) const {
+    return {};
+  }
+
+  /**
    * @brief Selects or deselects the specified track.
    * @param track_index The index of the track.
    * @param select True to select the track, false to deselect.
