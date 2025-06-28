@@ -5,5 +5,10 @@ ave_library("generic_content_source") {
     "generic_source.cc",
     "generic_source.h",
   ]
-  deps = [ "//api:api_content_source" ]
+  deps = [
+    "../player:packet_source",
+    "//api:api_content_source",
+    "//base/data_source:file_source",
+    "//media/foundation",
+  ]
 }

@@ -37,7 +37,7 @@ using ave::media::Message;
 
 class GenericSource : public Handler, public ContentSource {
  public:
-  GenericSource();
+  explicit GenericSource(std::shared_ptr<DemuxerFactory> demuxer_factory);
   ~GenericSource() override;
 
   void SetNotify(Notify* notify) override;
@@ -64,6 +64,8 @@ class GenericSource : public Handler, public ContentSource {
   size_t GetTrackCount() const override;
 
   std::shared_ptr<MediaFormat> GetTrackInfo(size_t track_index) const override;
+  std::shared_ptr<MediaFormat> GetTrackInfo(
+      MediaType track_type) const override;
 
   status_t SelectTrack(size_t track_index, bool select) override;
 
@@ -129,10 +131,11 @@ class GenericSource : public Handler, public ContentSource {
   int64_t duration_us_ GUARDED_BY(lock_);
   int64_t bitrate_ GUARDED_BY(lock_);
 
-  std::unique_ptr<DemuxerFactory> demuxer_factory_;
+  std::shared_ptr<DemuxerFactory> demuxer_factory_;
   std::shared_ptr<Demuxer> demuxer_;
 
   std::vector<std::shared_ptr<MediaSource>> sources_ GUARDED_BY(lock_);
+  // selected track indices
   Track audio_track_ GUARDED_BY(lock_);
   Track video_track_ GUARDED_BY(lock_);
   Track subtitle_track_ GUARDED_BY(lock_);

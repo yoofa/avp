@@ -13,8 +13,15 @@
 namespace ave {
 namespace player {
 
+class DemuxerFactory;
+
+// A concrete factory that produces GenericSource-backed ContentSource
+// and injects a DemuxerFactory so GenericSource can demux input.
 class DefaultContentSourceFactory : public ContentSourceFactory {
  public:
+  explicit DefaultContentSourceFactory(
+      std::shared_ptr<DemuxerFactory> demuxer_factory)
+      : demuxer_factory_(std::move(demuxer_factory)) {}
   ~DefaultContentSourceFactory() override = default;
 
   std::shared_ptr<ContentSource> CreateContentSource(
@@ -27,6 +34,9 @@ class DefaultContentSourceFactory : public ContentSourceFactory {
 
   std::shared_ptr<ContentSource> CreateContentSource(
       std::shared_ptr<ave::DataSource> data_source) override;
+
+ private:
+  std::shared_ptr<DemuxerFactory> demuxer_factory_;
 };
 
 }  // namespace player

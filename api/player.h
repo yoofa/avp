@@ -115,6 +115,8 @@ class Player {
     virtual ~Listener() = default;
 
    public:
+    virtual void OnCompletion() {}
+    virtual void OnError(status_t error) {}
   };
 
   /**

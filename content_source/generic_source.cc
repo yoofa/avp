@@ -33,13 +33,14 @@ using ave::media::Looper;
 using ave::media::MediaSource;
 using ave::media::ReplyToken;
 
-GenericSource::GenericSource()
+GenericSource::GenericSource(std::shared_ptr<DemuxerFactory> demuxer_factory)
     : notify_(nullptr),
       fd_(-1),
       offset_(-1),
       length_(-1),
       duration_us_(-1LL),
       bitrate_(-1LL),
+      demuxer_factory_(std::move(demuxer_factory)),
       audio_last_dequeue_time_us_(-1),
       video_last_dequeue_time_us_(-1),
       pending_read_buffer_types_(0),
@@ -172,6 +173,26 @@ std::shared_ptr<MediaFormat> GenericSource::GetTrackInfo(
   }
 
   return sources_[track_index]->GetFormat();
+}
+
+std::shared_ptr<MediaFormat> GenericSource::GetTrackInfo(
+    MediaType track_type) const {
+  std::lock_guard<std::mutex> lock(lock_);
+
+  switch (track_type) {
+    case MediaType::VIDEO:
+      return video_track_.source ? video_track_.source->GetFormat() : nullptr;
+    case MediaType::AUDIO:
+      return audio_track_.source ? audio_track_.source->GetFormat() : nullptr;
+    case MediaType::SUBTITLE:
+      return subtitle_track_.source ? subtitle_track_.source->GetFormat()
+                                    : nullptr;
+    case MediaType::TIMED_TEXT:
+      return timed_text_track_.source ? timed_text_track_.source->GetFormat()
+                                      : nullptr;
+    default:
+      return nullptr;
+  }
 }
 
 status_t GenericSource::DequeueAccessUnit(
@@ -349,7 +370,8 @@ status_t GenericSource::InitFromDataSource() {
   AVE_CHECK(datasource != nullptr);
 
   lock_.unlock();
-  demuxer_ = demuxer_factory_->CreateDemuxer(datasource);
+  demuxer_ =
+      demuxer_factory_ ? demuxer_factory_->CreateDemuxer(datasource) : nullptr;
 
   if (demuxer_ == nullptr) {
     lock_.lock();
