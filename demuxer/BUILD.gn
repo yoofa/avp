@@ -4,6 +4,7 @@ group("demuxer") {
 }
 
 ave_library("ave_demuxer_factory") {
+  deps = [ ":ffmpeg_demuxer_factory" ]
 }
 
 ave_library("ffmpeg_demuxer_factory") {
@@ -15,9 +16,9 @@ ave_library("ffmpeg_demuxer_factory") {
   ]
   deps = [
     "../api:player_interface",
-    "../base:logging",
-    "../base:utils",
-    "../modules/ffmpeg:ffmpeg_helper",
+    "//base:logging",
+    "//base:utils",
+    "//media/modules/ffmpeg:ffmpeg_utils",
     "//third_party/ffmpeg",
   ]
 }

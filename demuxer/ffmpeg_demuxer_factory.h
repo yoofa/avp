@@ -10,22 +10,20 @@
 
 #include <memory>
 
-#include "player/data_source.h"
-#include "player/demuxer.h"
-#include "player/demuxer_factory.h"
+#include "api/demuxer/demuxer.h"
+#include "api/demuxer/demuxer_factory.h"
+#include "base/data_source/data_source.h"
 
 namespace ave {
 namespace player {
 
 class FFmpegDemuxerFactory : public DemuxerFactory {
  public:
-  FFmpegDemuxerFactory();
-  virtual ~FFmpegDemuxerFactory() override;
-  virtual std::shared_ptr<Demuxer> createDemuxer(
-      std::shared_ptr<DataSource> dataSource) override;
+  FFmpegDemuxerFactory() = default;
+  ~FFmpegDemuxerFactory() override = default;
 
- private:
-  std::shared_ptr<Demuxer> mFFmpegDemuxer;
+  std::shared_ptr<Demuxer> CreateDemuxer(
+      std::shared_ptr<ave::DataSource> dataSource) override;
 };
 
 }  // namespace player

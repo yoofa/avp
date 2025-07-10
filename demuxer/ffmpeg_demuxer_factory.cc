@@ -7,20 +7,20 @@
 
 #include "ffmpeg_demuxer_factory.h"
 
+#include <memory>
+
 #include "ffmpeg_demuxer.h"
 
 namespace ave {
 namespace player {
 
-FFmpegDemuxerFactory::FFmpegDemuxerFactory() {}
-FFmpegDemuxerFactory::~FFmpegDemuxerFactory() {}
-
-std::shared_ptr<Demuxer> FFmpegDemuxerFactory::createDemuxer(
-    std::shared_ptr<DataSource> dataSource) {
-  std::shared_ptr<FFmpegDemuxer> ffmpegDemuxer(
-      std::make_shared<FFmpegDemuxer>(dataSource));
-  ffmpegDemuxer->init();
-  return ffmpegDemuxer;
+std::shared_ptr<Demuxer> FFmpegDemuxerFactory::CreateDemuxer(
+    std::shared_ptr<ave::DataSource> dataSource) {
+  auto demuxer = std::make_shared<FFmpegDemuxer>(std::move(dataSource));
+  if (demuxer->Init() != ave::OK) {
+    return nullptr;
+  }
+  return demuxer;
 }
 
 }  // namespace player

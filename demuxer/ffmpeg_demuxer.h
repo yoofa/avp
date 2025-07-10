@@ -8,8 +8,11 @@
 #ifndef FFMPEG_DEMUXER_H
 #define FFMPEG_DEMUXER_H
 
-#include "player/data_source.h"
-#include "player/demuxer.h"
+#include <list>
+#include <vector>
+#include "api/demuxer/demuxer.h"
+#include "base/data_source/data_source.h"
+#include "media/foundation/media_source.h"
 
 extern "C" {
 #include "third_party/ffmpeg/libavformat/avformat.h"
@@ -20,53 +23,57 @@ extern "C" {
 namespace ave {
 namespace player {
 
+using ave::media::MediaPacket;
+
 struct FFmpegSource;
 
 class FFmpegDemuxer : public Demuxer {
  public:
-  explicit FFmpegDemuxer(std::shared_ptr<DataSource> dataSource);
-  virtual ~FFmpegDemuxer();
-  virtual size_t getTrackCount() override;
-  virtual std::shared_ptr<MediaSource> getTrack(size_t trackIndex) override;
-  virtual status_t getDemuxerMeta(std::shared_ptr<MetaData>& metaData) override;
-  virtual status_t getTrackMeta(std::shared_ptr<MetaData>& metaData,
-                                size_t trackIndex) override;
+  explicit FFmpegDemuxer(std::shared_ptr<ave::DataSource> dataSource);
+  ~FFmpegDemuxer() override;
 
-  virtual const char* name() override;
+  // Demuxer API
+  status_t GetFormat(std::shared_ptr<ave::media::MediaFormat>& format) override;
+  size_t GetTrackCount() override;
+  status_t GetTrackFormat(std::shared_ptr<ave::media::MediaFormat>& format,
+                          size_t trackIndex) override;
+  std::shared_ptr<ave::media::MediaSource> GetTrack(size_t trackIndex) override;
+  const char* name() override;
 
-  status_t init();
+  // Internal init
+  status_t Init();
 
  private:
   friend struct FFmpegSource;
 
   struct TrackInfo {
     TrackInfo(size_t index,
-              std::shared_ptr<MetaData>,
+              std::shared_ptr<ave::media::MediaFormat>,
               std::shared_ptr<FFmpegSource> source);
     ~TrackInfo();
 
-    size_t mTrackIndex;
-    std::shared_ptr<MetaData> mMeta;
-    std::shared_ptr<FFmpegSource> mSource;
-    std::list<std::shared_ptr<Buffer>> mPackets;
+    size_t track_index;
+    std::shared_ptr<ave::media::MediaFormat> meta;
+    std::shared_ptr<FFmpegSource> source;
+    std::list<std::shared_ptr<ave::media::MediaPacket>> packets;
 
-    size_t packetSize();
-    status_t enqueuePacket(std::shared_ptr<Buffer> packet);
-    status_t dequeuePacket(std::shared_ptr<Buffer>& packet);
+    size_t PacketSize();
+    status_t EnqueuePacket(std::shared_ptr<MediaPacket> packet);
+    status_t DequeuePacket(std::shared_ptr<MediaPacket>& packet);
   };
 
-  status_t addTrack(const AVStream* avStream, size_t index);
-  status_t readAnAvPacket(size_t index);
-  status_t readAvFrame(std::shared_ptr<Buffer>& buffer,
+  status_t AddTrack(const AVStream* avStream, size_t index);
+  status_t ReadAnAvPacket(size_t index);
+  status_t ReadAvFrame(std::shared_ptr<ave::media::MediaPacket>& packet,
                        size_t index,
-                       const MediaSource::ReadOptions* options);
+                       const ave::media::MediaSource::ReadOptions* options);
 
-  std::shared_ptr<DataSource> mDataSource;
-  AVFormatContext* mFormatContext;
-  AVIOContext* mIOContext;
-  std::shared_ptr<MetaData> mMeta;
+  // std::shared_ptr<ave::DataSource> data_source_;
+  AVFormatContext* av_format_context_;
+  AVIOContext* av_io_context_;
+  std::shared_ptr<ave::media::MediaFormat> source_format_;
 
-  std::vector<TrackInfo> mTracks;
+  std::vector<TrackInfo> tracks_;
 };
 
 }  // namespace player

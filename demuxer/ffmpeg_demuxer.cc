@@ -13,291 +13,280 @@
 #include "base/hexdump.h"
 #include "base/logging.h"
 
-#include "media/utils.h"
+#include "media/foundation/media_format.h"
+#include "media/foundation/media_source.h"
+#include "media/modules/ffmpeg/ffmpeg_utils.h"
 
-#include "player/data_source.h"
-#include "player/media_source.h"
-
-#include "modules/ffmpeg/ffmpeg_helper.h"
+// #include "base/units/time_delta.h"
+// #include "modules/ffmpeg/ffmpeg_helper.h"
 
 namespace ave {
 namespace player {
 
+using ave::media::Message;
+
 enum { kBufferSize = 32 * 1024 };
-int lastVideoTimeUs = 0;
+int64_t lastVideoTimeUs = 0;
 
 static int AVIOReadOperation(void* opaque, uint8_t* buf, int size) {
-  DataSource* dataSource = reinterpret_cast<DataSource*>(opaque);
-  ssize_t result = dataSource->read(buf, size);
-  if (result < 0)
+  auto* data_source = reinterpret_cast<DataSource*>(opaque);
+  ssize_t result = data_source->Read(buf, size);
+  if (result < 0) {
     result = AVERROR(EIO);
+  }
   return static_cast<int>(result);
 }
 
 static int64_t AVIOSeekOperation(void* opaque, int64_t offset, int whence) {
-  DataSource* dataSource = reinterpret_cast<DataSource*>(opaque);
+  auto* data_source = reinterpret_cast<DataSource*>(opaque);
   int64_t new_offset = AVERROR(EIO);
   switch (whence) {
     case SEEK_SET:
     case SEEK_CUR:
     case SEEK_END:
-      new_offset = dataSource->seek(offset, whence);
+      new_offset = data_source->Seek(offset, whence);
       break;
 
     case AVSEEK_SIZE:
-      dataSource->getSize(&new_offset);
+      data_source->GetSize(&new_offset);
       break;
 
     default:
       break;
   }
-  if (new_offset < 0)
+  if (new_offset < 0) {
     new_offset = AVERROR(EIO);
+  }
   return new_offset;
 }
 
 ////////////////////////////////////
 
+using ave::media::Buffer;
+using ave::media::MediaFormat;
+using ave::media::MediaSource;
+
 struct FFmpegSource : public MediaSource {
   FFmpegSource(FFmpegDemuxer* demuxer,
                size_t index,
-               std::shared_ptr<MetaData> meta);
-  virtual ~FFmpegSource() override;
+               std::shared_ptr<MediaFormat> meta);
+  ~FFmpegSource() override;
 
-  virtual status_t start() override;
-  virtual status_t stop() override;
-  virtual status_t read(std::shared_ptr<Buffer>& buffer,
-                        const ReadOptions* options) override;
-  virtual std::shared_ptr<MetaData> getMeta() override;
+  status_t Start(std::shared_ptr<Message> params) override;
+  status_t Stop() override;
+  status_t Read(std::shared_ptr<MediaPacket>& packet,
+                const ReadOptions* options) override;
+  std::shared_ptr<MediaFormat> GetFormat() override;
 
  private:
-  FFmpegDemuxer* mDemuxer;
-  size_t mTrackIndex;
-  std::shared_ptr<MetaData> mMeta;
+  FFmpegDemuxer* demuxer_;
+  size_t track_index;
+  std::shared_ptr<MediaFormat> meta;
 };
 
 FFmpegSource::FFmpegSource(FFmpegDemuxer* demuxer,
                            size_t index,
-                           std::shared_ptr<MetaData> meta)
-    : mDemuxer(demuxer), mTrackIndex(index), mMeta(std::move(meta)) {}
+                           std::shared_ptr<MediaFormat> meta)
+    : demuxer_(demuxer), track_index(index), meta(std::move(meta)) {}
 
-FFmpegSource::~FFmpegSource() {}
+FFmpegSource::~FFmpegSource() = default;
 
-status_t FFmpegSource::start() {
-  return OK;
+status_t FFmpegSource::Start(std::shared_ptr<Message> params) {
+  (void)params;  // Unused parameter
+  return ave::OK;
 }
 
-status_t FFmpegSource::stop() {
-  return OK;
+status_t FFmpegSource::Stop() {
+  return ave::OK;
 }
 
-status_t FFmpegSource::read(std::shared_ptr<Buffer>& buffer,
+status_t FFmpegSource::Read(std::shared_ptr<MediaPacket>& packet,
                             const ReadOptions* options) {
-  return mDemuxer->readAvFrame(buffer, mTrackIndex, options);
+  auto ret = demuxer_->ReadAvFrame(packet, track_index, options);
+  if (ret != ave::OK) {
+    return ret;
+  }
+  if (!packet) {
+    return ave::WOULD_BLOCK;
+  }
+  return ave::OK;
 }
 
-std::shared_ptr<MetaData> FFmpegSource::getMeta() {
-  AVE_LOG(LS_INFO) << "getMeta:" << mMeta->toString();
-  return mMeta;
+std::shared_ptr<MediaFormat> FFmpegSource::GetFormat() {
+  return meta;
 }
 
 ////////////////////////////////////
 FFmpegDemuxer::TrackInfo::TrackInfo(size_t index,
-                                    std::shared_ptr<MetaData> meta,
+                                    std::shared_ptr<MediaFormat> meta,
                                     std::shared_ptr<FFmpegSource> source)
-    : mTrackIndex(index), mMeta(std::move(meta)), mSource(std::move(source)) {}
+    : track_index(index), meta(std::move(meta)), source(std::move(source)) {}
 
-FFmpegDemuxer::TrackInfo::~TrackInfo() {}
+FFmpegDemuxer::TrackInfo::~TrackInfo() = default;
 
-size_t FFmpegDemuxer::TrackInfo::packetSize() {
-  return mPackets.size();
+size_t FFmpegDemuxer::TrackInfo::PacketSize() {
+  return packets.size();
 }
 
-status_t FFmpegDemuxer::TrackInfo::enqueuePacket(
-    std::shared_ptr<Buffer> packet) {
-  mPackets.push_back(std::move(packet));
-  return OK;
+status_t FFmpegDemuxer::TrackInfo::EnqueuePacket(
+    std::shared_ptr<MediaPacket> packet) {
+  packets.push_back(std::move(packet));
+  return ave::OK;
 }
 
-status_t FFmpegDemuxer::TrackInfo::dequeuePacket(
-    std::shared_ptr<Buffer>& packet) {
-  if (mPackets.size() == 0) {
-    return WOULD_BLOCK;
+status_t FFmpegDemuxer::TrackInfo::DequeuePacket(
+    std::shared_ptr<MediaPacket>& packet) {
+  if (packets.empty()) {
+    return ave::WOULD_BLOCK;
   }
-
-  packet = mPackets.front();
-  mPackets.pop_front();
-
-  return OK;
+  packet = packets.front();
+  packets.pop_front();
+  return ave::OK;
 }
 
 ////////////////////////////////////
 
-FFmpegDemuxer::FFmpegDemuxer(std::shared_ptr<DataSource> dataSource)
-    : mDataSource(dataSource) {
+FFmpegDemuxer::FFmpegDemuxer(std::shared_ptr<ave::DataSource> data_source)
+    : Demuxer(data_source) {
   av_log_set_level(AV_LOG_QUIET);
-  mFormatContext = avformat_alloc_context();
-  mIOContext = avio_alloc_context(
+  av_format_context_ = avformat_alloc_context();
+  av_io_context_ = avio_alloc_context(
       static_cast<unsigned char*>(av_malloc(kBufferSize)), kBufferSize, 0,
-      mDataSource.get(), &AVIOReadOperation, nullptr, &AVIOSeekOperation);
-  mIOContext->seekable = mDataSource->flags() & DataSource::kSeekable;
-  mIOContext->write_flag = 0;
+      data_source_.get(), &AVIOReadOperation, nullptr, &AVIOSeekOperation);
+  av_io_context_->seekable = data_source_->Flags() & DataSource::kSeekable;
+  av_io_context_->write_flag = 0;
 
-  mFormatContext->flags |= AVFMT_FLAG_CUSTOM_IO;
-  mFormatContext->pb = mIOContext;
+  av_format_context_->flags |= AVFMT_FLAG_CUSTOM_IO;
+  av_format_context_->pb = av_io_context_;
 }
 
-FFmpegDemuxer::~FFmpegDemuxer() {}
+FFmpegDemuxer::~FFmpegDemuxer() = default;
 
-status_t FFmpegDemuxer::init() {
-  AVIOSeekOperation(mIOContext->opaque, 0, SEEK_CUR);
-  int ret;
-  ret = avformat_open_input(&mFormatContext, nullptr, nullptr, nullptr);
-  ret = avformat_find_stream_info(mFormatContext, nullptr);
-  mMeta = std::make_shared<MetaData>();
+status_t FFmpegDemuxer::Init() {
+  AVIOSeekOperation(av_io_context_->opaque, 0, SEEK_CUR);
+  int ret = OK;
+  ret = avformat_open_input(&av_format_context_, nullptr, nullptr, nullptr);
+  ret = avformat_find_stream_info(av_format_context_, nullptr);
+  source_format_ = MediaFormat::CreatePtr(ave::media::MediaType::AUDIO,
+                                          MediaFormat::FormatType::kTrack);
 
-  AVE_LOG(LS_VERBOSE) << "init, streams: " << mFormatContext->nb_streams;
+  AVE_LOG(LS_VERBOSE) << "init, streams: " << av_format_context_->nb_streams;
 
-  mMeta->setInt64(kKeyDuration, mFormatContext->duration);
-  mMeta->setInt64(kKeyBitRate, mFormatContext->bit_rate);
-  AVE_LOG(LS_VERBOSE) << " demuxer meta <" << mMeta->toString() << ">";
+  source_format_->SetDuration(
+      base::TimeDelta::Micros(av_format_context_->duration));
+  source_format_->SetBitrate(av_format_context_->bit_rate);
 
-  for (size_t i = 0; i < mFormatContext->nb_streams; i++) {
-    const AVStream* avStream = mFormatContext->streams[i];
+  for (size_t i = 0; i < av_format_context_->nb_streams; i++) {
+    const AVStream* avStream = av_format_context_->streams[i];
     if (avStream != nullptr) {
-      addTrack(avStream, i);
+      AddTrack(avStream, i);
     }
   }
 
-  return OK;
+  return ret;
 }
 
-std::shared_ptr<MetaData> createMetaFromAVStream(const AVStream* avStream) {
-  std::shared_ptr<MetaData> meta = std::make_shared<MetaData>();
-  // AVCodecParameters codecPar = avStream->codecpar;
-  //
-  meta->setInt64(kKeyDuration, avStream->duration);
-
-  switch (avStream->codecpar->codec_type) {
-    case AVMEDIA_TYPE_VIDEO: {
-      AVStreamToVideoMeta(avStream, meta);
-      break;
-    }
-    case AVMEDIA_TYPE_AUDIO: {
-      AVStreamToAudioMeta(avStream, meta);
-      break;
-    }
-    case AVMEDIA_TYPE_SUBTITLE: {
-      break;
-    }
-    default:
-      return nullptr;
-  }
-  meta->setInt32(kKeyBitRate, avStream->codecpar->bit_rate);
-
-  const char* mime;
-  meta->findCString(kKeyMIMEType, &mime);
-
-  AVE_LOG(LS_VERBOSE) << "avStream.meta: " << meta->toString();
-
-  return meta;
-}
-
-status_t FFmpegDemuxer::addTrack(const AVStream* avStream, size_t index) {
-  std::shared_ptr<MetaData> meta = createMetaFromAVStream(avStream);
+status_t FFmpegDemuxer::AddTrack(const AVStream* avStream, size_t index) {
+  std::shared_ptr<MediaFormat> meta =
+      media::ffmpeg_utils::ExtractMetaFromAVStream(avStream);
   // if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-  AVE_LOG(LS_INFO) << "dump(" << avStream->codecpar->codec_type << "):";
-  hexdump(avStream->codecpar->extradata, avStream->codecpar->extradata_size);
+  // AVE_LOG(LS_INFO) << "dump(" << avStream->codecpar->codec_type << "):";
+  // hexdump(avStream->codecpar->extradata, avStream->codecpar->extradata_size);
   //}
 
   std::shared_ptr<FFmpegSource> source(
       std::make_shared<FFmpegSource>(this, index, meta));
-  mTracks.emplace_back(index, meta, source);
+  tracks_.emplace_back(index, meta, source);
 
-  return OK;
+  return ave::OK;
 }
 
-size_t FFmpegDemuxer::getTrackCount() {
-  return mTracks.size();
+size_t FFmpegDemuxer::GetTrackCount() {
+  return tracks_.size();
 }
 
-std::shared_ptr<MediaSource> FFmpegDemuxer::getTrack(size_t trackIndex) {
-  if (trackIndex >= mTracks.size()) {
+std::shared_ptr<MediaSource> FFmpegDemuxer::GetTrack(size_t trackIndex) {
+  if (trackIndex >= tracks_.size()) {
     return nullptr;
   }
-  return mTracks[trackIndex].mSource;
+  return tracks_[trackIndex].source;
 }
 
-status_t FFmpegDemuxer::getDemuxerMeta(std::shared_ptr<MetaData>& metaData) {
-  metaData = mMeta;
-  return OK;
+status_t FFmpegDemuxer::GetFormat(std::shared_ptr<MediaFormat>& format) {
+  format = source_format_;
+  return ave::OK;
 }
 
-status_t FFmpegDemuxer::getTrackMeta(std::shared_ptr<MetaData>& metaData,
-                                     size_t trackIndex) {
-  if (trackIndex >= mTracks.size()) {
-    return UNKNOWN_ERROR;
+status_t FFmpegDemuxer::GetTrackFormat(std::shared_ptr<MediaFormat>& format,
+                                       size_t trackIndex) {
+  if (trackIndex >= tracks_.size()) {
+    return ave::UNKNOWN_ERROR;
   }
-  // TODO(youfa) use copy, not addRef
-  metaData = mTracks[trackIndex].mMeta;
-  return OK;
+  format = tracks_[trackIndex].meta;
+  return ave::OK;
 }
 
-status_t FFmpegDemuxer::readAnAvPacket(size_t index) {
+status_t FFmpegDemuxer::ReadAnAvPacket(size_t index) {
   AVPacket pkt;
-  status_t err;
+  status_t err = OK;
 
   while (true) {
-    err = av_read_frame(mFormatContext, &pkt);
+    err = av_read_frame(av_format_context_, &pkt);
     if (err < 0) {
-      return err;
+      return media::ERROR_END_OF_STREAM;
     }
 
-    DCHECK_GE(pkt.stream_index, 0);
-    DCHECK_LT(static_cast<size_t>(pkt.stream_index), mTracks.size());
+    AVE_DCHECK_GE(pkt.stream_index, 0);
+    AVE_DCHECK_LT(static_cast<size_t>(pkt.stream_index), tracks_.size());
 
     if (pkt.stream_index == 0) {
       AVE_LOG(LS_INFO)
           << "readAnAvPacket, index:" << pkt.stream_index << "time_base:"
-          << mFormatContext->streams[pkt.stream_index]->time_base.num << "/"
-          << mFormatContext->streams[pkt.stream_index]->time_base.den
+          << av_format_context_->streams[pkt.stream_index]->time_base.num << "/"
+          << av_format_context_->streams[pkt.stream_index]->time_base.den
           << ", pts:" << pkt.pts << ",time_us:"
-          << ConvertFromTimeBase(
-                 mFormatContext->streams[pkt.stream_index]->time_base, pkt.pts)
+          << media::ffmpeg_utils::ConvertFromTimeBase(
+                 av_format_context_->streams[pkt.stream_index]->time_base,
+                 pkt.pts)
           << ", diff:" << (pkt.pts - lastVideoTimeUs);
 
       lastVideoTimeUs = pkt.pts;
     }
 
     if (pkt.stream_index >= 0 &&
-        pkt.stream_index < static_cast<int>(mTracks.size())) {
-      mTracks[pkt.stream_index].enqueuePacket(createBufferFromAvPacket(
-          &pkt, mFormatContext->streams[pkt.stream_index]->time_base));
+        pkt.stream_index < static_cast<int>(tracks_.size())) {
+      tracks_[pkt.stream_index].EnqueuePacket(
+          media::ffmpeg_utils::CreateMediaPacketFromAVPacket(&pkt));
     }
     if (static_cast<size_t>(pkt.stream_index) == index) {
       break;
     }
   }
 
-  return OK;
+  return err;
 }
 
-status_t FFmpegDemuxer::readAvFrame(std::shared_ptr<Buffer>& buffer,
+status_t FFmpegDemuxer::ReadAvFrame(std::shared_ptr<MediaPacket>& packet,
                                     size_t index,
                                     const MediaSource::ReadOptions* options) {
-  if (index >= mTracks.size()) {
-    return UNKNOWN_ERROR;
+  if (index >= tracks_.size()) {
+    return ave::UNKNOWN_ERROR;
   }
 
   // TODO(youfa) readOption
 
-  if (mTracks[index].packetSize() == 0) {
-    return readAnAvPacket(index);
+  if (tracks_[index].PacketSize() == 0) {
+    auto st = ReadAnAvPacket(index);
+    if (st != ave::OK) {
+      return st;
+    }
   }
 
-  mTracks[index].dequeuePacket(buffer);
-
-  return OK;
+  auto st = tracks_[index].DequeuePacket(packet);
+  if (st != ave::OK) {
+    return st;
+  }
+  return ave::OK;
 }
 
 const char* FFmpegDemuxer::name() {
