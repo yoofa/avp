@@ -10,6 +10,7 @@
 #include <memory>
 
 #include "base/checks.h"
+#include "media/foundation/media_format.h"
 #include "media/foundation/message_object.h"
 
 #include "message_def.h"
@@ -19,13 +20,13 @@ using ::ave::media::MessageObject;
 namespace ave {
 namespace player {
 
-AVPDecoderBase::AVPDecoderBase(
-    std::shared_ptr<Message> notify,
-    std::shared_ptr<ContentSource> source,
-    std::shared_ptr<AVSynchronizeRender> synchronizer)
+AVPDecoderBase::AVPDecoderBase(std::shared_ptr<Message> notify,
+                               std::shared_ptr<ContentSource> source,
+                               std::shared_ptr<AVPRender> render)
     : notify_(std::move(notify)),
       source_(std::move(source)),
-      synchronizer_(std::move(synchronizer)),
+      avp_render_(std::move(render)),
+      paused_(true),
       looper_(std::make_shared<Looper>()),
       request_input_buffers_pending_(false) {
   looper_->setName("AVPDecoder");
@@ -43,6 +44,7 @@ void AVPDecoderBase::Init() {
 
 void AVPDecoderBase::Configure(const std::shared_ptr<MediaFormat>& format) {
   auto msg(std::make_shared<Message>(kWhatConfigure, shared_from_this()));
+  // TODO: Fix MediaFormat inheritance issue
   msg->setObject(kMediaFormat, std::static_pointer_cast<MessageObject>(format));
   msg->post();
 }
@@ -50,21 +52,17 @@ void AVPDecoderBase::Configure(const std::shared_ptr<MediaFormat>& format) {
 // set parameters on the fly
 void AVPDecoderBase::SetParameters(const std::shared_ptr<Message>& parameters) {
   auto msg(std::make_shared<Message>(kWhatSetParameters, shared_from_this()));
-  msg->setMessage("format", parameters);
+  msg->setMessage(kParameters, parameters);
   msg->post();
 }
-void AVPDecoderBase::SetSynchronizer(
-    const std::shared_ptr<AVSynchronizeRender> synchronizer) {
-  auto msg(std::make_shared<Message>(kWhatSetSynchronizer, shared_from_this()));
-  msg->setObject(kSynchronizer, std::move(synchronizer));
-  msg->post();
-}
-void AVPDecoderBase::SetVideoRender(
+
+status_t AVPDecoderBase::SetVideoRender(
     const std::shared_ptr<VideoRender> video_render) {
   auto msg(std::make_shared<Message>(kWhatSetVideoRender, shared_from_this()));
 
   msg->setObject(kVideoRender, std::move(video_render));
   msg->post();
+  return ave::OK;
 }
 
 void AVPDecoderBase::Start() {
@@ -113,7 +111,7 @@ void AVPDecoderBase::OnRequestInputBuffers() {
     auto msg(std::make_shared<Message>(kWhatRequestInputBuffers,
                                        shared_from_this()));
 
-    // TODO(youfa) rate control
+    // rate control: re-request in 10ms if still pending
     msg->post(10 * 1000LL);
   }
 }
@@ -132,13 +130,7 @@ void AVPDecoderBase::onMessageReceived(const std::shared_ptr<Message>& msg) {
       OnSetParameters(parameters);
       break;
     }
-    case kWhatSetSynchronizer: {
-      std::shared_ptr<MessageObject> synchronizer;
-      AVE_CHECK(msg->findObject(kSynchronizer, synchronizer));
-      OnSetSynchronizer(
-          std::dynamic_pointer_cast<AVSynchronizeRender>(synchronizer));
-      break;
-    }
+    // kWhatSetSynchronizer is not used in current design
     case kWhatSetVideoRender: {
       std::shared_ptr<MessageObject> render;
       AVE_CHECK(msg->findObject(kVideoRender, render));

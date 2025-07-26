@@ -8,13 +8,13 @@
 #ifndef AVP_DECODER_BASE_H
 #define AVP_DECODER_BASE_H
 
-#include "media/foundation/av_synchronize_render.h"
 #include "media/foundation/handler.h"
+#include "media/foundation/media_format.h"
 #include "media/video/video_render.h"
+#include "player/avp_render.h"
 
 #include "api/content_source/content_source.h"
 
-using ::ave::media::AVSynchronizeRender;
 using ::ave::media::Handler;
 using ::ave::media::Looper;
 using ::ave::media::Message;
@@ -28,25 +28,22 @@ class AVPDecoderBase : public Handler {
   enum {
     kWhatDecoderError = 'decE',
   };
-  explicit AVPDecoderBase(
-      std::shared_ptr<Message> notify,
-      std::shared_ptr<ContentSource> source,
-      std::shared_ptr<AVSynchronizeRender> synchronizer = nullptr);
+  explicit AVPDecoderBase(std::shared_ptr<Message> notify,
+                          std::shared_ptr<ContentSource> source,
+                          std::shared_ptr<AVPRender> render = nullptr);
   ~AVPDecoderBase() override;
 
   void Init();
   void Configure(const std::shared_ptr<MediaFormat>& format);
   void SetParameters(const std::shared_ptr<Message>& parameters);
-  void SetSynchronizer(const std::shared_ptr<AVSynchronizeRender> synchronizer);
-  void SetVideoRender(const std::shared_ptr<VideoRender> video_render);
+  status_t SetVideoRender(const std::shared_ptr<VideoRender> video_render);
   void Start();
   // synchronize pause
   void Pause();
   void Resume();
   void Flush();
   void Shutdown();
-
-  void ReportError(status_t err);
+  virtual void Stop() {}
 
  protected:
   enum {
@@ -68,8 +65,6 @@ class AVPDecoderBase : public Handler {
   // internal message handler function
   virtual void OnConfigure(const std::shared_ptr<MediaFormat>& format) = 0;
   virtual void OnSetParameters(const std::shared_ptr<Message>& params) = 0;
-  virtual void OnSetSynchronizer(
-      const std::shared_ptr<AVSynchronizeRender>& synchronizer) = 0;
   virtual void OnSetVideoRender(
       const std::shared_ptr<VideoRender>& video_render) = 0;
   virtual void OnStart() = 0;
@@ -77,6 +72,9 @@ class AVPDecoderBase : public Handler {
   virtual void OnResume() = 0;
   virtual void OnFlush() = 0;
   virtual void OnShutdown() = 0;
+
+  // run in handler thread
+  void ReportError(status_t err);
 
   // input buffer flow
   void OnRequestInputBuffers();
@@ -87,7 +85,8 @@ class AVPDecoderBase : public Handler {
 
   std::shared_ptr<Message> notify_;
   std::shared_ptr<ContentSource> source_;
-  std::shared_ptr<AVSynchronizeRender> synchronizer_;
+  std::shared_ptr<AVPRender> avp_render_;
+  bool paused_;
 
  private:
   std::shared_ptr<Looper> looper_;
