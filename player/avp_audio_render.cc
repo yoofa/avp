@@ -196,23 +196,22 @@ uint64_t AVPAudioRender::RenderFrameInternal(
     }
   }
 
-    // Write audio data to track
-    ssize_t bytes_written = WriteAudioData(frame);
-    if (bytes_written > 0) {
-      total_bytes_written_ += bytes_written;
-      AVE_LOG(LS_VERBOSE) << "Wrote " << bytes_written
-                          << " bytes to audio track";
+  // Write audio data to track
+  ssize_t bytes_written = WriteAudioData(frame);
+  if (bytes_written > 0) {
+    total_bytes_written_ += bytes_written;
+    AVE_LOG(LS_VERBOSE) << "Wrote " << bytes_written << " bytes to audio track";
 
-      // Update sync anchor if this is the master stream
-      if (master_stream_) {
-        UpdateSyncAnchor(frame);
-      }
+    // Update sync anchor if this is the master stream
+    if (master_stream_) {
+      UpdateSyncAnchor(frame);
+    }
 
-      // Calculate next frame delay based on real playback latency
-      // This should be based on the audio track's buffer state and sample rate
-      int64_t next_delay_us = CalculateNextAudioFrameDelay();
-      last_audio_pts_us_ = audio_info->pts.us();
-      return next_delay_us;
+    // Calculate next frame delay based on real playback latency
+    // This should be based on the audio track's buffer state and sample rate
+    int64_t next_delay_us = CalculateNextAudioFrameDelay();
+    last_audio_pts_us_ = audio_info->pts.us();
+    return next_delay_us;
   }
 
   last_audio_pts_us_ = audio_info->pts.us();
