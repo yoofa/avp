@@ -52,7 +52,7 @@ class PacketSource {
   mutable std::mutex lock_;
   std::condition_variable condition_;
   std::shared_ptr<MediaFormat> format_ GUARDED_BY(lock_);
-  std::queue<std::shared_ptr<MediaPacket>> packets_ GUARDED_BY(lock_);
+  std::queue<std::shared_ptr<MediaPacket>> packets_ /*GUARDED_BY(lock_)*/;
 
   AVE_DISALLOW_COPY_AND_ASSIGN(PacketSource);
 };

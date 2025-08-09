@@ -1,0 +1,180 @@
+# AVP Player Decoder Module
+
+This module implements the decoder architecture for the AVP (Audio Video Player) system. It provides a flexible and extensible framework for handling different types of media decoding requirements.
+
+## Architecture Overview
+
+The decoder module follows a hierarchical design with a base class and specialized implementations for different use cases:
+
+```
+AVPDecoderBase (abstract base)
+├── AVPDecoder (normal software/hardware decoding)
+├── AVPPassthroughDecoder (audio passthrough)
+├── AVPTunnelDecoder (hardware tunnel mode)
+└── AVPSubtitleDecoder (subtitle parsing)
+```
+
+## Components
+
+### AVPDecoderBase
+The abstract base class that defines the common interface for all decoders:
+- Message-based communication
+- Lifecycle management (Init, Configure, Start, Pause, Resume, Flush, Shutdown)
+- Input buffer management
+- Error handling
+
+### AVPDecoder
+The standard decoder for normal software or hardware decoding:
+- Uses CodecFactory to create appropriate codecs
+- Handles both audio and video streams
+- Integrates with AVPRender for AV synchronization
+- Supports various codec backends (FFmpeg, Android MediaCodec, etc.)
+
+### AVPPassthroughDecoder
+Specialized decoder for audio formats that can be sent directly to hardware:
+- Supports formats like AAC, AC3, DTS, etc.
+- Bypasses software decoding for power efficiency
+- Maintains compatibility with the decoder interface
+- Aggregates small buffers for better performance
+
+### AVPTunnelDecoder
+Hardware-accelerated decoder for video tunnel mode:
+- Direct hardware rendering (e.g., Android MediaCodec with Surface)
+- Automatic frame rendering by hardware
+- Minimal CPU overhead
+- Requires VideoRender for configuration
+
+### AVPSubtitleDecoder
+Decoder for subtitle formats:
+- Supports SRT, ASS, VTT, and other subtitle formats
+- Parses subtitle packets into renderable frames
+- Integrates with AV synchronization
+- Caches subtitle data for efficient rendering
+
+## Usage
+
+### Creating Decoders
+
+Use the `AVPDecoderFactory` to create appropriate decoders:
+
+```cpp
+// Create a normal decoder
+auto decoder = AVPDecoderFactory::CreateDecoder(
+    codec_factory, notify, source, render, format);
+
+// Create a passthrough decoder for audio
+auto passthrough_decoder = AVPDecoderFactory::CreateDecoder(
+    codec_factory, notify, source, render, format, nullptr, 
+    AVPDecoderFactory::DECODER_PASSTHROUGH);
+
+// Create a tunnel decoder for video
+auto tunnel_decoder = AVPDecoderFactory::CreateDecoder(
+    codec_factory, notify, source, render, format, video_render,
+    AVPDecoderFactory::DECODER_TUNNEL);
+
+// Create a subtitle decoder
+auto subtitle_decoder = AVPDecoderFactory::CreateDecoder(
+    codec_factory, notify, source, render, format, nullptr,
+    AVPDecoderFactory::DECODER_SUBTITLE);
+```
+
+### Decoder Lifecycle
+
+```cpp
+// Initialize and configure
+decoder->Init();
+decoder->Configure(format);
+
+// Start decoding
+decoder->Start();
+
+// Control playback
+decoder->Pause();
+decoder->Resume();
+
+// Cleanup
+decoder->Flush();
+decoder->Shutdown();
+```
+
+### Integration with ContentSource and AVPRender
+
+The decoder architecture integrates seamlessly with the content source and renderer:
+
+1. **ContentSource**: Provides media packets to the decoder
+2. **CodecFactory**: Creates appropriate codecs for decoding
+3. **AVPRender**: Handles AV synchronization and frame rendering
+4. **VideoRender**: Optional video renderer for tunnel mode
+
+## Supported Formats
+
+### Audio Passthrough
+- AAC (Advanced Audio Coding)
+- AC3 (Dolby Digital)
+- EAC3 (Dolby Digital Plus)
+- DTS (Digital Theater Systems)
+- DTS-HD (High Definition)
+- MPEG Audio
+- Vorbis
+- FLAC
+- Opus
+
+### Video Tunnel Mode
+- H.264/AVC
+- H.265/HEVC
+- VP8
+- VP9
+- AV1
+
+### Subtitle Formats
+- SRT (SubRip)
+- ASS/SSA (Advanced SubStation Alpha)
+- VTT (WebVTT)
+- Generic text-based formats
+
+## Error Handling
+
+All decoders implement comprehensive error handling:
+- Invalid formats are detected and reported
+- Codec creation failures are handled gracefully
+- Network and I/O errors are propagated
+- Resource cleanup is guaranteed
+
+## Threading Model
+
+Decoders operate in their own message loop thread:
+- All decoder operations are asynchronous
+- Message-based communication ensures thread safety
+- Callbacks are posted to the appropriate threads
+- No blocking operations in the main thread
+
+## Performance Considerations
+
+- **Passthrough Mode**: Minimizes CPU usage for supported audio formats
+- **Tunnel Mode**: Reduces memory copies and CPU overhead for video
+- **Buffer Aggregation**: Combines small packets for better efficiency
+- **Lazy Initialization**: Codecs are created only when needed
+- **Resource Management**: Proper cleanup prevents memory leaks
+
+## Testing
+
+The module includes comprehensive unit tests:
+- Mock implementations for testing
+- Coverage of all decoder types
+- Error condition testing
+- Performance benchmarks
+
+Run tests with:
+```bash
+ninja -C out/Debug player_unittests
+./out/Debug/player_unittests
+```
+
+## Future Enhancements
+
+- Support for more subtitle formats
+- Enhanced error recovery mechanisms
+- Performance optimizations
+- Additional codec backends
+- Adaptive quality switching
+- Multi-track subtitle support

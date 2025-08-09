@@ -8,7 +8,10 @@ ave_library("avplayer_builder") {
   sources = [ "avp_builder.cc" ]
   deps = [
     ":avplayer",
-    "//api:player_interface",
+    "../api:default_content_source_factory",
+    "../api:player_interface",
+    "../demuxer:ave_demuxer_factory",
+    "//media/codec/ffmpeg:ffmpeg_codec",
   ]
 }
 
@@ -20,21 +23,29 @@ ave_library("packet_source") {
   deps = [ "//media/foundation:foundation" ]
 }
 
+ave_library("message_def") {
+  sources = [ "message_def.h" ]
+}
+
 ave_library("avplayer") {
   sources = [
-    "avp_decoder.cc",
-    "avp_decoder.h",
     "avplayer.cc",
     "avplayer.h",
-    "message_def.h",
   ]
   configs += [ "//build/config/compiler:rtti" ]
 
   deps = [
+    ":avp_audio_render",
+    ":avp_decoder",
+    ":avp_render",
+    ":avp_video_render",
+    ":avsync_controller",
+    ":message_def",
     "//api:player_interface",
     "//base:logging",
     "//base:utils",
     "//base/system:ave_export",
+    "//media/codec:codec",
     "//media/foundation:foundation",
   ]
 
@@ -90,6 +101,41 @@ ave_library("avp_audio_render") {
   ]
 }
 
+ave_library("avp_video_render") {
+  sources = [
+    "avp_video_render.cc",
+    "avp_video_render.h",
+  ]
+  deps = [
+    ":avp_render",
+    "//base:logging",
+    "//media/foundation:foundation",
+    "//media/video:video_render",
+  ]
+}
+
+ave_library("avp_decoder") {
+  sources = [
+    "avp_decoder.cc",
+    "avp_decoder.h",
+    "avp_decoder_base.cc",
+    "avp_decoder_base.h",
+    "avp_decoder_factory.cc",
+    "avp_decoder_factory.h",
+    "avp_passthrough_decoder.cc",
+    "avp_passthrough_decoder.h",
+    "avp_subtitle_decoder.cc",
+    "avp_subtitle_decoder.h",
+    "avp_tunnel_decoder.cc",
+    "avp_tunnel_decoder.h",
+  ]
+  deps = [
+    "//base:logging",
+    "//media/foundation:foundation",
+  ]
+  configs += [ "//build/config/compiler:rtti" ]
+}
+
 ave_library("avp_render_unittest") {
   testonly = true
   sources = [ "avp_render_unittest.cc" ]
@@ -110,11 +156,35 @@ ave_library("avp_audio_render_unittest") {
   ]
 }
 
+ave_library("avp_video_render_unittest") {
+  testonly = true
+  sources = [ "avp_video_render_unittest.cc" ]
+  deps = [
+    ":avp_video_render",
+    "//base/test:mock_task_runner_factory",
+    "//test:test_support",
+  ]
+}
+
+ave_library("avp_decoder_unittest") {
+  testonly = true
+  sources = [ "avp_decoder_unittest.cc" ]
+  deps = [
+    ":avplayer",
+    "//base/test:mock_task_runner_factory",
+    "//media/codec/test:dummy_codec",
+    "//test:test_support",
+  ]
+}
+
 executable("player_unittests") {
   testonly = true
   deps = [
     ":avp_audio_render_unittest",
+
+    #":avp_decoder_unittest",
     ":avp_render_unittest",
+    ":avp_video_render_unittest",
     ":avsync_controller_unittest",
     "//test:test_main",
     "//test:test_support",
