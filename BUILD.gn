@@ -10,28 +10,19 @@ group("default") {
       "media:media_unittests",
       "test",
     ]
-
-    deps += [ "media/audio:yplay" ]
   }
 }
 
-ave_static_library("avp") {
+ave_shared_library("avp") {
   testonly = true
   sources = []
 
-  complete_static_lib = true
+  #complete_static_lib = true
   suppressed_configs += [ "//build/config/compiler:thin_archive" ]
   defines = []
   deps = []
 
-  deps += [
-    "api",
-    "base",
-
-    #"media",
-
-    #"player",
-  ]
+  deps += [ "player:avplayer_builder" ]
 
   #deps += [ "demuxer" ]
 }
