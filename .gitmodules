@@ -1,9 +1,0 @@
-[submodule "base"]
-	path = base
-	url = https://github.com/yoofa/base.git
-[submodule "media"]
-	path = media
-	url = https://github.com/yoofa/media.git
-[submodule "ave_third_party"]
-  path = third_party
-  url = https://github.com/yoofa/ave_third_party.git

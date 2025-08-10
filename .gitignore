@@ -42,12 +42,23 @@
 /x86-generic_out/
 /xcodebuild
 /.vscode
+
+# project ignore
+/base
 /build
 /buildtools
+/common
+/media
+/out
 /testing
 /third_party
 /tools
 
+
+
 # for gclient files isnore
 .cipd
+_gclient_*
 .gclient_*
+
+
