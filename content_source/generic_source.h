@@ -23,7 +23,8 @@
 #include "api/content_source/content_source.h"
 #include "api/demuxer/demuxer.h"
 #include "api/demuxer/demuxer_factory.h"
-#include "player/packet_source.h"
+
+#include "../core/packet_source.h"
 
 namespace ave {
 namespace player {

@@ -14,10 +14,10 @@
 #include "base/logging.h"
 #include "media/foundation/media_meta.h"
 
-#include "player/avp_decoder.h"
-#include "player/avp_passthrough_decoder.h"
-#include "player/avp_subtitle_decoder.h"
-#include "player/avp_tunnel_decoder.h"
+#include "avp_decoder.h"
+#include "avp_passthrough_decoder.h"
+#include "avp_subtitle_decoder.h"
+#include "avp_tunnel_decoder.h"
 
 namespace ave {
 namespace player {

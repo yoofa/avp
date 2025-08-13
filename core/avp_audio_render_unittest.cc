@@ -13,7 +13,9 @@
 #include "base/time_utils.h"
 #include "media/audio/audio_device.h"
 #include "media/foundation/media_frame.h"
-#include "player/mock_task_runner_factory.h"
+
+#include "mock_task_runner_factory.h"
+
 #include "test/gtest.h"
 
 namespace ave {

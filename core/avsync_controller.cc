@@ -4,11 +4,11 @@
  *
  * Distributed under terms of the GPLv2 license.
  */
-#include "player/avsync_controller.h"
-
 #include <algorithm>
 
 #include "base/time_utils.h"
+
+#include "avsync_controller.h"
 
 namespace ave {
 namespace player {

@@ -10,10 +10,12 @@
 #include <memory>
 #include <thread>
 
-#include "api/player_interface.h"
 #include "base/logging.h"
 #include "media/foundation/media_frame.h"
-#include "player/mock_task_runner_factory.h"
+
+#include "api/player_interface.h"
+#include "mock_task_runner_factory.h"
+
 #include "test/gtest.h"
 
 namespace ave {

@@ -13,7 +13,8 @@
 #include <queue>
 
 #include "media/foundation/media_packet.h"
-#include "player/avp_decoder_base.h"
+
+#include "avp_decoder_base.h"
 
 using ave::media::MediaPacket;
 

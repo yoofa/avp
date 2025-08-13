@@ -22,11 +22,12 @@
 
 #include "api/content_source/content_source.h"
 #include "api/player.h"
-#include "player/avp_audio_render.h"
-#include "player/avp_decoder.h"
-#include "player/avp_decoder_factory.h"
-#include "player/avp_video_render.h"
-#include "player/avsync_controller.h"
+
+#include "avp_audio_render.h"
+#include "avp_decoder.h"
+#include "avp_decoder_factory.h"
+#include "avp_video_render.h"
+#include "avsync_controller.h"
 
 namespace ave {
 namespace player {

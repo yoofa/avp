@@ -14,7 +14,7 @@
 #include "media/foundation/media_errors.h"
 #include "media/foundation/media_packet.h"
 
-#include "player/message_def.h"
+#include "message_def.h"
 
 using ave::media::MediaPacket;
 

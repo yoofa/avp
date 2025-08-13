@@ -22,7 +22,7 @@ ave_shared_library("avp") {
   defines = []
   deps = []
 
-  deps += [ "player:avplayer_builder" ]
+  deps += [ "core:avplayer_builder" ]
 
   #deps += [ "demuxer" ]
 }

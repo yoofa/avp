@@ -15,8 +15,9 @@
 #include "media/video/video_render.h"
 
 #include "api/content_source/content_source.h"
-#include "player/avp_decoder_base.h"
-#include "player/avp_render.h"
+
+#include "avp_decoder_base.h"
+#include "avp_render.h"
 
 namespace ave {
 namespace player {

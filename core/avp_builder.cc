@@ -6,7 +6,8 @@
  */
 
 #include "api/player.h"
-#include "player/avplayer.h"
+
+#include "avplayer.h"
 
 namespace ave {
 namespace player {

@@ -16,9 +16,9 @@
 #include "media/foundation/media_packet.h"
 #include "test/gtest.h"
 
-#include "player/avp_render.h"
+#include "avp_render.h"
 
-using ave::base::test::MockTaskRunnerFactory;
+using ave::base::MockTaskRunnerFactory;
 using ave::media::MediaMeta;
 using ave::media::MediaPacket;
 using ave::media::MediaType;

@@ -8,10 +8,9 @@
 #ifndef AVP_DECODER_BASE_H
 #define AVP_DECODER_BASE_H
 
+#include "avp_render.h"
 #include "media/foundation/handler.h"
-#include "media/foundation/media_meta.h"
 #include "media/video/video_render.h"
-#include "player/avp_render.h"
 
 #include "api/content_source/content_source.h"
 

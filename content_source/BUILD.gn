@@ -6,7 +6,7 @@ ave_library("generic_content_source") {
     "generic_source.h",
   ]
   deps = [
-    "../player:packet_source",
+    "../core:packet_source",
     "//api:api_content_source",
     "//base/data_source:file_source",
     "//media/foundation",
