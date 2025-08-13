@@ -11,7 +11,7 @@
 #include <memory>
 
 #include "media/codec/codec_factory.h"
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 #include "media/video/video_render.h"
 
 #include "api/content_source/content_source.h"
@@ -52,7 +52,7 @@ class AVPDecoderFactory {
       std::shared_ptr<Message> notify,
       std::shared_ptr<ContentSource> source,
       std::shared_ptr<AVPRender> render,
-      const std::shared_ptr<MediaFormat>& format,
+      const std::shared_ptr<MediaMeta>& format,
       std::shared_ptr<VideoRender> video_render = nullptr,
       DecoderType decoder_type = DECODER_NORMAL);
 
@@ -65,7 +65,7 @@ class AVPDecoderFactory {
    * @return The appropriate decoder type
    */
   static DecoderType DetermineDecoderType(
-      const std::shared_ptr<MediaFormat>& format,
+      const std::shared_ptr<MediaMeta>& format,
       bool is_passthrough = false,
       bool is_tunnel = false);
 
@@ -74,14 +74,14 @@ class AVPDecoderFactory {
    * @param format The media format to check
    * @return True if passthrough is supported
    */
-  static bool SupportsPassthrough(const std::shared_ptr<MediaFormat>& format);
+  static bool SupportsPassthrough(const std::shared_ptr<MediaMeta>& format);
 
   /**
    * @brief Checks if a format supports tunnel mode
    * @param format The media format to check
    * @return True if tunnel mode is supported
    */
-  static bool SupportsTunnel(const std::shared_ptr<MediaFormat>& format);
+  static bool SupportsTunnel(const std::shared_ptr<MediaMeta>& format);
 
  private:
   AVPDecoderFactory() = delete;

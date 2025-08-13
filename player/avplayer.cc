@@ -10,7 +10,7 @@
 #include "base/errors.h"
 #include "base/logging.h"
 #include "media/foundation/media_errors.h"
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 #include "media/foundation/message_object.h"
 
 #include "content_source/generic_source.h"
@@ -608,10 +608,10 @@ void AvPlayer::OnFlagsChanged(int32_t flags) {
   msg->post();
 }
 
-void AvPlayer::OnVideoSizeChanged(std::shared_ptr<MediaFormat>& format) {
+void AvPlayer::OnVideoSizeChanged(std::shared_ptr<MediaMeta>& format) {
   auto msg = std::make_shared<Message>(kWhatSourceVideoSizeChanged,
                                        shared_from_this());
-  msg->setObject(kMediaFormat, std::static_pointer_cast<MessageObject>(format));
+  msg->setObject(kMediaMeta, std::static_pointer_cast<MessageObject>(format));
   msg->post();
 }
 
@@ -692,8 +692,8 @@ void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
     }
     case kWhatSourceVideoSizeChanged: {
       std::shared_ptr<MessageObject> obj;
-      if (msg->findObject(kMediaFormat, obj)) {
-        auto format = std::dynamic_pointer_cast<MediaFormat>(obj);
+      if (msg->findObject(kMediaMeta, obj)) {
+        auto format = std::dynamic_pointer_cast<MediaMeta>(obj);
         if (listener_.lock()) {
           // listener_.lock()->onVideoSizeChanged(format->width(),
           // format->height());
@@ -756,8 +756,8 @@ void AvPlayer::OnDecoderNotify(const std::shared_ptr<Message>& msg) {
   switch (what) {
     case AVPDecoder::kWhatVideoSizeChanged: {
       std::shared_ptr<MessageObject> obj;
-      msg->findObject(kMediaFormat, obj);
-      auto format = std::dynamic_pointer_cast<MediaFormat>(obj);
+      msg->findObject(kMediaMeta, obj);
+      auto format = std::dynamic_pointer_cast<MediaMeta>(obj);
       if (listener_.lock()) {
         // TODO: Implement onVideoSizeChanged in Listener interface
         // listener_.lock()->onVideoSizeChanged(format->width(),

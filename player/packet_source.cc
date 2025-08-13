@@ -12,7 +12,7 @@
 namespace ave {
 namespace player {
 
-PacketSource::PacketSource(std::shared_ptr<MediaFormat> format)
+PacketSource::PacketSource(std::shared_ptr<MediaMeta> format)
     : format_(std::move(format)) {}
 
 PacketSource::~PacketSource() = default;
@@ -27,7 +27,7 @@ status_t PacketSource::Stop() {
 
 void PacketSource::Clear() {}
 
-void PacketSource::SetFormat(std::shared_ptr<MediaFormat> format) {
+void PacketSource::SetFormat(std::shared_ptr<MediaMeta> format) {
   std::lock_guard<std::mutex> l(lock_);
   format_ = std::move(format);
 }

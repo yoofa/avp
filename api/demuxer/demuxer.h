@@ -12,13 +12,13 @@
 
 #include "api/player_interface.h"
 #include "base/data_source/data_source.h"
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 #include "media/foundation/media_source.h"
 
 namespace ave {
 namespace player {
 
-using ave::media::MediaFormat;
+using ave::media::MediaMeta;
 using ave::media::MediaSource;
 
 class Demuxer {
@@ -27,11 +27,11 @@ class Demuxer {
       : data_source_(std::move(data_source)) {}
   virtual ~Demuxer() = default;
 
-  virtual status_t GetFormat(std::shared_ptr<MediaFormat>& format) = 0;
+  virtual status_t GetFormat(std::shared_ptr<MediaMeta>& format) = 0;
 
   virtual size_t GetTrackCount() = 0;
 
-  virtual status_t GetTrackFormat(std::shared_ptr<MediaFormat>& format,
+  virtual status_t GetTrackFormat(std::shared_ptr<MediaMeta>& format,
                                   size_t trackIndex) = 0;
 
   virtual std::shared_ptr<MediaSource> GetTrack(size_t trackIndex) = 0;

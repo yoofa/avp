@@ -49,7 +49,7 @@ AVPPassthroughDecoder::~AVPPassthroughDecoder() {
 }
 
 void AVPPassthroughDecoder::OnConfigure(
-    const std::shared_ptr<MediaFormat>& format) {
+    const std::shared_ptr<MediaMeta>& format) {
   AVE_LOG(LS_VERBOSE) << "OnConfigure";
 
   cached_bytes_ = 0;

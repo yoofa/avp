@@ -11,11 +11,11 @@
 #include <map>
 #include <memory>
 
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 #include "media/foundation/media_packet.h"
 #include "player/avp_decoder_base.h"
 
-using ave::media::MediaFormat;
+using ave::media::MediaMeta;
 using ave::media::MediaPacket;
 
 namespace ave {
@@ -47,7 +47,7 @@ class AVPSubtitleDecoder : public AVPDecoderBase {
     kWhatParseSubtitle = 'parS',
   };
 
-  void OnConfigure(const std::shared_ptr<MediaFormat>& format) override;
+  void OnConfigure(const std::shared_ptr<MediaMeta>& format) override;
   void OnSetParameters(const std::shared_ptr<Message>& params) override;
   void OnSetVideoRender(
       const std::shared_ptr<VideoRender>& video_render) override;

@@ -10,7 +10,7 @@
 #include <memory>
 
 #include "base/checks.h"
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 #include "media/foundation/message_object.h"
 
 #include "message_def.h"
@@ -42,10 +42,10 @@ void AVPDecoderBase::Init() {
   looper_->registerHandler(shared_from_this());
 }
 
-void AVPDecoderBase::Configure(const std::shared_ptr<MediaFormat>& format) {
+void AVPDecoderBase::Configure(const std::shared_ptr<MediaMeta>& format) {
   auto msg(std::make_shared<Message>(kWhatConfigure, shared_from_this()));
-  // TODO: Fix MediaFormat inheritance issue
-  msg->setObject(kMediaFormat, std::static_pointer_cast<MessageObject>(format));
+  // TODO: Fix MediaMeta inheritance issue
+  msg->setObject(kMediaMeta, std::static_pointer_cast<MessageObject>(format));
   msg->post();
 }
 
@@ -120,8 +120,8 @@ void AVPDecoderBase::onMessageReceived(const std::shared_ptr<Message>& msg) {
   switch (msg->what()) {
     case kWhatConfigure: {
       std::shared_ptr<MessageObject> format;
-      AVE_CHECK(msg->findObject(kMediaFormat, format));
-      OnConfigure(std::dynamic_pointer_cast<MediaFormat>(format));
+      AVE_CHECK(msg->findObject(kMediaMeta, format));
+      OnConfigure(std::dynamic_pointer_cast<MediaMeta>(format));
       break;
     }
     case kWhatSetParameters: {

@@ -53,7 +53,7 @@ class GenericSource : public Handler, public ContentSource {
   void Resume() override;
   status_t SeekTo(int64_t seek_time_us, SeekMode mode) override;
 
-  std::shared_ptr<MediaFormat> GetFormat() override;
+  std::shared_ptr<MediaMeta> GetFormat() override;
 
   status_t DequeueAccessUnit(
       MediaType track_type,
@@ -63,9 +63,8 @@ class GenericSource : public Handler, public ContentSource {
 
   size_t GetTrackCount() const override;
 
-  std::shared_ptr<MediaFormat> GetTrackInfo(size_t track_index) const override;
-  std::shared_ptr<MediaFormat> GetTrackInfo(
-      MediaType track_type) const override;
+  std::shared_ptr<MediaMeta> GetTrackInfo(size_t track_index) const override;
+  std::shared_ptr<MediaMeta> GetTrackInfo(MediaType track_type) const override;
 
   status_t SelectTrack(size_t track_index, bool select) override;
 
@@ -110,7 +109,7 @@ class GenericSource : public Handler, public ContentSource {
 
   void NotifyPrepared(status_t err = ave::OK) REQUIRES(lock_);
   void NotifyFlagsChanged(int32_t flags) REQUIRES(lock_);
-  void NotifyVideoSizeChanged(std::shared_ptr<MediaFormat>& format)
+  void NotifyVideoSizeChanged(std::shared_ptr<MediaMeta>& format)
       REQUIRES(lock_);
   void NotifyBuffering(int32_t percentage) REQUIRES(lock_);
 
@@ -127,7 +126,7 @@ class GenericSource : public Handler, public ContentSource {
   int64_t offset_ GUARDED_BY(lock_);
   int64_t length_ GUARDED_BY(lock_);
   std::shared_ptr<ave::DataSource> data_source_ GUARDED_BY(lock_);
-  std::shared_ptr<MediaFormat> source_format_ GUARDED_BY(lock_);
+  std::shared_ptr<MediaMeta> source_format_ GUARDED_BY(lock_);
   int64_t duration_us_ GUARDED_BY(lock_);
   int64_t bitrate_ GUARDED_BY(lock_);
 

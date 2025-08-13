@@ -37,7 +37,7 @@ class AVPPassthroughDecoder : public AVPDecoderBase {
 
  protected:
   // AVPDecoderBase implementation
-  void OnConfigure(const std::shared_ptr<MediaFormat>& format) override;
+  void OnConfigure(const std::shared_ptr<MediaMeta>& format) override;
   void OnSetParameters(const std::shared_ptr<Message>& params) override;
   void OnSetVideoRender(
       const std::shared_ptr<VideoRender>& video_render) override;

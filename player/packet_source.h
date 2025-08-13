@@ -14,20 +14,20 @@
 
 #include "base/constructor_magic.h"
 #include "base/thread_annotation.h"
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 #include "media/foundation/media_packet.h"
 #include "media/foundation/media_utils.h"
 
 namespace ave {
 namespace player {
 
-using ave::media::MediaFormat;
+using ave::media::MediaMeta;
 using ave::media::MediaPacket;
 using ave::media::MediaType;
 
 class PacketSource {
  public:
-  explicit PacketSource(std::shared_ptr<MediaFormat> format);
+  explicit PacketSource(std::shared_ptr<MediaMeta> format);
   ~PacketSource();
 
   MediaType type() const {
@@ -40,7 +40,7 @@ class PacketSource {
 
   void Clear();
 
-  void SetFormat(std::shared_ptr<MediaFormat> format);
+  void SetFormat(std::shared_ptr<MediaMeta> format);
 
   bool HasBufferAvailable(status_t* result);
   size_t GetAvailableBufferCount(status_t* result);
@@ -51,7 +51,7 @@ class PacketSource {
  private:
   mutable std::mutex lock_;
   std::condition_variable condition_;
-  std::shared_ptr<MediaFormat> format_ GUARDED_BY(lock_);
+  std::shared_ptr<MediaMeta> format_ GUARDED_BY(lock_);
   std::queue<std::shared_ptr<MediaPacket>> packets_ /*GUARDED_BY(lock_)*/;
 
   AVE_DISALLOW_COPY_AND_ASSIGN(PacketSource);

@@ -8,7 +8,7 @@
 #include "avp_video_render.h"
 
 #include "base/logging.h"
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 
 namespace ave {
 namespace player {
@@ -17,7 +17,7 @@ AVPVideoRender::AVPVideoRender(base::TaskRunnerFactory* task_runner_factory,
                                IAVSyncController* avsync_controller)
     : AVPRender(task_runner_factory, avsync_controller),
       current_video_format_(media::MediaType::VIDEO,
-                            media::MediaFormat::FormatType::kSample),
+                            media::MediaMeta::FormatType::kSample),
       format_initialized_(false),
       total_frames_rendered_(0),
       total_frames_dropped_(0),

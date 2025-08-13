@@ -13,8 +13,8 @@
 #include "base/checks.h"
 #include "base/logging.h"
 #include "media/foundation/media_errors.h"
-#include "media/foundation/media_format.h"
 #include "media/foundation/media_frame.h"
+#include "media/foundation/media_meta.h"
 #include "media/foundation/media_packet.h"
 #include "media/foundation/message_object.h"
 
@@ -39,8 +39,7 @@ AVPSubtitleDecoder::~AVPSubtitleDecoder() {
   AVE_LOG(LS_VERBOSE) << "~AVPSubtitleDecoder";
 }
 
-void AVPSubtitleDecoder::OnConfigure(
-    const std::shared_ptr<MediaFormat>& format) {
+void AVPSubtitleDecoder::OnConfigure(const std::shared_ptr<MediaMeta>& format) {
   AVE_LOG(LS_VERBOSE) << "OnConfigure";
 
   subtitle_format_ = format->mime();

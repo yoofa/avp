@@ -207,7 +207,7 @@ AVE_EXPORT class AvPlayer : public Player,
   /******* Source Notify *******/
   void OnPrepared(status_t err) override;
   void OnFlagsChanged(int32_t flags) override;
-  void OnVideoSizeChanged(std::shared_ptr<MediaFormat>& format) override;
+  void OnVideoSizeChanged(std::shared_ptr<MediaMeta>& format) override;
   void OnSeekComplete() override;
   void OnBufferingStart() override;
   void OnBufferingUpdate(int percent) override;

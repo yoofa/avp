@@ -9,7 +9,7 @@
 #define AVP_DECODER_BASE_H
 
 #include "media/foundation/handler.h"
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 #include "media/video/video_render.h"
 #include "player/avp_render.h"
 
@@ -34,7 +34,7 @@ class AVPDecoderBase : public Handler {
   ~AVPDecoderBase() override;
 
   void Init();
-  void Configure(const std::shared_ptr<MediaFormat>& format);
+  void Configure(const std::shared_ptr<MediaMeta>& format);
   void SetParameters(const std::shared_ptr<Message>& parameters);
   status_t SetVideoRender(const std::shared_ptr<VideoRender> video_render);
   void Start();
@@ -63,7 +63,7 @@ class AVPDecoderBase : public Handler {
   };
 
   // internal message handler function
-  virtual void OnConfigure(const std::shared_ptr<MediaFormat>& format) = 0;
+  virtual void OnConfigure(const std::shared_ptr<MediaMeta>& format) = 0;
   virtual void OnSetParameters(const std::shared_ptr<Message>& params) = 0;
   virtual void OnSetVideoRender(
       const std::shared_ptr<VideoRender>& video_render) = 0;

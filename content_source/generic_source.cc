@@ -159,12 +159,12 @@ status_t GenericSource::SeekTo(int64_t seek_time_us, SeekMode mode) {
   return err;
 }
 
-std::shared_ptr<MediaFormat> GenericSource::GetFormat() {
+std::shared_ptr<MediaMeta> GenericSource::GetFormat() {
   std::lock_guard<std::mutex> lock(lock_);
   return source_format_;
 }
 
-std::shared_ptr<MediaFormat> GenericSource::GetTrackInfo(
+std::shared_ptr<MediaMeta> GenericSource::GetTrackInfo(
     size_t track_index) const {
   std::lock_guard<std::mutex> lock(lock_);
   AVE_DCHECK(track_index < sources_.size());
@@ -175,7 +175,7 @@ std::shared_ptr<MediaFormat> GenericSource::GetTrackInfo(
   return sources_[track_index]->GetFormat();
 }
 
-std::shared_ptr<MediaFormat> GenericSource::GetTrackInfo(
+std::shared_ptr<MediaMeta> GenericSource::GetTrackInfo(
     MediaType track_type) const {
   std::lock_guard<std::mutex> lock(lock_);
 
@@ -378,7 +378,7 @@ status_t GenericSource::InitFromDataSource() {
     return ave::UNKNOWN_ERROR;
   }
 
-  std::shared_ptr<MediaFormat> source_format;
+  std::shared_ptr<MediaMeta> source_format;
 
   demuxer_->GetFormat(source_format);
 
@@ -404,7 +404,7 @@ status_t GenericSource::InitFromDataSource() {
       continue;
     }
 
-    std::shared_ptr<MediaFormat> format;
+    std::shared_ptr<MediaMeta> format;
     demuxer_->GetTrackFormat(format, i);
 
     if (format == nullptr) {
@@ -744,8 +744,7 @@ void GenericSource::NotifyFlagsChanged(int32_t flags) {
   }
 }
 
-void GenericSource::NotifyVideoSizeChanged(
-    std::shared_ptr<MediaFormat>& format) {
+void GenericSource::NotifyVideoSizeChanged(std::shared_ptr<MediaMeta>& format) {
   if (notify_ != nullptr) {
     notify_->OnVideoSizeChanged(format);
   }

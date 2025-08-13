@@ -33,9 +33,9 @@ class FFmpegDemuxer : public Demuxer {
   ~FFmpegDemuxer() override;
 
   // Demuxer API
-  status_t GetFormat(std::shared_ptr<ave::media::MediaFormat>& format) override;
+  status_t GetFormat(std::shared_ptr<ave::media::MediaMeta>& format) override;
   size_t GetTrackCount() override;
-  status_t GetTrackFormat(std::shared_ptr<ave::media::MediaFormat>& format,
+  status_t GetTrackFormat(std::shared_ptr<ave::media::MediaMeta>& format,
                           size_t trackIndex) override;
   std::shared_ptr<ave::media::MediaSource> GetTrack(size_t trackIndex) override;
   const char* name() override;
@@ -48,12 +48,12 @@ class FFmpegDemuxer : public Demuxer {
 
   struct TrackInfo {
     TrackInfo(size_t index,
-              std::shared_ptr<ave::media::MediaFormat>,
+              std::shared_ptr<ave::media::MediaMeta>,
               std::shared_ptr<FFmpegSource> source);
     ~TrackInfo();
 
     size_t track_index;
-    std::shared_ptr<ave::media::MediaFormat> meta;
+    std::shared_ptr<ave::media::MediaMeta> meta;
     std::shared_ptr<FFmpegSource> source;
     std::list<std::shared_ptr<ave::media::MediaPacket>> packets;
 
@@ -71,7 +71,7 @@ class FFmpegDemuxer : public Demuxer {
   // std::shared_ptr<ave::DataSource> data_source_;
   AVFormatContext* av_format_context_;
   AVIOContext* av_io_context_;
-  std::shared_ptr<ave::media::MediaFormat> source_format_;
+  std::shared_ptr<ave::media::MediaMeta> source_format_;
 
   std::vector<TrackInfo> tracks_;
 };

@@ -12,7 +12,7 @@
 #include <mutex>
 
 #include "avp_render.h"
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 #include "media/video/video_render.h"
 
 namespace ave {
@@ -88,7 +88,7 @@ class AVPVideoRender : public AVPRender {
   std::shared_ptr<media::VideoRender> video_render_ GUARDED_BY(mutex_);
 
   // Video format tracking
-  media::MediaFormat current_video_format_ GUARDED_BY(mutex_);
+  media::MediaMeta current_video_format_ GUARDED_BY(mutex_);
   bool format_initialized_ GUARDED_BY(mutex_);
 
   // Statistics

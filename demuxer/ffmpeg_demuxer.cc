@@ -13,7 +13,7 @@
 #include "base/hexdump.h"
 #include "base/logging.h"
 
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 #include "media/foundation/media_source.h"
 #include "media/modules/ffmpeg/ffmpeg_utils.h"
 
@@ -63,30 +63,30 @@ static int64_t AVIOSeekOperation(void* opaque, int64_t offset, int whence) {
 ////////////////////////////////////
 
 using ave::media::Buffer;
-using ave::media::MediaFormat;
+using ave::media::MediaMeta;
 using ave::media::MediaSource;
 
 struct FFmpegSource : public MediaSource {
   FFmpegSource(FFmpegDemuxer* demuxer,
                size_t index,
-               std::shared_ptr<MediaFormat> meta);
+               std::shared_ptr<MediaMeta> meta);
   ~FFmpegSource() override;
 
   status_t Start(std::shared_ptr<Message> params) override;
   status_t Stop() override;
   status_t Read(std::shared_ptr<MediaPacket>& packet,
                 const ReadOptions* options) override;
-  std::shared_ptr<MediaFormat> GetFormat() override;
+  std::shared_ptr<MediaMeta> GetFormat() override;
 
  private:
   FFmpegDemuxer* demuxer_;
   size_t track_index;
-  std::shared_ptr<MediaFormat> meta;
+  std::shared_ptr<MediaMeta> meta;
 };
 
 FFmpegSource::FFmpegSource(FFmpegDemuxer* demuxer,
                            size_t index,
-                           std::shared_ptr<MediaFormat> meta)
+                           std::shared_ptr<MediaMeta> meta)
     : demuxer_(demuxer), track_index(index), meta(std::move(meta)) {}
 
 FFmpegSource::~FFmpegSource() = default;
@@ -112,13 +112,13 @@ status_t FFmpegSource::Read(std::shared_ptr<MediaPacket>& packet,
   return ave::OK;
 }
 
-std::shared_ptr<MediaFormat> FFmpegSource::GetFormat() {
+std::shared_ptr<MediaMeta> FFmpegSource::GetFormat() {
   return meta;
 }
 
 ////////////////////////////////////
 FFmpegDemuxer::TrackInfo::TrackInfo(size_t index,
-                                    std::shared_ptr<MediaFormat> meta,
+                                    std::shared_ptr<MediaMeta> meta,
                                     std::shared_ptr<FFmpegSource> source)
     : track_index(index), meta(std::move(meta)), source(std::move(source)) {}
 
@@ -167,8 +167,8 @@ status_t FFmpegDemuxer::Init() {
   int ret = OK;
   ret = avformat_open_input(&av_format_context_, nullptr, nullptr, nullptr);
   ret = avformat_find_stream_info(av_format_context_, nullptr);
-  source_format_ = MediaFormat::CreatePtr(ave::media::MediaType::AUDIO,
-                                          MediaFormat::FormatType::kTrack);
+  source_format_ = MediaMeta::CreatePtr(ave::media::MediaType::AUDIO,
+                                        MediaMeta::FormatType::kTrack);
 
   AVE_LOG(LS_VERBOSE) << "init, streams: " << av_format_context_->nb_streams;
 
@@ -187,7 +187,7 @@ status_t FFmpegDemuxer::Init() {
 }
 
 status_t FFmpegDemuxer::AddTrack(const AVStream* avStream, size_t index) {
-  std::shared_ptr<MediaFormat> meta =
+  std::shared_ptr<MediaMeta> meta =
       media::ffmpeg_utils::ExtractMetaFromAVStream(avStream);
   // if (avStream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
   // AVE_LOG(LS_INFO) << "dump(" << avStream->codecpar->codec_type << "):";
@@ -212,12 +212,12 @@ std::shared_ptr<MediaSource> FFmpegDemuxer::GetTrack(size_t trackIndex) {
   return tracks_[trackIndex].source;
 }
 
-status_t FFmpegDemuxer::GetFormat(std::shared_ptr<MediaFormat>& format) {
+status_t FFmpegDemuxer::GetFormat(std::shared_ptr<MediaMeta>& format) {
   format = source_format_;
   return ave::OK;
 }
 
-status_t FFmpegDemuxer::GetTrackFormat(std::shared_ptr<MediaFormat>& format,
+status_t FFmpegDemuxer::GetTrackFormat(std::shared_ptr<MediaMeta>& format,
                                        size_t trackIndex) {
   if (trackIndex >= tracks_.size()) {
     return ave::UNKNOWN_ERROR;

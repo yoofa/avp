@@ -12,14 +12,14 @@
 #include "base/test/mock_task_runner_factory.h"
 #include "media/codec/codec_factory.h"
 #include "media/codec/test/dummy_codec_factory.h"
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 #include "media/foundation/media_packet.h"
 #include "test/gtest.h"
 
 #include "player/avp_render.h"
 
 using ave::base::test::MockTaskRunnerFactory;
-using ave::media::MediaFormat;
+using ave::media::MediaMeta;
 using ave::media::MediaPacket;
 using ave::media::MediaType;
 using ave::media::test::DummyCodecFactory;
@@ -50,12 +50,12 @@ class MockContentSource : public ContentSource {
     return OK;
   }
 
-  std::shared_ptr<MediaFormat> GetFormat() override { return format_; }
+  std::shared_ptr<MediaMeta> GetFormat() override { return format_; }
   status_t GetDuration(int64_t* duration_us) override {
     return INVALID_OPERATION;
   }
   size_t GetTrackCount() const override { return 1; }
-  std::shared_ptr<MediaFormat> GetTrackInfo(size_t track_index) const override {
+  std::shared_ptr<MediaMeta> GetTrackInfo(size_t track_index) const override {
     return format_;
   }
   status_t SelectTrack(size_t track_index, bool select) override {
@@ -69,12 +69,12 @@ class MockContentSource : public ContentSource {
 
   void AddPacket(std::shared_ptr<MediaPacket> packet) { packets_.push(packet); }
 
-  void SetFormat(std::shared_ptr<MediaFormat> format) { format_ = format; }
+  void SetFormat(std::shared_ptr<MediaMeta> format) { format_ = format; }
 
  private:
   Notify* notify_ = nullptr;
   std::queue<std::shared_ptr<MediaPacket>> packets_;
-  std::shared_ptr<MediaFormat> format_;
+  std::shared_ptr<MediaMeta> format_;
 };
 
 class MockAVPRender : public AVPRender {
@@ -135,16 +135,16 @@ class AVPDecoderTest : public ::testing::Test {
                                         content_source_, render_.get());
   }
 
-  std::shared_ptr<MediaFormat> CreateAudioFormat() {
-    auto format = std::make_shared<MediaFormat>();
+  std::shared_ptr<MediaMeta> CreateAudioFormat() {
+    auto format = std::make_shared<MediaMeta>();
     format->setMime("audio/aac");
     format->setInt32("sample_rate", 44100);
     format->setInt32("channel_count", 2);
     return format;
   }
 
-  std::shared_ptr<MediaFormat> CreateVideoFormat() {
-    auto format = std::make_shared<MediaFormat>();
+  std::shared_ptr<MediaMeta> CreateVideoFormat() {
+    auto format = std::make_shared<MediaMeta>();
     format->setMime("video/avc");
     format->setInt32("width", 1920);
     format->setInt32("height", 1080);
@@ -242,7 +242,7 @@ TEST_F(AVPDecoderTest, ErrorHandling) {
   decoder_ = CreateDecoder();
 
   // Try to configure with invalid format
-  auto invalid_format = std::make_shared<MediaFormat>();
+  auto invalid_format = std::make_shared<MediaMeta>();
   invalid_format->setMime("invalid/mime");
 
   decoder_->Init();

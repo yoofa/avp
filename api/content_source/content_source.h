@@ -12,7 +12,7 @@
 
 #include "base/errors.h"
 
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 #include "media/foundation/media_packet.h"
 
 #include "api/player_interface.h"
@@ -20,7 +20,7 @@
 namespace ave {
 namespace player {
 
-using ave::media::MediaFormat;
+using ave::media::MediaMeta;
 using ave::media::MediaType;
 
 class ContentSource : public ave::media::MessageObject {
@@ -55,7 +55,7 @@ class ContentSource : public ave::media::MessageObject {
     /**
      *
      */
-    virtual void OnVideoSizeChanged(std::shared_ptr<MediaFormat>& format) = 0;
+    virtual void OnVideoSizeChanged(std::shared_ptr<MediaMeta>& format) = 0;
 
     /**
      * @brief Called when a seek operation is completed.
@@ -148,13 +148,13 @@ class ContentSource : public ave::media::MessageObject {
   /**
    * @brief Retrieves the media format associated with the content source.
    *
-   * This function returns a shared pointer to the `MediaFormat` object that
+   * This function returns a shared pointer to the `MediaMeta` object that
    * represents the format of the media content provided by the content source.
    *
-   * @return A shared pointer to the `MediaFormat` object representing the media
+   * @return A shared pointer to the `MediaMeta` object representing the media
    * format.
    */
-  virtual std::shared_ptr<MediaFormat> GetFormat() = 0;
+  virtual std::shared_ptr<MediaMeta> GetFormat() = 0;
 
   /**
    * @brief Gets the duration of the content source.
@@ -177,7 +177,7 @@ class ContentSource : public ave::media::MessageObject {
    * @param track_index The index of the track.
    * @return The media format of the track.
    */
-  virtual std::shared_ptr<MediaFormat> GetTrackInfo(
+  virtual std::shared_ptr<MediaMeta> GetTrackInfo(
       size_t /* track_index */) const {
     return {};
   }
@@ -187,7 +187,7 @@ class ContentSource : public ave::media::MessageObject {
    * @param track_type The type of the track.
    * @return The media format of the track type.
    */
-  virtual std::shared_ptr<MediaFormat> GetTrackInfo(
+  virtual std::shared_ptr<MediaMeta> GetTrackInfo(
       MediaType /* track_type */) const {
     return {};
   }

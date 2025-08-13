@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "base/logging.h"
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 
 #include "player/avp_decoder.h"
 #include "player/avp_passthrough_decoder.h"
@@ -27,7 +27,7 @@ std::shared_ptr<AVPDecoderBase> AVPDecoderFactory::CreateDecoder(
     std::shared_ptr<Message> notify,
     std::shared_ptr<ContentSource> source,
     std::shared_ptr<AVPRender> render,
-    const std::shared_ptr<MediaFormat>& format,
+    const std::shared_ptr<MediaMeta>& format,
     std::shared_ptr<VideoRender> video_render,
     DecoderType decoder_type) {
   if (!format) {
@@ -94,7 +94,7 @@ std::shared_ptr<AVPDecoderBase> AVPDecoderFactory::CreateDecoder(
 }
 
 AVPDecoderFactory::DecoderType AVPDecoderFactory::DetermineDecoderType(
-    const std::shared_ptr<MediaFormat>& format,
+    const std::shared_ptr<MediaMeta>& format,
     bool is_passthrough,
     bool is_tunnel) {
   if (!format) {
@@ -126,7 +126,7 @@ AVPDecoderFactory::DecoderType AVPDecoderFactory::DetermineDecoderType(
 }
 
 bool AVPDecoderFactory::SupportsPassthrough(
-    const std::shared_ptr<MediaFormat>& format) {
+    const std::shared_ptr<MediaMeta>& format) {
   if (!format) {
     return false;
   }
@@ -149,7 +149,7 @@ bool AVPDecoderFactory::SupportsPassthrough(
 }
 
 bool AVPDecoderFactory::SupportsTunnel(
-    const std::shared_ptr<MediaFormat>& format) {
+    const std::shared_ptr<MediaMeta>& format) {
   if (!format) {
     return false;
   }

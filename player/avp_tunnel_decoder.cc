@@ -14,7 +14,7 @@
 #include "base/logging.h"
 #include "media/codec/codec_id.h"
 #include "media/foundation/media_errors.h"
-#include "media/foundation/media_format.h"
+#include "media/foundation/media_meta.h"
 #include "media/foundation/message.h"
 #include "media/foundation/message_object.h"
 
@@ -41,7 +41,7 @@ AVPTunnelDecoder::~AVPTunnelDecoder() {
   }
 }
 
-void AVPTunnelDecoder::OnConfigure(const std::shared_ptr<MediaFormat>& format) {
+void AVPTunnelDecoder::OnConfigure(const std::shared_ptr<MediaMeta>& format) {
   AVE_CHECK(format != nullptr);
   AVE_CHECK(decoder_ == nullptr);
 
@@ -245,10 +245,10 @@ void AVPTunnelDecoder::HandleAnOutputBuffer(size_t index) {
 }
 
 void AVPTunnelDecoder::HandleAnOutputFormatChanged(
-    const std::shared_ptr<MediaFormat>& format) {
+    const std::shared_ptr<MediaMeta>& format) {
   auto notify = notify_->dup();
   notify->setInt32(kWhat, kWhatTunnelFormatChanged);
-  notify->setObject(kMediaFormat, format);
+  notify->setObject(kMediaMeta, format);
   notify->post();
 }
 
@@ -272,11 +272,10 @@ void AVPTunnelDecoder::OnOutputBufferAvailable(size_t index) {
 }
 
 void AVPTunnelDecoder::OnOutputFormatChanged(
-    const std::shared_ptr<MediaFormat>& format) {
+    const std::shared_ptr<MediaMeta>& format) {
   auto msg = std::make_shared<Message>(
       AVPTunnelDecoder::kWhatDecodingFormatChange, shared_from_this());
-  msg->setObject(kMediaFormat,
-                 std::dynamic_pointer_cast<MessageObject>(format));
+  msg->setObject(kMediaMeta, std::dynamic_pointer_cast<MessageObject>(format));
   msg->post();
 }
 
@@ -320,9 +319,8 @@ void AVPTunnelDecoder::onMessageReceived(const std::shared_ptr<Message>& msg) {
 
     case kWhatDecodingFormatChange: {
       std::shared_ptr<MessageObject> format;
-      AVE_CHECK(msg->findObject(kMediaFormat, format));
-      HandleAnOutputFormatChanged(
-          std::dynamic_pointer_cast<MediaFormat>(format));
+      AVE_CHECK(msg->findObject(kMediaMeta, format));
+      HandleAnOutputFormatChanged(std::dynamic_pointer_cast<MediaMeta>(format));
       break;
     }
     case kWhatDecodingError: {
