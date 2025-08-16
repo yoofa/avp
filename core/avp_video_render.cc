@@ -62,7 +62,7 @@ void AVPVideoRender::Flush() {
 
 uint64_t AVPVideoRender::RenderFrameInternal(
     std::shared_ptr<media::MediaFrame>& frame) {
-  if (!frame || frame->GetMediaType() != media::MediaType::VIDEO) {
+  if (!frame || frame->stream_type() != media::MediaType::VIDEO) {
     AVE_LOG(LS_WARNING) << "Invalid video frame";
     return 0;
   }

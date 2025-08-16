@@ -149,12 +149,12 @@ int64_t AVPRender::CalculateRenderLateUs(
     const std::shared_ptr<media::MediaFrame>& frame) {
   // Calculate render delay based on frame PTS and current timestamp
   int64_t frame_pts_us = 0;
-  if (frame->GetMediaType() == media::MediaType::AUDIO) {
+  if (frame->stream_type() == media::MediaType::AUDIO) {
     auto* audio_info = frame->audio_info();
     if (audio_info) {
       frame_pts_us = audio_info->pts.us();
     }
-  } else if (frame->GetMediaType() == media::MediaType::VIDEO) {
+  } else if (frame->stream_type() == media::MediaType::VIDEO) {
     auto* video_info = frame->video_info();
     if (video_info) {
       frame_pts_us = video_info->pts.us();
@@ -193,7 +193,7 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
   auto& entry = frame_queue_.front();
   auto& frame = entry.frame;
 
-  if (frame->GetMediaType() == media::MediaType::AUDIO) {
+  if (frame->stream_type() == media::MediaType::AUDIO) {
     // For audio, render immediately and schedule next based on returned delay
 
     next_render_delay_us = RenderFrameInternal(frame);

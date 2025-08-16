@@ -23,7 +23,7 @@ extern "C" {
 namespace ave {
 namespace player {
 
-using ave::media::MediaPacket;
+using ave::media::MediaFrame;
 
 struct FFmpegSource;
 
@@ -55,16 +55,16 @@ class FFmpegDemuxer : public Demuxer {
     size_t track_index;
     std::shared_ptr<ave::media::MediaMeta> meta;
     std::shared_ptr<FFmpegSource> source;
-    std::list<std::shared_ptr<ave::media::MediaPacket>> packets;
+    std::list<std::shared_ptr<ave::media::MediaFrame>> packets;
 
     size_t PacketSize();
-    status_t EnqueuePacket(std::shared_ptr<MediaPacket> packet);
-    status_t DequeuePacket(std::shared_ptr<MediaPacket>& packet);
+    status_t EnqueuePacket(std::shared_ptr<MediaFrame> packet);
+    status_t DequeuePacket(std::shared_ptr<MediaFrame>& packet);
   };
 
   status_t AddTrack(const AVStream* avStream, size_t index);
   status_t ReadAnAvPacket(size_t index);
-  status_t ReadAvFrame(std::shared_ptr<ave::media::MediaPacket>& packet,
+  status_t ReadAvFrame(std::shared_ptr<ave::media::MediaFrame>& packet,
                        size_t index,
                        const ave::media::MediaSource::ReadOptions* options);
 

@@ -15,7 +15,6 @@
 #include "base/logging.h"
 #include "media/foundation/looper.h"
 #include "media/foundation/media_source.h"
-#include "media/foundation/media_utils.h"
 #include "media/foundation/message.h"
 
 #include "api/content_source/content_source.h"
@@ -197,7 +196,7 @@ std::shared_ptr<MediaMeta> GenericSource::GetTrackInfo(
 
 status_t GenericSource::DequeueAccessUnit(
     MediaType track_type,
-    std::shared_ptr<MediaPacket>& access_unit) {
+    std::shared_ptr<MediaFrame>& access_unit) {
   std::lock_guard<std::mutex> lock(lock_);
 
   if (!started_) {
@@ -229,7 +228,7 @@ status_t GenericSource::DequeueAccessUnit(
   }
 
   int64_t time_us = 0;
-  if (access_unit->media_type() == MediaType::VIDEO) {
+  if (access_unit->stream_type() == MediaType::VIDEO) {
     time_us = access_unit->video_info()->pts.us();
     video_last_dequeue_time_us_ = time_us;
   } else {
@@ -628,7 +627,7 @@ void GenericSource::ReadBuffer(MediaType track_type,
   }
 
   for (size_t num_buffer = 0; num_buffer < max_buffers;) {
-    std::vector<std::shared_ptr<MediaPacket>> media_packets;
+    std::vector<std::shared_ptr<MediaFrame>> media_packets;
     status_t err = ave::OK;
 
     // will unlock later, add reference
@@ -640,7 +639,7 @@ void GenericSource::ReadBuffer(MediaType track_type,
       err = source->ReadMultiple(media_packets, max_buffers - num_buffer,
                                  &read_options);
     } else {
-      std::shared_ptr<MediaPacket> packet;
+      std::shared_ptr<MediaFrame> packet;
       err = source->Read(packet, &read_options);
       if (err == ave::OK && packet != nullptr) {
         media_packets.push_back(packet);

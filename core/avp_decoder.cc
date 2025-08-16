@@ -15,8 +15,6 @@
 #include "base/logging.h"
 #include "media/codec/codec_id.h"
 #include "media/foundation/media_errors.h"
-#include "media/foundation/media_meta.h"
-#include "media/foundation/message.h"
 #include "media/foundation/message_object.h"
 
 #include "message_def.h"
@@ -165,7 +163,7 @@ void AVPDecoder::OnShutdown() {
 bool AVPDecoder::DoRequestInputBuffers() {
   status_t err = OK;
   while (err == OK) {
-    std::shared_ptr<MediaPacket> packet;
+    std::shared_ptr<MediaFrame> packet;
     err = source_->DequeueAccessUnit(
         is_audio_ ? MediaType::AUDIO : MediaType::VIDEO, packet);
     if (err == WOULD_BLOCK) {

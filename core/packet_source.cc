@@ -50,13 +50,13 @@ size_t PacketSource::GetAvailableBufferCount(status_t* result) {
   return 0;
 }
 
-status_t PacketSource::QueueAccessunit(std::shared_ptr<MediaPacket> packet) {
+status_t PacketSource::QueueAccessunit(std::shared_ptr<MediaFrame> packet) {
   std::lock_guard<std::mutex> l(lock_);
   packets_.push(std::move(packet));
   return ave::OK;
 }
 
-status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaPacket>& packet) {
+status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaFrame>& packet) {
   packet.reset();
   std::unique_lock<std::mutex> l(lock_);
   while (!packets_.size()) {

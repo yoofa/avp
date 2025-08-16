@@ -17,9 +17,6 @@
 #include "media/foundation/media_source.h"
 #include "media/modules/ffmpeg/ffmpeg_utils.h"
 
-// #include "base/units/time_delta.h"
-// #include "modules/ffmpeg/ffmpeg_helper.h"
-
 namespace ave {
 namespace player {
 
@@ -74,7 +71,7 @@ struct FFmpegSource : public MediaSource {
 
   status_t Start(std::shared_ptr<Message> params) override;
   status_t Stop() override;
-  status_t Read(std::shared_ptr<MediaPacket>& packet,
+  status_t Read(std::shared_ptr<MediaFrame>& packet,
                 const ReadOptions* options) override;
   std::shared_ptr<MediaMeta> GetFormat() override;
 
@@ -100,7 +97,7 @@ status_t FFmpegSource::Stop() {
   return ave::OK;
 }
 
-status_t FFmpegSource::Read(std::shared_ptr<MediaPacket>& packet,
+status_t FFmpegSource::Read(std::shared_ptr<MediaFrame>& packet,
                             const ReadOptions* options) {
   auto ret = demuxer_->ReadAvFrame(packet, track_index, options);
   if (ret != ave::OK) {
@@ -129,13 +126,13 @@ size_t FFmpegDemuxer::TrackInfo::PacketSize() {
 }
 
 status_t FFmpegDemuxer::TrackInfo::EnqueuePacket(
-    std::shared_ptr<MediaPacket> packet) {
+    std::shared_ptr<MediaFrame> packet) {
   packets.push_back(std::move(packet));
   return ave::OK;
 }
 
 status_t FFmpegDemuxer::TrackInfo::DequeuePacket(
-    std::shared_ptr<MediaPacket>& packet) {
+    std::shared_ptr<MediaFrame>& packet) {
   if (packets.empty()) {
     return ave::WOULD_BLOCK;
   }
@@ -256,7 +253,7 @@ status_t FFmpegDemuxer::ReadAnAvPacket(size_t index) {
     if (pkt.stream_index >= 0 &&
         pkt.stream_index < static_cast<int>(tracks_.size())) {
       tracks_[pkt.stream_index].EnqueuePacket(
-          media::ffmpeg_utils::CreateMediaPacketFromAVPacket(&pkt));
+          media::ffmpeg_utils::CreateMediaFrameFromAVPacket(&pkt));
     }
     if (static_cast<size_t>(pkt.stream_index) == index) {
       break;
@@ -266,7 +263,7 @@ status_t FFmpegDemuxer::ReadAnAvPacket(size_t index) {
   return err;
 }
 
-status_t FFmpegDemuxer::ReadAvFrame(std::shared_ptr<MediaPacket>& packet,
+status_t FFmpegDemuxer::ReadAvFrame(std::shared_ptr<MediaFrame>& packet,
                                     size_t index,
                                     const MediaSource::ReadOptions* options) {
   if (index >= tracks_.size()) {

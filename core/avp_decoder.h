@@ -26,7 +26,7 @@ using ave::media::CodecCallback;
 using ave::media::CodecFactory;
 using ave::media::Handler;
 using ave::media::Looper;
-using ave::media::MediaPacket;
+using ave::media::MediaFrame;
 using ave::media::Message;
 
 namespace ave {
@@ -99,7 +99,7 @@ class AVPDecoder : public AVPDecoderBase, public CodecCallback {
   std::string codec_name_;
 
   bool is_audio_;
-  std::list<std::shared_ptr<MediaPacket>> input_packet_queue_;
+  std::list<std::shared_ptr<MediaFrame>> input_packet_queue_;
 };
 
 }  // namespace player

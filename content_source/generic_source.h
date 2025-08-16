@@ -16,7 +16,7 @@
 #include "base/unique_fd.h"
 #include "media/foundation/handler.h"
 #include "media/foundation/looper.h"
-#include "media/foundation/media_packet.h"
+#include "media/foundation/media_frame.h"
 #include "media/foundation/media_source.h"
 #include "media/foundation/message.h"
 
@@ -31,7 +31,7 @@ namespace player {
 
 using ave::media::Buffer;
 using ave::media::Handler;
-using ave::media::MediaPacket;
+using ave::media::MediaFrame;
 using ave::media::MediaSource;
 using ave::media::MediaType;
 using ave::media::Message;
@@ -56,9 +56,8 @@ class GenericSource : public Handler, public ContentSource {
 
   std::shared_ptr<MediaMeta> GetFormat() override;
 
-  status_t DequeueAccessUnit(
-      MediaType track_type,
-      std::shared_ptr<MediaPacket>& access_unit) override;
+  status_t DequeueAccessUnit(MediaType track_type,
+                             std::shared_ptr<MediaFrame>& access_unit) override;
 
   status_t GetDuration(int64_t* duration_us) override;
 

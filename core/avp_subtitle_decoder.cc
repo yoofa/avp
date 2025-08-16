@@ -15,13 +15,11 @@
 #include "media/foundation/media_errors.h"
 #include "media/foundation/media_frame.h"
 #include "media/foundation/media_meta.h"
-#include "media/foundation/media_packet.h"
 #include "media/foundation/message_object.h"
 
 #include "message_def.h"
 
 using ave::media::MediaFrame;
-using ave::media::MediaPacket;
 
 namespace ave {
 namespace player {
@@ -105,7 +103,7 @@ void AVPSubtitleDecoder::OnShutdown() {
 bool AVPSubtitleDecoder::DoRequestInputBuffers() {
   status_t err = OK;
   while (err == OK) {
-    std::shared_ptr<MediaPacket> packet;
+    std::shared_ptr<MediaFrame> packet;
     err = source_->DequeueAccessUnit(MediaType::SUBTITLE, packet);
     if (err == WOULD_BLOCK) {
       break;
@@ -126,7 +124,7 @@ bool AVPSubtitleDecoder::DoRequestInputBuffers() {
 }
 
 void AVPSubtitleDecoder::ParseSubtitlePacket(
-    const std::shared_ptr<MediaPacket>& packet) {
+    const std::shared_ptr<MediaFrame>& packet) {
   if (!packet || packet->size() == 0) {
     return;
   }
@@ -148,14 +146,14 @@ void AVPSubtitleDecoder::ParseSubtitlePacket(
     frame->SetData(const_cast<uint8_t*>(packet->data()), packet->size());
     // TODO: Set PTS and duration when MediaFrame supports it
 
-    // TODO: Fix MediaPacket interface
+    // TODO: Fix MediaFrame interface
     // subtitle_cache_[packet->pts()] = frame;
     RenderSubtitleFrame(frame);
   }
 }
 
 void AVPSubtitleDecoder::ParseSRTSubtitle(
-    const std::shared_ptr<MediaPacket>& packet) {
+    const std::shared_ptr<MediaFrame>& packet) {
   // Simple SRT parsing - in real implementation, you'd want a more robust
   // parser
   std::string subtitle_text(reinterpret_cast<const char*>(packet->data()),
@@ -173,7 +171,7 @@ void AVPSubtitleDecoder::ParseSRTSubtitle(
 }
 
 void AVPSubtitleDecoder::ParseASSSubtitle(
-    const std::shared_ptr<MediaPacket>& packet) {
+    const std::shared_ptr<MediaFrame>& packet) {
   // ASS/SSA subtitle parsing
   std::string subtitle_text(reinterpret_cast<const char*>(packet->data()),
                             packet->size());
@@ -189,7 +187,7 @@ void AVPSubtitleDecoder::ParseASSSubtitle(
 }
 
 void AVPSubtitleDecoder::ParseVTTSubtitle(
-    const std::shared_ptr<MediaPacket>& packet) {
+    const std::shared_ptr<MediaFrame>& packet) {
   // WebVTT subtitle parsing
   std::string subtitle_text(reinterpret_cast<const char*>(packet->data()),
                             packet->size());
@@ -223,7 +221,7 @@ void AVPSubtitleDecoder::onMessageReceived(
     case kWhatParseSubtitle: {
       std::shared_ptr<ave::media::MessageObject> obj;
       if (msg->findObject("packet", obj)) {
-        auto packet = std::dynamic_pointer_cast<MediaPacket>(obj);
+        auto packet = std::dynamic_pointer_cast<MediaFrame>(obj);
         if (packet) {
           ParseSubtitlePacket(packet);
         }

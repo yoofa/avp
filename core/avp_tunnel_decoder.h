@@ -13,8 +13,8 @@
 
 #include "media/codec/codec.h"
 #include "media/codec/codec_factory.h"
+#include "media/foundation/media_frame.h"
 #include "media/foundation/media_meta.h"
-#include "media/foundation/media_packet.h"
 
 #include "avp_decoder_base.h"
 
@@ -22,8 +22,8 @@ using ave::media::Codec;
 using ave::media::CodecBuffer;
 using ave::media::CodecCallback;
 using ave::media::CodecFactory;
+using ave::media::MediaFrame;
 using ave::media::MediaMeta;
-using ave::media::MediaPacket;
 
 namespace ave {
 namespace player {
@@ -92,7 +92,7 @@ class AVPTunnelDecoder : public AVPDecoderBase, public CodecCallback {
   std::shared_ptr<Codec> decoder_;
   std::string codec_name_;
 
-  std::list<std::shared_ptr<MediaPacket>> input_packet_queue_;
+  std::list<std::shared_ptr<MediaFrame>> input_packet_queue_;
 };
 
 }  // namespace player

@@ -168,7 +168,7 @@ void AVPAudioRender::Flush() {
 
 uint64_t AVPAudioRender::RenderFrameInternal(
     std::shared_ptr<media::MediaFrame>& frame) {
-  if (!frame || frame->GetMediaType() != media::MediaType::AUDIO) {
+  if (!frame || frame->stream_type() != media::MediaType::AUDIO) {
     AVE_LOG(LS_WARNING) << "Invalid audio frame";
     return 0;
   }
@@ -465,7 +465,7 @@ int64_t AVPAudioRender::CalculateNextAudioFrameDelay() {
 
   // Calculate time per frame
   float msecs_per_frame = audio_track_->msecsPerFrame();
-  int64_t frame_duration_us = static_cast<int64_t>(msecs_per_frame * 1000.0f);
+  auto frame_duration_us = static_cast<int64_t>(msecs_per_frame * 1000.0f);
 
   // If buffer is nearly full, we need to wait longer
   // If buffer is nearly empty, we can write more data

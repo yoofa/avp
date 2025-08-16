@@ -12,8 +12,8 @@
 
 #include "base/errors.h"
 
+#include "media/foundation/media_frame.h"
 #include "media/foundation/media_meta.h"
-#include "media/foundation/media_packet.h"
 
 #include "api/player_interface.h"
 
@@ -143,7 +143,7 @@ class ContentSource : public ave::media::MessageObject {
    */
   virtual status_t DequeueAccessUnit(
       MediaType track_type,
-      std::shared_ptr<ave::media::MediaPacket>& access_unit) = 0;
+      std::shared_ptr<ave::media::MediaFrame>& access_unit) = 0;
 
   /**
    * @brief Retrieves the media format associated with the content source.

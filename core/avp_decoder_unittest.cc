@@ -12,15 +12,15 @@
 #include "base/test/mock_task_runner_factory.h"
 #include "media/codec/codec_factory.h"
 #include "media/codec/test/dummy_codec_factory.h"
+#include "media/foundation/media_frame.h"
 #include "media/foundation/media_meta.h"
-#include "media/foundation/media_packet.h"
 #include "test/gtest.h"
 
 #include "avp_render.h"
 
 using ave::base::MockTaskRunnerFactory;
+using ave::media::MediaFrame;
 using ave::media::MediaMeta;
-using ave::media::MediaPacket;
 using ave::media::MediaType;
 using ave::media::test::DummyCodecFactory;
 
@@ -41,7 +41,7 @@ class MockContentSource : public ContentSource {
 
   status_t DequeueAccessUnit(
       MediaType track_type,
-      std::shared_ptr<MediaPacket>& access_unit) override {
+      std::shared_ptr<MediaFrame>& access_unit) override {
     if (packets_.empty()) {
       return WOULD_BLOCK;
     }
@@ -67,13 +67,13 @@ class MockContentSource : public ContentSource {
   bool IsStreaming() const override { return false; }
   status_t FeedMoreESData() override { return OK; }
 
-  void AddPacket(std::shared_ptr<MediaPacket> packet) { packets_.push(packet); }
+  void AddPacket(std::shared_ptr<MediaFrame> packet) { packets_.push(packet); }
 
   void SetFormat(std::shared_ptr<MediaMeta> format) { format_ = format; }
 
  private:
   Notify* notify_ = nullptr;
-  std::queue<std::shared_ptr<MediaPacket>> packets_;
+  std::queue<std::shared_ptr<MediaFrame>> packets_;
   std::shared_ptr<MediaMeta> format_;
 };
 
@@ -151,10 +151,10 @@ class AVPDecoderTest : public ::testing::Test {
     return format;
   }
 
-  std::shared_ptr<MediaPacket> CreatePacket(const uint8_t* data,
-                                            size_t size,
-                                            int64_t pts = 0) {
-    auto packet = MediaPacket::CreateShared(size);
+  std::shared_ptr<MediaFrame> CreatePacket(const uint8_t* data,
+                                           size_t size,
+                                           int64_t pts = 0) {
+    auto packet = MediaFrame::CreateShared(size);
     if (data && size > 0) {
       memcpy(packet->data(), data, size);
     }
@@ -231,7 +231,7 @@ TEST_F(AVPDecoderTest, HandleEndOfStream) {
 
   // Add EOS packet
   auto eos_packet = CreatePacket(nullptr, 0, 0);
-  eos_packet->setFlags(MediaPacket::FLAG_END_OF_STREAM);
+  eos_packet->setFlags(MediaFrame::FLAG_END_OF_STREAM);
   content_source_->AddPacket(eos_packet);
 
   // Let the decoder process

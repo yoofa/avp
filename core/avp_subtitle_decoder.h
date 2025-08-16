@@ -11,13 +11,13 @@
 #include <map>
 #include <memory>
 
+#include "media/foundation/media_frame.h"
 #include "media/foundation/media_meta.h"
-#include "media/foundation/media_packet.h"
 
 #include "avp_decoder_base.h"
 
+using ave::media::MediaFrame;
 using ave::media::MediaMeta;
-using ave::media::MediaPacket;
 
 namespace ave {
 namespace player {
@@ -59,13 +59,13 @@ class AVPSubtitleDecoder : public AVPDecoderBase {
   void OnShutdown() override;
 
   bool DoRequestInputBuffers() override;
-  void ParseSubtitlePacket(const std::shared_ptr<MediaPacket>& packet);
+  void ParseSubtitlePacket(const std::shared_ptr<MediaFrame>& packet);
   void RenderSubtitleFrame(const std::shared_ptr<media::MediaFrame>& frame);
 
   // Subtitle format specific parsing
-  void ParseSRTSubtitle(const std::shared_ptr<MediaPacket>& packet);
-  void ParseASSSubtitle(const std::shared_ptr<MediaPacket>& packet);
-  void ParseVTTSubtitle(const std::shared_ptr<MediaPacket>& packet);
+  void ParseSRTSubtitle(const std::shared_ptr<MediaFrame>& packet);
+  void ParseASSSubtitle(const std::shared_ptr<MediaFrame>& packet);
+  void ParseVTTSubtitle(const std::shared_ptr<MediaFrame>& packet);
 
   std::string subtitle_format_;
   std::map<int64_t, std::shared_ptr<media::MediaFrame>> subtitle_cache_;

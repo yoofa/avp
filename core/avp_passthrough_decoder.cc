@@ -12,11 +12,11 @@
 
 #include "base/logging.h"
 #include "media/foundation/media_errors.h"
-#include "media/foundation/media_packet.h"
+#include "media/foundation/media_frame.h"
 
 #include "message_def.h"
 
-using ave::media::MediaPacket;
+using ave::media::MediaFrame;
 
 namespace ave {
 namespace player {
@@ -135,9 +135,9 @@ bool AVPPassthroughDecoder::DoRequestInputBuffers() {
   return (err == WOULD_BLOCK) && (source_->FeedMoreESData() == OK);
 }
 
-std::shared_ptr<MediaPacket> AVPPassthroughDecoder::AggregateBuffer(
-    const std::shared_ptr<MediaPacket>& packet) {
-  std::shared_ptr<MediaPacket> aggregate;
+std::shared_ptr<MediaFrame> AVPPassthroughDecoder::AggregateBuffer(
+    const std::shared_ptr<MediaFrame>& packet) {
+  std::shared_ptr<MediaFrame> aggregate;
 
   if (packet == nullptr) {
     aggregate = aggregate_buffer_;
@@ -150,7 +150,7 @@ std::shared_ptr<MediaPacket> AVPPassthroughDecoder::AggregateBuffer(
     if (small_size < (kAggregateBufferSizeBytes / 3)) {
       return nullptr;
     }
-    aggregate_buffer_ = MediaPacket::CreateShared(kAggregateBufferSizeBytes);
+    aggregate_buffer_ = MediaFrame::CreateShared(kAggregateBufferSizeBytes);
   }
 
   if (aggregate_buffer_ != nullptr) {
@@ -193,7 +193,7 @@ std::shared_ptr<MediaPacket> AVPPassthroughDecoder::AggregateBuffer(
 }
 
 status_t AVPPassthroughDecoder::DequeueAccessUnit(
-    std::shared_ptr<MediaPacket>& packet) {
+    std::shared_ptr<MediaFrame>& packet) {
   status_t err = OK;
   if (pending_audio_access_unit_ != nullptr) {
     packet = pending_audio_access_unit_;
@@ -219,7 +219,7 @@ status_t AVPPassthroughDecoder::DequeueAccessUnit(
 }
 
 status_t AVPPassthroughDecoder::FetchInputData(std::shared_ptr<Message>& msg) {
-  std::shared_ptr<MediaPacket> packet;
+  std::shared_ptr<MediaFrame> packet;
 
   do {
     status_t err = DequeueAccessUnit(packet);
@@ -268,7 +268,7 @@ void AVPPassthroughDecoder::OnInputBufferFilled(
     cached_bytes_ += aggregate_buffer_->size();
 
     // Reset aggregate buffer
-    // TODO: Fix MediaPacket interface
+    // TODO: Fix MediaFrame interface
     // aggregate_buffer_->setRange(0, 0);
   }
 }
@@ -286,7 +286,7 @@ void AVPPassthroughDecoder::DoFlush(bool notifyComplete) {
   ++buffer_generation_;
   skip_rendering_until_media_time_us_ = -1;
   if (aggregate_buffer_) {
-    // TODO: Fix MediaPacket interface
+    // TODO: Fix MediaFrame interface
     // aggregate_buffer_->setRange(0, 0);
   }
 

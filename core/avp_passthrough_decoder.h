@@ -12,11 +12,11 @@
 #include <mutex>
 #include <queue>
 
-#include "media/foundation/media_packet.h"
+#include "media/foundation/media_frame.h"
 
 #include "avp_decoder_base.h"
 
-using ave::media::MediaPacket;
+using ave::media::MediaFrame;
 
 namespace ave {
 namespace player {
@@ -59,9 +59,9 @@ class AVPPassthroughDecoder : public AVPDecoderBase {
   bool IsStaleReply(const std::shared_ptr<Message>& msg);
   bool IsDoneFetching() const;
 
-  std::shared_ptr<MediaPacket> AggregateBuffer(
-      const std::shared_ptr<MediaPacket>& packet);
-  status_t DequeueAccessUnit(std::shared_ptr<MediaPacket>& packet);
+  std::shared_ptr<MediaFrame> AggregateBuffer(
+      const std::shared_ptr<MediaFrame>& packet);
+  status_t DequeueAccessUnit(std::shared_ptr<MediaFrame>& packet);
   status_t FetchInputData(std::shared_ptr<Message>& msg);
   void OnInputBufferFilled(const std::shared_ptr<Message>& msg);
   void OnBufferConsumed(int32_t size);
@@ -73,8 +73,8 @@ class AVPPassthroughDecoder : public AVPDecoderBase {
   size_t cached_bytes_;
 
   // Buffer aggregation for better power efficiency
-  std::shared_ptr<MediaPacket> aggregate_buffer_;
-  std::shared_ptr<MediaPacket> pending_audio_access_unit_;
+  std::shared_ptr<MediaFrame> aggregate_buffer_;
+  std::shared_ptr<MediaFrame> pending_audio_access_unit_;
   status_t pending_audio_err_;
 
   // For buffer generation tracking
