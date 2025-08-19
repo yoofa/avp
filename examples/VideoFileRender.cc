@@ -17,10 +17,10 @@
 #include "base/logging.h"
 #include "base/utils.h"
 
-#include "media/buffer.h"
+#include "media/foundation/buffer.h"
 
 namespace ave {
-namespace player {
+namespace media {
 
 VideoFileRender::VideoFileRender(const char* file) : mFd(-1) {
   mFd = open(file, O_LARGEFILE | O_RDWR | O_CREAT);
@@ -40,13 +40,10 @@ VideoFileRender::~VideoFileRender() {
   }
 }
 
-void VideoFileRender::onFrame(std::shared_ptr<Buffer>& frame) {
-  int64_t timeUs;
-  frame->meta()->findInt64("timeUs", &timeUs);
-  // AVE_LOG(LS_INFO) << "onFrame, pts: " << timeUs << ", size:" <<
-  // frame->size();
+void VideoFileRender::OnFrame(const std::shared_ptr<MediaFrame>& frame) {
+  // AVE_LOG(LS_INFO) << "OnFrame, size:" << frame->size();
   ::write(mFd, frame->data(), frame->size());
 }
 
-}  // namespace player
+}  // namespace media
 }  // namespace ave

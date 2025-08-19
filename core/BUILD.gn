@@ -10,7 +10,9 @@ ave_library("avplayer_builder") {
     ":avplayer",
     "../api:default_content_source_factory",
     "../api:player_interface",
-    "../demuxer:ave_demuxer_factory",
+    "../demuxer",
+    "//media/audio",
+    "//media/codec",
     "//media/codec/ffmpeg:ffmpeg_codec",
   ]
 }
@@ -32,7 +34,8 @@ ave_library("avplayer") {
     "avplayer.cc",
     "avplayer.h",
   ]
-  configs += [ "//build/config/compiler:rtti" ]
+
+  #configs += [ "//build/config/compiler:rtti" ]
 
   deps = [
     ":avp_audio_render",
@@ -42,6 +45,7 @@ ave_library("avplayer") {
     ":avsync_controller",
     ":message_def",
     "//api:player_interface",
+    "//base:byte_utils",
     "//base:logging",
     "//base:utils",
     "//base/system:ave_export",
@@ -133,7 +137,8 @@ ave_library("avp_decoder") {
     "//base:logging",
     "//media/foundation:foundation",
   ]
-  configs += [ "//build/config/compiler:rtti" ]
+
+  #configs += [ "//build/config/compiler:rtti" ]
 }
 
 ave_library("avp_render_unittest") {

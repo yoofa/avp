@@ -8,22 +8,23 @@
 #ifndef VIDEOFILERENDER_H
 #define VIDEOFILERENDER_H
 
-#include "player/video_sink.h"
+#include "media/foundation/media_frame.h"
+#include "media/foundation/media_sink_base.h"
 
 namespace ave {
-namespace player {
+namespace media {
 
-class VideoFileRender : public VideoSink {
+class VideoFileRender : public MediaFrameSink {
  public:
   VideoFileRender(const char* file);
   virtual ~VideoFileRender();
-  virtual void onFrame(std::shared_ptr<Buffer>& frame) override;
+  void OnFrame(const std::shared_ptr<MediaFrame>& frame) override;
 
  private:
   int mFd;
 };
 
-}  // namespace player
+}  // namespace media
 }  // namespace ave
 
 #endif /* !VIDEOFILERENDER_H */

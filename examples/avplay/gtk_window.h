@@ -12,28 +12,31 @@
 
 #include <gtk/gtk.h>
 
-#include "media/buffer.h"
-#include "media/foundation/message.h"
-#include "player/video_sink.h"
+#include "media/foundation/media_frame.h"
+#include "media/video/video_render.h"
+
+using ave::media::MediaFrame;
+using ave::media::VideoRender;
 
 class GtkWnd {
  protected:
-  class GtkVideoRender : public avp::VideoSink {
+  class GtkVideoRender : public VideoRender {
    public:
     GtkVideoRender(GtkWnd* window);
-    virtual ~GtkVideoRender();
-    void onFrame(std::shared_ptr<ave::Buffer>& frame) override;
-    const uint8_t* image() const { return mImage.get(); }
+    ~GtkVideoRender() override;
 
-    int width() const { return mWidth; }
-    int height() const { return mHeight; }
+    void OnFrame(const std::shared_ptr<MediaFrame>& frame) override;
+    const uint8_t* image() const { return image_.get(); }
+
+    int width() const { return width_; }
+    int height() const { return height_; }
 
    private:
     void setSize(int width, int height);
-    GtkWnd* mGtkWnd;
-    std::unique_ptr<uint8_t[]> mImage;
-    int mWidth;
-    int mHeight;
+    GtkWnd* gtkwnd_;
+    std::unique_ptr<uint8_t[]> image_;
+    int width_;
+    int height_;
   };
 
  public:
@@ -50,16 +53,16 @@ class GtkWnd {
 
   void draw(GtkWidget* widget, cairo_t* cr);
 
-  std::shared_ptr<GtkVideoRender> videoRender() { return mVideoRender; }
+  std::shared_ptr<GtkVideoRender> videoRender() { return video_render_; }
 
  private:
-  GtkWidget* mWindow;
-  GtkWidget* mDrawArea;
-  std::shared_ptr<GtkVideoRender> mVideoRender;
-  int mWidth;
-  int mHeight;
-  std::unique_ptr<uint8_t[]> mDrawBuffer;
-  int mDrawBufferSize;
+  GtkWidget* window_;
+  GtkWidget* draw_area_;
+  std::shared_ptr<GtkVideoRender> video_render_;
+  int width_;
+  int height_;
+  std::unique_ptr<uint8_t[]> draw_buffer_;
+  int draw_buffer_size_;
 };
 
 #endif /* !GTK_WINDOW_H */

@@ -8,10 +8,11 @@
 #ifndef AUDIOFILERENDER_H
 #define AUDIOFILERENDER_H
 
-#include "player/audio_sink.h"
+#include "media/audio/audio_sink.h"
+#include "media/foundation/buffer.h"
 
 namespace ave {
-namespace player {
+namespace media {
 
 class AudioFileRender : public AudioSink {
  public:
@@ -23,7 +24,7 @@ class AudioFileRender : public AudioSink {
   int mFd;
 };
 
-}  // namespace player
+}  // namespace media
 }  // namespace ave
 
 #endif /* !AUDIOFILERENDER_H */

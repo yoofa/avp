@@ -1,6 +1,7 @@
 import("//avp.gni")
 
 group("demuxer") {
+  deps = [ ":ave_demuxer_factory" ]
 }
 
 ave_library("ave_demuxer_factory") {

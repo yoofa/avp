@@ -24,6 +24,7 @@ ave_library("default_content_source_factory") {
   ]
   deps = [
     ":api_content_source",
+    ":api_demuxer",
     "//content_source:generic_content_source",
   ]
 }

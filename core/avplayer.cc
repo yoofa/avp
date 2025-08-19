@@ -6,6 +6,7 @@
  */
 #include "avplayer.h"
 
+#include "base/byte_utils.h"
 #include "base/checks.h"
 #include "base/errors.h"
 #include "base/logging.h"
@@ -175,7 +176,8 @@ void AvPlayer::PerformSetVideoRender(
   if (video_decoder_) {
     // Set the new render sink to the existing decoder
     video_decoder_->SetVideoRender(video_render);
-  } else {
+  }
+  if (video_render_) {
     // If no decoder, just set the render sink
     video_render_->SetSink(video_render_sink_);
   }
@@ -801,7 +803,10 @@ void AvPlayer::OnDecoderNotify(const std::shared_ptr<Message>& msg) {
 void AvPlayer::OnRenderNotify(const std::shared_ptr<Message>& msg) {}
 
 void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
-  AVE_LOG(LS_VERBOSE) << "AvPlayer::onMessageReceived:" << message->what();
+  // make message->what() to 4cc
+  char what_str[5] = {0};
+  MakeFourCCString(message->what(), what_str);
+  AVE_LOG(LS_VERBOSE) << "AvPlayer::onMessageReceived:" << what_str;
   status_t err = ave::OK;
   switch (message->what()) {
       /************* from avplayer ***************/
@@ -834,7 +839,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
                                    video_decoder_ != nullptr
                                ? "has"
                                : "no")
-                       << "video decoder=%p)";
+                       << "video decoder=" << video_decoder_.get() << ")";
 
       if (source_ == nullptr || !started_ ||
           source_->GetTrackInfo(MediaType::VIDEO) == nullptr ||
@@ -876,6 +881,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
     }
 
     case kWhatPrepare: {
+      AVE_CHECK(source_);
       source_->Prepare();
       break;
     }
