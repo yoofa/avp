@@ -22,6 +22,38 @@ namespace player {
 
 using ave::media::Message;
 
+namespace {
+
+void AppendTrackInfoToPacket(std::shared_ptr<MediaFrame>& packet,
+                             std::shared_ptr<MediaMeta>& track_meta) {
+  switch (packet->stream_type()) {
+    case media::MediaType::AUDIO: {
+      // AVE_LOG(LS_VERBOSE) << "AppendTrackInfoToPacket, sample_rate:"
+      //                     << packet->sample_rate()
+      //                     << ", meta.sample_rate:" <<
+      //                     track_meta->sample_rate()
+      //                     << ", channel_layout:" << packet->channel_layout()
+      //                     << ", meta.channel_layout:"
+      //                     << track_meta->channel_layout();
+      packet->SetChannelLayout(track_meta->channel_layout());
+      packet->SetSampleRate(track_meta->sample_rate());
+      packet->SetBitsPerSample(track_meta->bits_per_sample());
+      packet->SetSamplesPerChannel(track_meta->samples_per_channel());
+      packet->SetCodec(track_meta->codec());
+      break;
+    }
+    case media::MediaType::VIDEO: {
+      break;
+    }
+
+    default: {
+      break;
+    }
+  }
+}
+
+}  // namespace
+
 enum { kBufferSize = 32 * 1024 };
 int64_t lastVideoTimeUs = 0;
 
@@ -160,6 +192,7 @@ FFmpegDemuxer::FFmpegDemuxer(std::shared_ptr<ave::DataSource> data_source)
 FFmpegDemuxer::~FFmpegDemuxer() = default;
 
 status_t FFmpegDemuxer::Init() {
+  AVE_LOG(LS_INFO) << "Init FFmpegDemuxer";
   AVIOSeekOperation(av_io_context_->opaque, 0, SEEK_CUR);
   int ret = OK;
   ret = avformat_open_input(&av_format_context_, nullptr, nullptr, nullptr);
@@ -237,23 +270,35 @@ status_t FFmpegDemuxer::ReadAnAvPacket(size_t index) {
     AVE_DCHECK_LT(static_cast<size_t>(pkt.stream_index), tracks_.size());
 
     if (pkt.stream_index == 0) {
-      AVE_LOG(LS_INFO)
-          << "readAnAvPacket, index:" << pkt.stream_index << "time_base:"
-          << av_format_context_->streams[pkt.stream_index]->time_base.num << "/"
-          << av_format_context_->streams[pkt.stream_index]->time_base.den
-          << ", pts:" << pkt.pts << ",time_us:"
-          << media::ffmpeg_utils::ConvertFromTimeBase(
-                 av_format_context_->streams[pkt.stream_index]->time_base,
-                 pkt.pts)
-          << ", diff:" << (pkt.pts - lastVideoTimeUs);
+      // AVE_LOG(LS_INFO)
+      //     << "readAnAvPacket, index:" << pkt.stream_index << ", time_base:"
+      //     << av_format_context_->streams[pkt.stream_index]->time_base.num <<
+      //     "/"
+      //     << av_format_context_->streams[pkt.stream_index]->time_base.den
+      //     << ", pts:" << pkt.pts << ",time_us:"
+      //     << media::ffmpeg_utils::ConvertFromTimeBase(
+      //            av_format_context_->streams[pkt.stream_index]->time_base,
+      //            pkt.pts)
+      //     << ", diff:" << (pkt.pts - lastVideoTimeUs);
 
       lastVideoTimeUs = pkt.pts;
     }
 
     if (pkt.stream_index >= 0 &&
         pkt.stream_index < static_cast<int>(tracks_.size())) {
-      tracks_[pkt.stream_index].EnqueuePacket(
-          media::ffmpeg_utils::CreateMediaFrameFromAVPacket(&pkt));
+      auto packet = media::ffmpeg_utils::CreateMediaFrameFromAVPacket(&pkt);
+      // append track info to packet
+      AppendTrackInfoToPacket(packet, tracks_[pkt.stream_index].meta);
+      // AVE_LOG(LS_VERBOSE) << "readAnAvPacket, index:" << pkt.stream_index
+      //                     << ", packet size:" << packet->size()
+      //                     << ", sample_rate:" << packet->sample_rate()
+      //                     << ", meta.sample_rate:"
+      //                     << tracks_[pkt.stream_index].meta->sample_rate()
+      //                     << ", channel_layout:" << packet->sample_rate()
+      //                     << "meta.channel_layout:"
+      //                     <<
+      //                     tracks_[pkt.stream_index].meta->channel_layout();
+      tracks_[pkt.stream_index].EnqueuePacket(packet);
     }
     if (static_cast<size_t>(pkt.stream_index) == index) {
       break;
