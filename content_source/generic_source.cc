@@ -361,7 +361,7 @@ status_t GenericSource::SelectTrack(size_t track_index, bool select) {
 
 /***************************************/
 status_t GenericSource::InitFromDataSource() {
-  AVE_LOG(LS_INFO) << "GenericSource::initFrodata_source_";
+  AVE_LOG(LS_INFO) << "GenericSource::InitFromDataSource";
 
   std::shared_ptr<DataSource> datasource;
   datasource = data_source_;
@@ -373,6 +373,7 @@ status_t GenericSource::InitFromDataSource() {
       demuxer_factory_ ? demuxer_factory_->CreateDemuxer(datasource) : nullptr;
 
   if (demuxer_ == nullptr) {
+    AVE_LOG(LS_ERROR) << "Failed to create demuxer";
     lock_.lock();
     return ave::UNKNOWN_ERROR;
   }
@@ -383,7 +384,7 @@ status_t GenericSource::InitFromDataSource() {
 
   size_t num_tracks = demuxer_->GetTrackCount();
   if (num_tracks == 0) {
-    AVE_LOG(LS_ERROR) << "InitFrodata_source_, source has no track!";
+    AVE_LOG(LS_ERROR) << "InitFromDataSource, source has no track!";
     lock_.lock();
     return ave::UNKNOWN_ERROR;
   }
@@ -426,7 +427,7 @@ status_t GenericSource::InitFromDataSource() {
       track->packet_source = std::make_shared<PacketSource>(format);
     }
 
-    AVE_LOG(LS_VERBOSE) << "InitFrodata_source_ track[" << i << "]: ";
+    AVE_LOG(LS_VERBOSE) << "InitFromDataSource track[" << i << "]: ";
 
     auto duration_us = format->duration().us_or(-1);
     if (duration_us > duration_us_) {
@@ -441,7 +442,7 @@ status_t GenericSource::InitFromDataSource() {
 
   bitrate_ = total_bitrate;
 
-  AVE_LOG(LS_VERBOSE) << "initFrodata_source_ done. tracks.size: "
+  AVE_LOG(LS_VERBOSE) << "initFromDataSource done. tracks.size: "
                       << sources_.size();
 
   if (sources_.size() == 0) {
@@ -460,6 +461,43 @@ void GenericSource::OnPrepare() {
       // AVE_LOG(LS_INFO) << "onPrepare, uri (" << uri << ")";
       if (!strncasecmp("http://", uri, 7) || !strncasecmp("https://", uri, 8)) {
         // TODO: create http source
+      } else if (!strncasecmp("file://", uri, 7)) {
+        uri += 7;
+        auto file_source = std::make_shared<FileSource>(uri);
+        if (file_source->InitCheck() == ave::OK) {
+          data_source_ = std::move(file_source);
+        }
+      } else if (!strncasecmp("fd://", uri, 5)) {
+        uri += 5;
+        char* end = nullptr;
+        int fd = strtol(uri, &end, 10);
+        if (end != uri) {
+          int64_t offset = 0;
+          int64_t length = -1;
+
+          if (*end == ':') {
+            uri = end + 1;
+            offset = strtoll(uri, &end, 10);
+            if (end != uri && *end == ':') {
+              uri = end + 1;
+              length = strtoll(uri, &end, 10);
+            }
+          }
+
+          if (end != uri) {
+            auto file_source =
+                std::make_shared<FileSource>(dup(fd), offset, length);
+            if (file_source->InitCheck() == ave::OK) {
+              data_source_ = std::move(file_source);
+            }
+          }
+        }
+      } else {
+        // treat as file path
+        auto file_source = std::make_shared<FileSource>(uri);
+        if (file_source->InitCheck() == ave::OK) {
+          data_source_ = std::move(file_source);
+        }
       }
     } else {
       auto file_source =
