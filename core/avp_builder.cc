@@ -20,6 +20,7 @@ namespace player {
 std::shared_ptr<Player> Player::Builder::build() {
   if (audio_device_ == nullptr) {
     audio_device_ = AudioDevice::CreateAudioDevice();
+    audio_device_->Init();
   }
   if (codec_factory_ == nullptr) {
     codec_factory_ = std::make_shared<media::FFmpegCodecFactory>();
