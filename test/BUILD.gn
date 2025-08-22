@@ -52,7 +52,7 @@ static_library("test_main") {
 executable("gtest_demo") {
   testonly = true
 
-  sources = [ "gtest_demo.cpp" ]
+  sources = [ "gtest_demo.cc" ]
 
   deps = [ ":test_support" ]
 }
