@@ -136,8 +136,8 @@ class AVPAudioRender : public AVPRender {
    * @param frame The audio frame.
    * @return The audio configuration.
    */
-  media::audio_config_t ConvertToAudioConfig(
-      const std::shared_ptr<media::MediaFrame>& frame) REQUIRES(mutex_);
+  static media::audio_config_t ConvertToAudioConfig(
+      const std::shared_ptr<media::MediaMeta>& frame);
 
   /**
    * @brief Writes audio data to the audio track.

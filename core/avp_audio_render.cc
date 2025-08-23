@@ -189,6 +189,11 @@ uint64_t AVPAudioRender::RenderFrameInternal(
     AVE_LOG(LS_INFO) << "Audio format changed, recreating audio track";
     DestroyAudioTrack();
     current_audio_config_ = ConvertToAudioConfig(frame);
+    AVE_LOG(LS_INFO) << "New audio config - sample_rate: "
+                     << current_audio_config_.sample_rate << ", channels: "
+                     << static_cast<int>(current_audio_config_.channel_layout)
+                     << ", format: "
+                     << static_cast<int>(current_audio_config_.format);
     status_t result = CreateAudioTrack();
     if (result != OK) {
       AVE_LOG(LS_ERROR) << "Failed to recreate audio track after format change";
@@ -246,6 +251,9 @@ status_t AVPAudioRender::CreateAudioTrack() {
       << "Audio track created successfully, supports_playback_rate: "
       << supports_playback_rate_;
 
+  // FIXME(youfa): start test
+  audio_track_->Start();
+
   return OK;
 }
 
@@ -297,8 +305,8 @@ bool AVPAudioRender::HasAudioFormatChanged(
 }
 
 media::audio_config_t AVPAudioRender::ConvertToAudioConfig(
-    const std::shared_ptr<media::MediaFrame>& frame) {
-  auto* audio_info = frame->audio_info();
+    const std::shared_ptr<media::MediaMeta>& frame) {
+  auto* audio_info = &(frame->sample_info()->audio());
   media::audio_config_t config = media::DefaultAudioConfig;
 
   if (audio_info) {
