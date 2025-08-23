@@ -22,6 +22,40 @@
 namespace ave {
 namespace player {
 
+namespace {
+
+bool NoNeedDecode(const std::shared_ptr<MediaMeta>& format) {
+  if (!format) {
+    return false;
+  }
+
+  auto mime = format->mime();
+  // Audio formats that typically do not need decoding
+  static const std::vector<std::string> no_decode_mimes = {"audio/raw",
+                                                           "audio/pcm"};
+
+  for (const auto& supported : no_decode_mimes) {
+    if (mime.find(supported) != std::string::npos) {
+      return true;
+    }
+  }
+
+  static const std::vector<ave::media::CodecId> no_decode_codecs = {
+      ave::media::CodecId::AVE_CODEC_ID_PCM_S16LE,
+      ave::media::CodecId::AVE_CODEC_ID_PCM_S16BE,
+  };
+
+  for (const auto& codec : no_decode_codecs) {
+    if (format->codec() == codec) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+}  // namespace
+
 std::shared_ptr<AVPDecoderBase> AVPDecoderFactory::CreateDecoder(
     std::shared_ptr<media::CodecFactory> codec_factory,
     std::shared_ptr<Message> notify,
@@ -95,7 +129,7 @@ std::shared_ptr<AVPDecoderBase> AVPDecoderFactory::CreateDecoder(
 
 AVPDecoderFactory::DecoderType AVPDecoderFactory::DetermineDecoderType(
     const std::shared_ptr<MediaMeta>& format,
-    bool is_passthrough,
+    bool perfer_passthrough,
     bool is_tunnel) {
   if (!format) {
     return DECODER_NORMAL;
@@ -118,7 +152,12 @@ AVPDecoderFactory::DecoderType AVPDecoderFactory::DetermineDecoderType(
   }
 
   // Check for passthrough mode
-  if (is_passthrough && SupportsPassthrough(format)) {
+  if (perfer_passthrough && SupportsPassthrough(format)) {
+    return DECODER_PASSTHROUGH;
+  }
+
+  // no need decoding format is also use passthrough
+  if (NoNeedDecode(format)) {
     return DECODER_PASSTHROUGH;
   }
 
@@ -127,25 +166,7 @@ AVPDecoderFactory::DecoderType AVPDecoderFactory::DetermineDecoderType(
 
 bool AVPDecoderFactory::SupportsPassthrough(
     const std::shared_ptr<MediaMeta>& format) {
-  if (!format) {
-    return false;
-  }
-
-  auto mime = format->mime();
-
-  // Audio formats that typically support passthrough
-  static const std::vector<std::string> passthrough_formats = {
-      "audio/aac",    "audio/ac3",       "audio/eac3", "audio/dts",
-      "audio/dts-hd", "audio/mp4a-latm", "audio/mpeg", "audio/vorbis",
-      "audio/flac",   "audio/opus"};
-
-  for (const auto& supported : passthrough_formats) {
-    if (mime.find(supported) != std::string::npos) {
-      return true;
-    }
-  }
-
-  return false;
+  return true;
 }
 
 bool AVPDecoderFactory::SupportsTunnel(

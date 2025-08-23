@@ -61,13 +61,13 @@ class AVPDecoderFactory {
    * @brief Determines the appropriate decoder type based on format and
    * requirements
    * @param format The media format
-   * @param is_passthrough Whether passthrough mode is requested
+   * @param perfer_passthrough Whether passthrough mode is requested
    * @param is_tunnel Whether tunnel mode is requested
    * @return The appropriate decoder type
    */
   static DecoderType DetermineDecoderType(
       const std::shared_ptr<MediaMeta>& format,
-      bool is_passthrough = false,
+      bool perfer_passthrough = false,
       bool is_tunnel = false);
 
   /**

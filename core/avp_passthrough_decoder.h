@@ -62,8 +62,8 @@ class AVPPassthroughDecoder : public AVPDecoderBase {
   std::shared_ptr<MediaFrame> AggregateBuffer(
       const std::shared_ptr<MediaFrame>& packet);
   status_t DequeueAccessUnit(std::shared_ptr<MediaFrame>& packet);
-  status_t FetchInputData(std::shared_ptr<Message>& msg);
-  void OnInputBufferFilled(const std::shared_ptr<Message>& msg);
+  status_t FetchInputData(std::shared_ptr<MediaFrame>& packet);
+  void OnInputBufferFilled(const std::shared_ptr<MediaFrame>& packet);
   void OnBufferConsumed(int32_t size);
   void DoFlush(bool notifyComplete);
 

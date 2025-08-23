@@ -11,8 +11,11 @@
 #include <cstdlib>
 
 #include "base/logging.h"
+#include "media/audio/audio.h"
 #include "media/foundation/media_errors.h"
 #include "media/foundation/media_frame.h"
+
+#include "avp_audio_render.h"
 
 #include "message_def.h"
 
@@ -27,6 +30,73 @@ const size_t kMaxCachedBytes = 200000;
 
 // Optimal buffer size for power consumption
 const size_t kAggregateBufferSizeBytes = 24 * 1024;
+
+media::audio_config_t ConvertTrackInfoToAudioConfig(
+    std::shared_ptr<MediaMeta> meta) {
+  auto audio_info = &(meta->track_info()->audio());
+  media::audio_config_t config = media::DefaultAudioConfig;
+
+  if (audio_info) {
+    config.sample_rate = static_cast<uint32_t>(audio_info->sample_rate_hz);
+    config.channel_layout = audio_info->channel_layout;
+
+    // Map codec to audio format
+    switch (audio_info->codec_id) {
+      case media::CodecId::AVE_CODEC_ID_PCM_S16LE:
+      case media::CodecId::AVE_CODEC_ID_PCM_S16BE:
+        config.format = media::AUDIO_FORMAT_PCM_16_BIT;
+        break;
+      case media::CodecId::AVE_CODEC_ID_PCM_S24LE:
+      case media::CodecId::AVE_CODEC_ID_PCM_S24BE:
+        config.format = media::AUDIO_FORMAT_PCM_24_BIT_PACKED;
+        break;
+      case media::CodecId::AVE_CODEC_ID_PCM_F32LE:
+      case media::CodecId::AVE_CODEC_ID_PCM_F32BE:
+        config.format = media::AUDIO_FORMAT_PCM_FLOAT;
+        break;
+      case media::CodecId::AVE_CODEC_ID_AAC:
+        config.format = media::AUDIO_FORMAT_AAC_LC;
+        config.offload_info.format = media::AUDIO_FORMAT_AAC_LC;
+        config.offload_info.sample_rate = config.sample_rate;
+        config.offload_info.channel_layout = config.channel_layout;
+        config.offload_info.bit_width = audio_info->bits_per_sample;
+        break;
+      case media::CodecId::AVE_CODEC_ID_AC3:
+        config.format = media::AUDIO_FORMAT_AC3;
+        config.offload_info.format = media::AUDIO_FORMAT_AC3;
+        config.offload_info.sample_rate = config.sample_rate;
+        config.offload_info.channel_layout = config.channel_layout;
+        break;
+      case media::CodecId::AVE_CODEC_ID_DTS:
+        config.format = media::AUDIO_FORMAT_DTS;
+        config.offload_info.format = media::AUDIO_FORMAT_DTS;
+        config.offload_info.sample_rate = config.sample_rate;
+        config.offload_info.channel_layout = config.channel_layout;
+        break;
+      default:
+        AVE_LOG(LS_WARNING)
+            << "Unsupported codec: " << static_cast<int>(audio_info->codec_id)
+            << ", using PCM as fallback";
+        config.format = media::AUDIO_FORMAT_PCM_16_BIT;
+        break;
+    }
+
+    // Calculate frame size
+    if (config.format == media::AUDIO_FORMAT_PCM_16_BIT) {
+      config.frame_size = 2 * ChannelLayoutToChannelCount(
+                                  config.channel_layout);  // 2 bytes per sample
+    } else if (config.format == media::AUDIO_FORMAT_PCM_24_BIT_PACKED) {
+      config.frame_size = 3 * ChannelLayoutToChannelCount(
+                                  config.channel_layout);  // 3 bytes per sample
+    } else if (config.format == media::AUDIO_FORMAT_PCM_FLOAT) {
+      config.frame_size = 4 * ChannelLayoutToChannelCount(
+                                  config.channel_layout);  // 4 bytes per sample
+    }
+  }
+
+  return config;
+}
+
 }  // namespace
 
 AVPPassthroughDecoder::AVPPassthroughDecoder(
@@ -57,6 +127,9 @@ void AVPPassthroughDecoder::OnConfigure(
   reached_eos_ = false;
   ++buffer_generation_;
 
+  auto audio_render = std::dynamic_pointer_cast<AVPAudioRender>(avp_render_);
+  audio_render->OpenAudioSink(ConvertTrackInfoToAudioConfig(format));
+
   // Request input buffers to start the decoding process
   OnRequestInputBuffers();
 }
@@ -75,16 +148,19 @@ void AVPPassthroughDecoder::OnSetVideoRender(
 
 void AVPPassthroughDecoder::OnStart() {
   AVE_LOG(LS_VERBOSE) << "OnStart";
+  paused_ = false;
   OnRequestInputBuffers();
 }
 
 void AVPPassthroughDecoder::OnPause() {
   AVE_LOG(LS_VERBOSE) << "OnPause";
+  paused_ = true;
   // Passthrough decoder doesn't need special pause handling
 }
 
 void AVPPassthroughDecoder::OnResume() {
   AVE_LOG(LS_VERBOSE) << "OnResume";
+  paused_ = false;
   OnRequestInputBuffers();
 }
 
@@ -121,15 +197,15 @@ bool AVPPassthroughDecoder::IsDoneFetching() const {
 bool AVPPassthroughDecoder::DoRequestInputBuffers() {
   status_t err = OK;
   while (!IsDoneFetching()) {
-    std::shared_ptr<Message> msg = std::make_shared<Message>();
+    std::shared_ptr<MediaFrame> packet;
 
-    err = FetchInputData(msg);
+    err = FetchInputData(packet);
 
     if (err != OK) {
       break;
     }
 
-    OnInputBufferFilled(msg);
+    OnInputBufferFilled(packet);
   }
 
   return (err == WOULD_BLOCK) && (source_->FeedMoreESData() == OK);
@@ -218,17 +294,12 @@ status_t AVPPassthroughDecoder::DequeueAccessUnit(
   return err;
 }
 
-status_t AVPPassthroughDecoder::FetchInputData(std::shared_ptr<Message>& msg) {
-  std::shared_ptr<MediaFrame> packet;
-
+status_t AVPPassthroughDecoder::FetchInputData(
+    std::shared_ptr<MediaFrame>& packet) {
   do {
     status_t err = DequeueAccessUnit(packet);
 
     if (err == WOULD_BLOCK) {
-      packet = AggregateBuffer(nullptr);
-      if (packet != nullptr) {
-        break;
-      }
       return err;
     }
     if (err != OK) {
@@ -240,37 +311,25 @@ status_t AVPPassthroughDecoder::FetchInputData(std::shared_ptr<Message>& msg) {
       }
       return err;
     }
-    packet = AggregateBuffer(packet);
   } while (packet == nullptr);
 
   return OK;
 }
 
 void AVPPassthroughDecoder::OnInputBufferFilled(
-    const std::shared_ptr<Message>& msg) {
+    const std::shared_ptr<MediaFrame>& packet) {
   if (reached_eos_) {
     return;
   }
 
-  // Create a virtual frame from the aggregated packet
-  if (aggregate_buffer_ && aggregate_buffer_->size() > 0) {
-    auto frame = std::make_shared<media::MediaFrame>(
-        media::MediaFrame::Create(aggregate_buffer_->size()));
-    frame->SetData(const_cast<uint8_t*>(aggregate_buffer_->data()),
-                   aggregate_buffer_->size());
-    // TODO: Set PTS when MediaFrame supports it
-
-    // Send to renderer for AV sync
-    if (avp_render_) {
-      avp_render_->RenderFrame(frame);
-    }
-
-    cached_bytes_ += aggregate_buffer_->size();
-
-    // Reset aggregate buffer
-    // TODO: Fix MediaFrame interface
-    // aggregate_buffer_->setRange(0, 0);
-  }
+  avp_render_->RenderFrame(
+      packet, [this, size = packet->size()](bool rendered) {
+        auto msg =
+            std::make_shared<Message>(kWhatBufferConsumed, shared_from_this());
+        msg->setInt32("generation", buffer_generation_);
+        msg->setInt32("size", static_cast<int32_t>(size));
+        msg->post();
+      });
 }
 
 void AVPPassthroughDecoder::OnBufferConsumed(int32_t size) {
