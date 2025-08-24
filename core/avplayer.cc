@@ -10,6 +10,8 @@
 #include "base/checks.h"
 #include "base/errors.h"
 #include "base/logging.h"
+#include "base/task_util/default_task_runner_factory.h"
+
 #include "media/foundation/media_errors.h"
 #include "media/foundation/media_meta.h"
 #include "media/foundation/message_object.h"
@@ -27,12 +29,14 @@ AvPlayer::AvPlayer(std::shared_ptr<ContentSourceFactory> content_source_factory,
                    std::shared_ptr<DemuxerFactory> demuxer_factory,
                    std::shared_ptr<CodecFactory> codec_factory,
                    std::shared_ptr<AudioDevice> audio_device)
-    : content_source_factory_(std::move(content_source_factory)),
+    : task_runner_factory_(ave::base::CreateDefaultTaskRunnerFactory()),
+      content_source_factory_(std::move(content_source_factory)),
       demuxer_factory_(std::move(demuxer_factory)),
       codec_factory_(std::move(codec_factory)),
       audio_device_(std::move(audio_device)),
       player_looper_(std::make_shared<Looper>()),
       started_(false),
+      pending_start_with_prepare_async_(false),
       prepared_(false),
       paused_(false),
       paused_for_buffering_(false),
@@ -200,34 +204,38 @@ status_t AvPlayer::InstantiateDecoder(
     return ave::OK;
   }
 
-  auto format = source_->GetTrackInfo(audio);
+  auto format =
+      source_->GetTrackInfo(audio ? MediaType::AUDIO : MediaType::VIDEO);
 
   if (format == nullptr) {
     return ave::UNKNOWN_ERROR;
   }
 
   std::string mime = format->mime();
-  AVE_LOG(LS_INFO) << "instantiateDecoder mime: " << mime;
+  AVE_LOG(LS_INFO) << "instantiateDecoder, audio:" << audio
+                   << ", mime: " << mime;
 
   if (audio) {
     auto notify =
         std::make_shared<Message>(kWhatAudioNotify, shared_from_this());
-    audio_render_ = std::make_shared<AVPAudioRender>(
-        nullptr, sync_controller_.get(), audio_device_, true);
-    auto render_ptr = std::static_pointer_cast<AVPRender>(audio_render_);
+    audio_render_ = std::make_shared<AVPAudioRender>(task_runner_factory_.get(),
+                                                     sync_controller_.get(),
+                                                     audio_device_, true);
     decoder = AVPDecoderFactory::CreateDecoder(codec_factory_, notify, source_,
-                                               render_ptr, format);
+                                               audio_render_, format);
   } else {
     auto notify =
         std::make_shared<Message>(kWhatVideoNotify, shared_from_this());
-    video_render_ =
-        std::make_shared<AVPVideoRender>(nullptr, sync_controller_.get());
+    video_render_ = std::make_shared<AVPVideoRender>(task_runner_factory_.get(),
+                                                     sync_controller_.get());
     video_render_->SetSink(video_render_sink_);
-    auto render_ptr = std::static_pointer_cast<AVPRender>(video_render_);
     decoder = AVPDecoderFactory::CreateDecoder(codec_factory_, notify, source_,
-                                               render_ptr, format,
+                                               video_render_, format,
                                                video_render_sink_);
   }
+
+  AVE_CHECK(decoder != nullptr)
+      << "failed to create decoder for mime: " << mime;
 
   decoder->Init();
 
@@ -241,9 +249,15 @@ status_t AvPlayer::InstantiateDecoder(
 ///////////////////////////////////////////
 
 void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
+  if (!prepared_) {
+    AVE_LOG(LS_INFO)
+        << "start called before prepared, will start after prepared";
+    // If not prepared yet, we will start after prepared
+    pending_start_with_prepare_async_ = true;
+    return;
+  }
   AVE_LOG(LS_VERBOSE) << "onStart, start_us: " << start_us
                       << ", seek_mode: " << seek_mode;
-
   if (!source_started_) {
     source_->Start();
     source_started_ = true;
@@ -261,8 +275,8 @@ void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
 
   // Instantiate decoders immediately based on current track info (NuPlayer
   // style)
-  bool has_audio = (source_->GetTrackInfo(true) != nullptr);
-  bool has_video = (source_->GetTrackInfo(false) != nullptr);
+  bool has_audio = (source_->GetTrackInfo(MediaType::AUDIO) != nullptr);
+  bool has_video = (source_->GetTrackInfo(MediaType::VIDEO) != nullptr);
 
   if (!has_audio && !has_video) {
     AVE_LOG(LS_ERROR) << "no metadata for either audio or video source";
@@ -598,65 +612,67 @@ void AvPlayer::SchedulePollDuration() {
 
 /********************* ContentSource::Notify Start *********************/
 void AvPlayer::OnPrepared(status_t err) {
-  auto msg = std::make_shared<Message>(kWhatSourcePrepared, shared_from_this());
+  auto msg = std::make_shared<Message>(kWhatSourceNotify, shared_from_this());
+  msg->setInt32(kWhat, kWhatSourcePrepared);
   msg->setInt32(kError, err);
   msg->post();
 }
 
 void AvPlayer::OnFlagsChanged(int32_t flags) {
-  auto msg =
-      std::make_shared<Message>(kWhatSourceFlagsChanged, shared_from_this());
+  auto msg = std::make_shared<Message>(kWhatSourceNotify, shared_from_this());
+  msg->setInt32(kWhat, kWhatSourceFlagsChanged);
   msg->setInt32(kFlags, flags);
   msg->post();
 }
 
 void AvPlayer::OnVideoSizeChanged(std::shared_ptr<MediaMeta>& format) {
-  auto msg = std::make_shared<Message>(kWhatSourceVideoSizeChanged,
-                                       shared_from_this());
+  auto msg = std::make_shared<Message>(kWhatSourceNotify, shared_from_this());
+  msg->setInt32(kWhat, kWhatSourceVideoSizeChanged);
   msg->setObject(kMediaMeta, std::static_pointer_cast<MessageObject>(format));
   msg->post();
 }
 
 void AvPlayer::OnSeekComplete() {
-  auto msg =
-      std::make_shared<Message>(kWhatSourceSeekComplete, shared_from_this());
+  auto msg = std::make_shared<Message>(kWhatSourceNotify, shared_from_this());
+  msg->setInt32(kWhat, kWhatSourceSeekComplete);
   msg->post();
 }
 
 void AvPlayer::OnBufferingStart() {
-  auto msg =
-      std::make_shared<Message>(kWhatSourceBufferingStart, shared_from_this());
+  auto msg = std::make_shared<Message>(kWhatSourceNotify, shared_from_this());
+  msg->setInt32(kWhat, kWhatSourceBufferingStart);
   msg->post();
 }
 
 void AvPlayer::OnBufferingUpdate(int percent) {
-  auto msg =
-      std::make_shared<Message>(kWhatSourceBufferingUpdate, shared_from_this());
+  auto msg = std::make_shared<Message>(kWhatSourceNotify, shared_from_this());
+  msg->setInt32(kWhat, kWhatSourceBufferingUpdate);
   msg->setInt32(kPercent, percent);
   msg->post();
 }
 
 void AvPlayer::OnBufferingEnd() {
-  auto msg =
-      std::make_shared<Message>(kWhatSourceBufferingEnd, shared_from_this());
+  auto msg = std::make_shared<Message>(kWhatSourceNotify, shared_from_this());
+  msg->setInt32(kWhat, kWhatSourceBufferingEnd);
   msg->post();
 }
 
 void AvPlayer::OnCompletion() {
-  auto msg =
-      std::make_shared<Message>(kWhatSourceCompletion, shared_from_this());
+  auto msg = std::make_shared<Message>(kWhatSourceNotify, shared_from_this());
+  msg->setInt32(kWhat, kWhatSourceCompletion);
   msg->post();
 }
 
 void AvPlayer::OnError(status_t error) {
-  auto msg = std::make_shared<Message>(kWhatSourceError, shared_from_this());
+  auto msg = std::make_shared<Message>(kWhatSourceNotify, shared_from_this());
+  msg->setInt32(kWhat, kWhatSourceError);
   msg->setInt32(kError, error);
   msg->post();
 }
 
 void AvPlayer::OnFetchData(MediaType stream_type) {
-  auto msg =
-      std::make_shared<Message>(kWhatSourceFetchData, shared_from_this());
+  auto msg = std::make_shared<Message>(kWhatSourceNotify, shared_from_this());
+  msg->setInt32(kWhat, kWhatSourceFetchData);
   msg->setInt32(kMediaType, static_cast<int32_t>(stream_type));
   msg->post();
 }
@@ -684,6 +700,10 @@ void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
       // TODO(youfa) new msg here
       // notifyListner(kWhatPrepared, msg);
 
+      if (pending_start_with_prepare_async_) {
+        pending_start_with_prepare_async_ = false;
+        OnStart();
+      }
       break;
     }
     case kWhatSourceFlagsChanged: {
@@ -807,6 +827,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
   char what_str[5] = {0};
   MakeFourCCString(message->what(), what_str);
   AVE_LOG(LS_VERBOSE) << "AvPlayer::onMessageReceived:" << what_str;
+  std::lock_guard<std::mutex> l(mutex_);
   status_t err = ave::OK;
   switch (message->what()) {
       /************* from avplayer ***************/
@@ -816,10 +837,12 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
           << "SetDataSource called when source is already set";
       std::shared_ptr<MessageObject> obj;
       AVE_CHECK(message->findObject(kContentSource, obj));
-      if (source_ != nullptr) {
+      if (obj != nullptr) {
+        AVE_LOG(LS_INFO) << "set content source: " << obj.get();
         // TODO(youfa): maybe need source lock
         source_ = std::dynamic_pointer_cast<ContentSource>(obj);
       } else {
+        AVE_LOG(LS_ERROR) << "no content source found in message";
         err = ave::UNKNOWN_ERROR;
       }
       // TODO(youfa): notify listener set data source completed
@@ -882,6 +905,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
 
     case kWhatPrepare: {
       AVE_CHECK(source_);
+      AVE_LOG(LS_VERBOSE) << "kWhatPrepare";
       source_->Prepare();
       break;
     }

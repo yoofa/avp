@@ -254,6 +254,7 @@ AVE_EXPORT class AvPlayer : public Player,
   void SchedulePollDuration();
 
   //
+  std::mutex mutex_;
   std::unique_ptr<base::TaskRunnerFactory> task_runner_factory_;
   std::shared_ptr<ContentSourceFactory> content_source_factory_;
   std::shared_ptr<DemuxerFactory> demuxer_factory_;
@@ -272,6 +273,7 @@ AVE_EXPORT class AvPlayer : public Player,
   std::shared_ptr<IAVSyncController> sync_controller_;
 
   bool started_;
+  bool pending_start_with_prepare_async_;
   bool prepared_;
   bool paused_;
   bool paused_for_buffering_;

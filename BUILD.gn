@@ -2,7 +2,10 @@ import("avp.gni")
 
 group("default") {
   testonly = true
-  deps = [ ":avp", "examples" ]
+  deps = [
+    ":avp",
+    "examples",
+  ]
 
   if (ave_include_test) {
     deps += [
