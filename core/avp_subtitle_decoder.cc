@@ -141,9 +141,8 @@ void AVPSubtitleDecoder::ParseSubtitlePacket(
     ParseVTTSubtitle(packet);
   } else {
     // Generic subtitle parsing
-    auto frame = std::make_shared<media::MediaFrame>(
-        media::MediaFrame::Create(packet->size()));
-    frame->SetData(const_cast<uint8_t*>(packet->data()), packet->size());
+    auto frame = media::MediaFrame::CreateSharedAsCopy(
+        packet->data(), packet->size(), MediaType::SUBTITLE);
     // TODO: Set PTS and duration when MediaFrame supports it
 
     // TODO: Fix MediaFrame interface
@@ -160,9 +159,8 @@ void AVPSubtitleDecoder::ParseSRTSubtitle(
                             packet->size());
 
   // Create a subtitle frame
-  auto frame = std::make_shared<media::MediaFrame>(
-      media::MediaFrame::Create(packet->size()));
-  frame->SetData(const_cast<uint8_t*>(packet->data()), packet->size());
+  auto frame = media::MediaFrame::CreateSharedAsCopy(
+      packet->data(), packet->size(), MediaType::SUBTITLE);
   // TODO: Set PTS and duration when MediaFrame supports it
   // TODO: Add subtitle metadata when MediaFrame supports it
 
@@ -176,9 +174,8 @@ void AVPSubtitleDecoder::ParseASSSubtitle(
   std::string subtitle_text(reinterpret_cast<const char*>(packet->data()),
                             packet->size());
 
-  auto frame = std::make_shared<media::MediaFrame>(
-      media::MediaFrame::Create(packet->size()));
-  frame->SetData(const_cast<uint8_t*>(packet->data()), packet->size());
+  auto frame = media::MediaFrame::CreateSharedAsCopy(
+      packet->data(), packet->size(), MediaType::SUBTITLE);
   // TODO: Set PTS and duration when MediaFrame supports it
   // TODO: Add subtitle metadata when MediaFrame supports it
 
@@ -192,9 +189,8 @@ void AVPSubtitleDecoder::ParseVTTSubtitle(
   std::string subtitle_text(reinterpret_cast<const char*>(packet->data()),
                             packet->size());
 
-  auto frame = std::make_shared<media::MediaFrame>(
-      media::MediaFrame::Create(packet->size()));
-  frame->SetData(const_cast<uint8_t*>(packet->data()), packet->size());
+  auto frame = media::MediaFrame::CreateSharedAsCopy(
+      packet->data(), packet->size(), MediaType::SUBTITLE);
   // TODO: Set PTS and duration when MediaFrame supports it
   // TODO: Add subtitle metadata when MediaFrame supports it
 

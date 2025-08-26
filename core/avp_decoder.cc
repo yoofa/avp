@@ -248,13 +248,12 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
 
   std::shared_ptr<media::MediaFrame> frame;
   if (is_audio_) {
-    frame = std::make_shared<media::MediaFrame>(
-        media::MediaFrame::Create(buffer->size()));
-    frame->SetData(const_cast<uint8_t*>(buffer->data()), buffer->size());
+    frame = media::MediaFrame::CreateSharedAsCopy(
+        buffer->data(), buffer->size(), MediaType::AUDIO);
   } else {
     // For video, if the buffer is a texture or handle, still notify render for
     // AV sync.
-    frame = std::make_shared<media::MediaFrame>(media::MediaFrame::Create(0));
+    frame = media::MediaFrame::CreateShared(0, MediaType::VIDEO);
   }
   // TODO: Set PTS from buffer metadata when available
 

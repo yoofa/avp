@@ -255,7 +255,7 @@ std::shared_ptr<MediaFrame> AVPPassthroughDecoder::AggregateBuffer(
       memcpy(const_cast<uint8_t*>(aggregate_buffer_->data() + big_size),
              packet->data(), small_size);
       big_size += small_size;
-      aggregate_buffer_->SetSize(big_size);
+      aggregate_buffer_->setRange(aggregate_buffer_->offset(), big_size);
 
       AVE_LOG(LS_VERBOSE) << "feedDecoderInputData() smallSize = " << small_size
                           << ", bigSize = " << big_size
