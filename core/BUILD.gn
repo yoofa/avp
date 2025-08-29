@@ -22,7 +22,6 @@ ave_library("packet_source") {
     "packet_source.cc",
     "packet_source.h",
   ]
-  deps = [ "//media/foundation:foundation" ]
 }
 
 ave_library("message_def") {
@@ -34,8 +33,6 @@ ave_library("avplayer") {
     "avplayer.cc",
     "avplayer.h",
   ]
-
-  #configs += [ "//build/config/compiler:rtti" ]
 
   deps = [
     ":avp_audio_render",
@@ -50,7 +47,7 @@ ave_library("avplayer") {
     "//base:utils",
     "//base/system:ave_export",
     "//media/codec:codec",
-    "//media/foundation:foundation",
+    "//media/video:video_render",
   ]
 
   cflags = [ "-Wno-multichar" ]
@@ -85,8 +82,8 @@ ave_library("avp_render") {
     "//api:player_interface",
     "//base:logging",
     "//base:task_util",
-    "//media/foundation:foundation",
   ]
+  public_deps = [ "//media/foundation:message_object" ]
 }
 
 ave_library("avp_audio_render") {
@@ -101,7 +98,6 @@ ave_library("avp_audio_render") {
     "//base:timeutils",
     "//base:utils",
     "//media/audio:audio",
-    "//media/foundation:foundation",
   ]
 }
 
@@ -113,7 +109,6 @@ ave_library("avp_video_render") {
   deps = [
     ":avp_render",
     "//base:logging",
-    "//media/foundation:foundation",
     "//media/video:video_render",
   ]
 }
@@ -133,12 +128,12 @@ ave_library("avp_decoder") {
     "avp_tunnel_decoder.cc",
     "avp_tunnel_decoder.h",
   ]
-  deps = [
-    "//base:logging",
-    "//media/foundation:foundation",
-  ]
+  deps = [ "//base:logging" ]
 
-  #configs += [ "//build/config/compiler:rtti" ]
+  deps += [
+    "//media/foundation:media_frame",
+    "//media/foundation:media_meta",
+  ]
 }
 
 ave_library("avp_render_unittest") {

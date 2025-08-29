@@ -9,6 +9,6 @@ ave_library("generic_content_source") {
     "../core:packet_source",
     "//api:api_content_source",
     "//base/data_source:file_source",
-    "//media/foundation",
+    "//media/foundation:message_object",
   ]
 }

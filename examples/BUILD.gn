@@ -29,6 +29,7 @@ ave_library("gtk_window") {
     "../api:player_interface",
     "../base:logging",
     "../media/foundation",
+    "//media/video:video_render",
     "//third_party/libyuv",
   ]
 
