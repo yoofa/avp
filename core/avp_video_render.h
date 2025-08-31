@@ -79,10 +79,12 @@ class AVPVideoRender : public AVPRender {
   /**
    * @brief Internal frame rendering method that handles video data.
    * @param frame The video frame to render.
+   * @param consumed True if the frame is full consumed and can be drop from
+   * queue.
    * @return Next frame delay in microseconds.
    */
-  uint64_t RenderFrameInternal(
-      std::shared_ptr<media::MediaFrame>& frame) override REQUIRES(mutex_);
+  uint64_t RenderFrameInternal(std::shared_ptr<media::MediaFrame>& frame,
+                               bool& consumed) override REQUIRES(mutex_);
 
  private:
   std::shared_ptr<media::VideoRender> video_render_ GUARDED_BY(mutex_);

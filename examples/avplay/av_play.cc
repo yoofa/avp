@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
         break;
     }
   }
-  ave::base::LogMessage::LogToDebug(ave::base::LogSeverity::LS_VERBOSE);
+  ave::base::LogMessage::LogToDebug(ave::base::LogSeverity::LS_INFO);
 
   std::unique_ptr<GtkWnd> gtkWindow(std::make_unique<GtkWnd>());
   gtkWindow->create();
@@ -99,6 +99,9 @@ int main(int argc, char* argv[]) {
   AVE_DCHECK(player->SetDataSource(url.c_str(), /*headers=*/{}) == ave::OK);
 
   AVE_DCHECK(player->Prepare() == ave::OK);
+
+  // sleep(2);  // wait for prepare done
+  sleep(2);
 
   // No explicit prepared callback in Player::Listener; start immediately
   player->Start();

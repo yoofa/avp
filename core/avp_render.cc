@@ -180,7 +180,7 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
   }
 
   if (update_generation != update_generation_) {
-    AVE_LOG(LS_VERBOSE) << "Dropping stale render task";
+    // AVE_LOG(LS_VERBOSE) << "Dropping stale render task";
     return;
   }
 
@@ -192,12 +192,16 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
 
   auto& entry = frame_queue_.front();
   auto& frame = entry.frame;
+  bool consumed = true;
 
   if (frame->stream_type() == media::MediaType::AUDIO) {
     // For audio, render immediately and schedule next based on returned delay
 
-    next_render_delay_us = RenderFrameInternal(frame);
-    frame_queue_.pop();
+    next_render_delay_us = RenderFrameInternal(frame, consumed);
+    if (consumed) {
+      ReleaseFrame(entry, true);
+      frame_queue_.pop();
+    }
   } else {
     // For video/subtitle, use original logic with drop frame behavior
     // Calculate delay within mutex lock
@@ -210,12 +214,10 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
       frame_queue_.pop();
     } else if (late_us > -5000) {
       // not too early, render the frame
-      try {
-        RenderFrameInternal(frame);
+      RenderFrameInternal(frame, consumed);
+      if (consumed) {
         ReleaseFrame(entry, true);
         frame_queue_.pop();
-      } catch (const std::exception& e) {
-        AVE_LOG(LS_ERROR) << "Exception in RenderFrameInternal: " << e.what();
       }
     } else {
       // too early, schedule next frame

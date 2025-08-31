@@ -131,10 +131,12 @@ class AVPRender : public media::MessageObject {
   /**
    * @brief Internal frame rendering method to be implemented by subclasses.
    * @param frame The frame to render.
+   * @param consumed Output parameter indicating if the frame was consumed.
    * @return Next frame delay in microseconds, or 0 if no more frames.
    */
   virtual uint64_t RenderFrameInternal(
-      std::shared_ptr<media::MediaFrame>& frame) = 0;
+      std::shared_ptr<media::MediaFrame>& frame,
+      bool& consumed) = 0;
 
   /**
    * @brief Gets the AV sync controller.

@@ -167,7 +167,8 @@ void AVPAudioRender::Flush() {
 }
 
 uint64_t AVPAudioRender::RenderFrameInternal(
-    std::shared_ptr<media::MediaFrame>& frame) {
+    std::shared_ptr<media::MediaFrame>& frame,
+    bool& consumed) {
   if (!frame || frame->stream_type() != media::MediaType::AUDIO) {
     AVE_LOG(LS_WARNING) << "Invalid audio frame";
     return 0;
@@ -201,26 +202,43 @@ uint64_t AVPAudioRender::RenderFrameInternal(
     }
   }
 
+  if (!cached_frame_) {
+    cached_frame_ = frame;
+    consumed = true;
+  } else {
+    consumed = false;
+  }
+
   // Write audio data to track
-  ssize_t bytes_written = WriteAudioData(frame);
+  ssize_t bytes_written = WriteAudioData(cached_frame_);
   if (bytes_written > 0) {
     total_bytes_written_ += bytes_written;
     AVE_LOG(LS_VERBOSE) << "Wrote " << bytes_written << " bytes to audio track";
 
     // Update sync anchor if this is the master stream
-    if (master_stream_) {
-      UpdateSyncAnchor(frame);
+    // and is first time to write thie cache frame
+    if (master_stream_ &&
+        (cached_frame_->size() == cached_frame_->capacity())) {
+      UpdateSyncAnchor(cached_frame_);
     }
 
-    // Calculate next frame delay based on real playback latency
-    // This should be based on the audio track's buffer state and sample rate
-    int64_t next_delay_us = CalculateNextAudioFrameDelay();
-    last_audio_pts_us_ = audio_info->pts.us();
-    return next_delay_us;
+    if (static_cast<size_t>(bytes_written) == cached_frame_->size()) {
+      cached_frame_.reset();
+    } else {
+      auto new_offset =
+          cached_frame_->data() - cached_frame_->base() + bytes_written;
+      auto new_size = cached_frame_->size() - bytes_written;
+      cached_frame_->setRange(new_offset, new_size);
+    }
   }
 
+  // Calculate next frame delay based on real playback latency
+  // This should be based on the audio track's buffer state and sample rate
+  int64_t next_delay_us = CalculateNextAudioFrameDelay();
   last_audio_pts_us_ = audio_info->pts.us();
-  return 0;
+  AVE_LOG(LS_WARNING) << "Wrote " << bytes_written
+                      << " bytes to audio track, next delay: " << next_delay_us;
+  return next_delay_us;
 }
 
 status_t AVPAudioRender::CreateAudioTrack() {
@@ -372,7 +390,9 @@ media::audio_config_t AVPAudioRender::ConvertToAudioConfig(
 
 ssize_t AVPAudioRender::WriteAudioData(
     const std::shared_ptr<media::MediaFrame>& frame) {
+  AVE_LOG(LS_VERBOSE) << "Writing audio data to track";
   if (!audio_track_ || !audio_track_->ready()) {
+    AVE_LOG(LS_WARNING) << "Audio track not ready";
     return -1;
   }
 
@@ -464,8 +484,7 @@ int64_t AVPAudioRender::CalculateNextAudioFrameDelay() {
   uint32_t frames_written = 0;
   audio_track_->GetFramesWritten(&frames_written);
 
-  // Calculate how much audio data is in the buffer
-  int64_t buffer_duration_us = audio_track_->GetBufferDurationInUs();
+  auto played_out_duration_us = audio_track_->GetPlayedOutDurationUs(0);
 
   // Get the latency of the audio track
   uint32_t latency_ms = audio_track_->latency();
@@ -483,16 +502,13 @@ int64_t AVPAudioRender::CalculateNextAudioFrameDelay() {
 
   int64_t next_delay_us = frame_duration_us;
 
-  // Adjust based on buffer state
-  if (buffer_duration_us > latency_us * 0.8) {
-    // Buffer is getting full, wait longer
-    next_delay_us = frame_duration_us * 2;
-  } else if (buffer_duration_us < latency_us * 0.2) {
-    // Buffer is getting empty, write more frequently
-    next_delay_us = frame_duration_us / 2;
-  }
+  AVE_LOG(LS_INFO) << __FUNCTION__ << ", frames_written: " << frames_written
+                   << ", played_out_duration_us: " << played_out_duration_us
+                   << ", latency_us: " << latency_us
+                   << ", frame_duration_us: " << frame_duration_us
+                   << ", next_delay_us: " << next_delay_us;
 
-  return next_delay_us;
+  return latency_us / 2;
 }
 
 }  // namespace player

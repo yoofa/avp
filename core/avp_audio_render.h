@@ -12,8 +12,10 @@
 #include <mutex>
 
 #include "avp_render.h"
+
 #include "media/audio/audio_device.h"
 #include "media/audio/audio_track.h"
+#include "media/foundation/media_frame.h"
 
 namespace ave {
 namespace player {
@@ -106,10 +108,11 @@ class AVPAudioRender : public AVPRender {
    * @brief Internal frame rendering method that handles audio data.
    * @param frame The audio frame to render.
    * @param render Whether to actually render the frame.
+   * @param consumed Output parameter indicating if the frame was consumed.
    * @return Next frame delay in microseconds.
    */
-  uint64_t RenderFrameInternal(
-      std::shared_ptr<media::MediaFrame>& frame) override REQUIRES(mutex_);
+  uint64_t RenderFrameInternal(std::shared_ptr<media::MediaFrame>& frame,
+                               bool& consumed) override REQUIRES(mutex_);
 
  private:
   /**
@@ -177,6 +180,7 @@ class AVPAudioRender : public AVPRender {
   bool master_stream_ GUARDED_BY(mutex_);
   bool audio_sink_ready_ GUARDED_BY(mutex_);
   float playback_rate_ GUARDED_BY(mutex_);
+  std::shared_ptr<media::MediaFrame> cached_frame_ GUARDED_BY(mutex_);
 
   // Audio format tracking
   media::audio_config_t current_audio_config_ GUARDED_BY(mutex_);

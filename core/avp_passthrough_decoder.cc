@@ -107,6 +107,7 @@ AVPPassthroughDecoder::AVPPassthroughDecoder(
       skip_rendering_until_media_time_us_(-1LL),
       reached_eos_(true),
       pending_buffers_to_drain_(0),
+      total_bytes_(0),
       cached_bytes_(0),
       pending_audio_access_unit_(nullptr),
       pending_audio_err_(OK),
@@ -195,6 +196,8 @@ bool AVPPassthroughDecoder::IsDoneFetching() const {
 }
 
 bool AVPPassthroughDecoder::DoRequestInputBuffers() {
+  AVE_LOG(LS_VERBOSE) << "DoRequestInputBuffers: cached_bytes="
+                      << cached_bytes_;
   status_t err = OK;
   while (!IsDoneFetching()) {
     std::shared_ptr<MediaFrame> packet;
@@ -202,6 +205,8 @@ bool AVPPassthroughDecoder::DoRequestInputBuffers() {
     err = FetchInputData(packet);
 
     if (err != OK) {
+      AVE_LOG(LS_VERBOSE)
+          << "DoRequestInputBuffers: FetchInputData returned err=" << err;
       break;
     }
 
@@ -300,9 +305,13 @@ status_t AVPPassthroughDecoder::FetchInputData(
     status_t err = DequeueAccessUnit(packet);
 
     if (err == WOULD_BLOCK) {
+      AVE_LOG(LS_VERBOSE)
+          << "FetchInputData: DequeueAccessUnit returned WOULD_BLOCK";
       return err;
     }
     if (err != OK) {
+      AVE_LOG(LS_VERBOSE) << "FetchInputData: DequeueAccessUnit returned err="
+                          << err;
       if (err == media::ERROR_END_OF_STREAM) {
         reached_eos_ = true;
         AVE_LOG(LS_INFO) << "Passthrough decoder: End of stream reached";
@@ -313,14 +322,21 @@ status_t AVPPassthroughDecoder::FetchInputData(
     }
   } while (packet == nullptr);
 
+  AVE_LOG(LS_VERBOSE) << "FetchInputData: got packet of size "
+                      << packet->size();
+
   return OK;
 }
 
 void AVPPassthroughDecoder::OnInputBufferFilled(
     const std::shared_ptr<MediaFrame>& packet) {
+  total_bytes_ += packet->size();
+  AVE_LOG(LS_VERBOSE) << "OnInputBufferFilled: totalBytes=" << total_bytes_;
   if (reached_eos_) {
     return;
   }
+
+  cached_bytes_ += packet->size();
 
   avp_render_->RenderFrame(
       packet, [this, size = packet->size()](bool rendered) {
@@ -330,13 +346,18 @@ void AVPPassthroughDecoder::OnInputBufferFilled(
         msg->setInt32("size", static_cast<int32_t>(size));
         msg->post();
       });
+
+  pending_buffers_to_drain_++;
+  AVE_LOG(LS_VERBOSE) << "OnInputBufferFilled: #ToDrain="
+                      << pending_buffers_to_drain_
+                      << ", cachedBytes=" << cached_bytes_;
 }
 
 void AVPPassthroughDecoder::OnBufferConsumed(int32_t size) {
   --pending_buffers_to_drain_;
   cached_bytes_ -= size;
   AVE_LOG(LS_VERBOSE) << "OnBufferConsumed: #ToDrain="
-                      << pending_buffers_to_drain_
+                      << pending_buffers_to_drain_ << ", consumed: " << size
                       << ", cachedBytes=" << cached_bytes_;
   OnRequestInputBuffers();
 }

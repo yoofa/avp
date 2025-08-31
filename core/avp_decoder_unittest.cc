@@ -105,8 +105,8 @@ class MockAVPRender : public AVPRender {
   void ClearRenderedFrames() { rendered_frames_.clear(); }
 
  protected:
-  uint64_t RenderFrameInternal(
-      std::shared_ptr<media::MediaFrame>& frame) override {
+  uint64_t RenderFrameInternal(std::shared_ptr<media::MediaFrame>& frame,
+                               bool& consumed) override {
     return 0;
   }
 

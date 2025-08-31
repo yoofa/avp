@@ -70,6 +70,7 @@ class AVPPassthroughDecoder : public AVPDecoderBase {
   int64_t skip_rendering_until_media_time_us_;
   bool reached_eos_;
   size_t pending_buffers_to_drain_;
+  size_t total_bytes_;
   size_t cached_bytes_;
 
   // Buffer aggregation for better power efficiency

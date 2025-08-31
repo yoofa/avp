@@ -61,7 +61,8 @@ void AVPVideoRender::Flush() {
 }
 
 uint64_t AVPVideoRender::RenderFrameInternal(
-    std::shared_ptr<media::MediaFrame>& frame) {
+    std::shared_ptr<media::MediaFrame>& frame,
+    bool& consumed) {
   if (!frame || frame->stream_type() != media::MediaType::VIDEO) {
     AVE_LOG(LS_WARNING) << "Invalid video frame";
     return 0;
@@ -89,6 +90,7 @@ uint64_t AVPVideoRender::RenderFrameInternal(
   // Pass frame to video render sink
   video_render_->OnFrame(frame);
   total_frames_rendered_++;
+  consumed = true;
 
   // Update last PTS
   auto* video_info = frame->video_info();

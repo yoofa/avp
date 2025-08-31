@@ -198,6 +198,7 @@ status_t GenericSource::DequeueAccessUnit(
     MediaType track_type,
     std::shared_ptr<MediaFrame>& access_unit) {
   std::lock_guard<std::mutex> lock(lock_);
+  AVE_LOG(LS_VERBOSE) << "DequeueAccessUnit, type: " << track_type;
 
   if (!started_) {
     return ave::WOULD_BLOCK;

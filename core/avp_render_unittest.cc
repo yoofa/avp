@@ -99,10 +99,11 @@ class TestAVPRender : public AVPRender {
   using AVPRender::IsRunning;
 
  protected:
-  uint64_t RenderFrameInternal(
-      std::shared_ptr<media::MediaFrame>& frame) override {
+  uint64_t RenderFrameInternal(std::shared_ptr<media::MediaFrame>& frame,
+                               bool& consumed) override {
     render_count_++;
     last_frame_ = frame;
+    consumed = true;
     return 0;
   }
 
