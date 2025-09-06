@@ -15,7 +15,6 @@
 #include "base/logging.h"
 #include "media/codec/codec_id.h"
 #include "media/foundation/media_errors.h"
-#include "media/foundation/message_object.h"
 
 #include "message_def.h"
 
@@ -23,7 +22,6 @@ namespace ave {
 namespace player {
 
 using ave::media::CodecId;
-using ave::media::MessageObject;
 
 AVPDecoder::AVPDecoder(std::shared_ptr<CodecFactory> codec_factory,
                        std::shared_ptr<Message> notify,
@@ -278,15 +276,11 @@ void AVPDecoder::HandleAnOutputFormatChanged(
     auto notify = notify_->dup();
     notify->setInt32(kWhat, kWhatAudioOutputFormatChanged);
     // TODO: Fix MediaMeta inheritance issue
-    // notify->setObject(kMediaMeta,
-    // std::dynamic_pointer_cast<MessageObject>(format));
     notify->post();
   } else {
     auto notify = notify_->dup();
     notify->setInt32(kWhat, kWhatVideoSizeChanged);
     // TODO: Fix MediaMeta inheritance issue
-    // notify->setObject(kMediaMeta,
-    // std::dynamic_pointer_cast<MessageObject>(format));
     notify->post();
   }
 }
@@ -314,7 +308,7 @@ void AVPDecoder::OnOutputFormatChanged(
     const std::shared_ptr<MediaMeta>& format) {
   auto msg = std::make_shared<Message>(AVPDecoder::kWhatDecodingFormatChange,
                                        shared_from_this());
-  msg->setObject(kMediaMeta, std::dynamic_pointer_cast<MessageObject>(format));
+  msg->setObject(kMediaMeta, format);
   msg->post();
 }
 
@@ -334,10 +328,9 @@ void AVPDecoder::OnFrameRendered(std::shared_ptr<Message> notify) {
 void AVPDecoder::onMessageReceived(const std::shared_ptr<Message>& msg) {
   switch (msg->what()) {
     case kWhatSetVideoRender: {
-      std::shared_ptr<MessageObject> obj;
-      AVE_CHECK(msg->findObject(kVideoRender, obj));
-      auto sink = std::dynamic_pointer_cast<VideoRender>(obj);
-      OnSetVideoRender(sink);
+      std::shared_ptr<VideoRender> video_render;
+      AVE_CHECK(msg->findObject(kVideoRender, video_render));
+      OnSetVideoRender(video_render);
       break;
     }
 
@@ -357,9 +350,9 @@ void AVPDecoder::onMessageReceived(const std::shared_ptr<Message>& msg) {
     }
 
     case kWhatDecodingFormatChange: {
-      std::shared_ptr<MessageObject> format;
+      std::shared_ptr<MediaMeta> format;
       AVE_CHECK(msg->findObject(kMediaMeta, format));
-      HandleAnOutputFormatChanged(std::dynamic_pointer_cast<MediaMeta>(format));
+      HandleAnOutputFormatChanged(format);
       break;
     }
     case kWhatDecodingError: {

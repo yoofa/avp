@@ -10,12 +10,7 @@
 #include <memory>
 
 #include "base/checks.h"
-#include "media/foundation/media_meta.h"
-#include "media/foundation/message_object.h"
-
 #include "message_def.h"
-
-using ::ave::media::MessageObject;
 
 namespace ave {
 namespace player {
@@ -45,7 +40,7 @@ void AVPDecoderBase::Init() {
 void AVPDecoderBase::Configure(const std::shared_ptr<MediaMeta>& format) {
   auto msg(std::make_shared<Message>(kWhatConfigure, shared_from_this()));
   // TODO: Fix MediaMeta inheritance issue
-  msg->setObject(kMediaMeta, std::static_pointer_cast<MessageObject>(format));
+  msg->setObject(kMediaMeta, format);
   msg->post();
 }
 
@@ -119,9 +114,9 @@ void AVPDecoderBase::OnRequestInputBuffers() {
 void AVPDecoderBase::onMessageReceived(const std::shared_ptr<Message>& msg) {
   switch (msg->what()) {
     case kWhatConfigure: {
-      std::shared_ptr<MessageObject> format;
+      std::shared_ptr<MediaMeta> format;
       AVE_CHECK(msg->findObject(kMediaMeta, format));
-      OnConfigure(std::dynamic_pointer_cast<MediaMeta>(format));
+      OnConfigure(format);
       break;
     }
     case kWhatSetParameters: {
@@ -132,9 +127,9 @@ void AVPDecoderBase::onMessageReceived(const std::shared_ptr<Message>& msg) {
     }
     // kWhatSetSynchronizer is not used in current design
     case kWhatSetVideoRender: {
-      std::shared_ptr<MessageObject> render;
+      std::shared_ptr<VideoRender> render;
       AVE_CHECK(msg->findObject(kVideoRender, render));
-      OnSetVideoRender(std::dynamic_pointer_cast<VideoRender>(render));
+      OnSetVideoRender(render);
       break;
     }
 

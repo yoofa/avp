@@ -128,7 +128,7 @@ void AVPPassthroughDecoder::OnConfigure(
   reached_eos_ = false;
   ++buffer_generation_;
 
-  auto audio_render = std::dynamic_pointer_cast<AVPAudioRender>(avp_render_);
+  auto audio_render = std::static_pointer_cast<AVPAudioRender>(avp_render_);
   audio_render->OpenAudioSink(ConvertTrackInfoToAudioConfig(format));
 
   // Request input buffers to start the decoding process

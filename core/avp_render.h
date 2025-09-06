@@ -12,12 +12,10 @@
 #include <queue>
 
 #include "api/player_interface.h"
-#include "base/sequence_checker.h"
 #include "base/task_util/task_runner.h"
 #include "base/task_util/task_runner_factory.h"
 #include "base/thread_annotation.h"
 #include "media/foundation/media_frame.h"
-#include "media/foundation/message_object.h"
 
 namespace ave {
 namespace player {
@@ -54,7 +52,7 @@ std::unique_ptr<RenderEvent> ToRenderEvent(Closure&& closure) {
  * @brief Base class for AV rendering components (Video, Audio, Subtitle).
  *        Provides timestamp management and frame rendering scheduling.
  */
-class AVPRender : public media::MessageObject {
+class AVPRender {
  public:
   /**
    * @brief Constructs AVPRender with task runner and sync controller.
@@ -64,7 +62,7 @@ class AVPRender : public media::MessageObject {
   AVPRender(base::TaskRunnerFactory* task_runner_factory,
             IAVSyncController* avsync_controller);
 
-  ~AVPRender() override;
+  virtual ~AVPRender();
 
   /**
    * @brief Renders a media frame with proper timing.

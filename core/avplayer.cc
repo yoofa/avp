@@ -14,7 +14,6 @@
 
 #include "media/foundation/media_errors.h"
 #include "media/foundation/media_meta.h"
-#include "media/foundation/message_object.h"
 
 #include "content_source/generic_source.h"
 
@@ -22,8 +21,6 @@
 
 namespace ave {
 namespace player {
-
-using ave::media::MessageObject;
 
 AvPlayer::AvPlayer(std::shared_ptr<ContentSourceFactory> content_source_factory,
                    std::shared_ptr<DemuxerFactory> demuxer_factory,
@@ -104,8 +101,7 @@ status_t AvPlayer::SetDataSource(std::shared_ptr<ContentSource> source) {
   auto msg = std::make_shared<Message>(kWhatSetDataSource, shared_from_this());
   source->SetNotify(this);
 
-  msg->setObject(kContentSource,
-                 std::static_pointer_cast<MessageObject>(std::move(source)));
+  msg->setObject(kContentSource, std::move(source));
   msg->post();
   return ave::OK;
 }
@@ -628,7 +624,7 @@ void AvPlayer::OnFlagsChanged(int32_t flags) {
 void AvPlayer::OnVideoSizeChanged(std::shared_ptr<MediaMeta>& format) {
   auto msg = std::make_shared<Message>(kWhatSourceNotify, shared_from_this());
   msg->setInt32(kWhat, kWhatSourceVideoSizeChanged);
-  msg->setObject(kMediaMeta, std::static_pointer_cast<MessageObject>(format));
+  msg->setObject(kMediaMeta, format);
   msg->post();
 }
 
@@ -713,9 +709,8 @@ void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
       break;
     }
     case kWhatSourceVideoSizeChanged: {
-      std::shared_ptr<MessageObject> obj;
-      if (msg->findObject(kMediaMeta, obj)) {
-        auto format = std::dynamic_pointer_cast<MediaMeta>(obj);
+      std::shared_ptr<MediaMeta> format;
+      if (msg->findObject(kMediaMeta, format)) {
         if (listener_.lock()) {
           // listener_.lock()->onVideoSizeChanged(format->width(),
           // format->height());
@@ -725,33 +720,42 @@ void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
     }
     case kWhatSourceBufferingStart: {
       paused_for_buffering_ = true;
-      if (audio_decoder_)
+      if (audio_decoder_) {
         audio_decoder_->Pause();
-      if (video_decoder_)
+      }
+      if (video_decoder_) {
         video_decoder_->Pause();
-      if (audio_render_)
+      }
+      if (audio_render_) {
         audio_render_->Pause();
-      if (video_render_)
+      }
+      if (video_render_) {
         video_render_->Pause();
+      }
       break;
     }
     case kWhatSourceBufferingEnd: {
       paused_for_buffering_ = false;
       if (!paused_ && !paused_by_client_) {
-        if (audio_decoder_)
+        if (audio_decoder_) {
           audio_decoder_->Resume();
-        if (video_decoder_)
+        }
+        if (video_decoder_) {
           video_decoder_->Resume();
-        if (audio_render_)
+        }
+        if (audio_render_) {
           audio_render_->Resume();
-        if (video_render_)
+        }
+        if (video_render_) {
           video_render_->Resume();
+        }
       }
       break;
     }
     case kWhatSourceCompletion: {
-      if (listener_.lock())
+      if (listener_.lock()) {
         listener_.lock()->OnCompletion();
+      }
       break;
     }
     case kWhatSourceError: {
@@ -777,9 +781,8 @@ void AvPlayer::OnDecoderNotify(const std::shared_ptr<Message>& msg) {
   AVE_CHECK(msg->findInt32(kWhat, &what));
   switch (what) {
     case AVPDecoder::kWhatVideoSizeChanged: {
-      std::shared_ptr<MessageObject> obj;
-      msg->findObject(kMediaMeta, obj);
-      auto format = std::dynamic_pointer_cast<MediaMeta>(obj);
+      std::shared_ptr<MediaMeta> format;
+      msg->findObject(kMediaMeta, format);
       if (listener_.lock()) {
         // TODO: Implement onVideoSizeChanged in Listener interface
         // listener_.lock()->onVideoSizeChanged(format->width(),
@@ -835,12 +838,12 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
       AVE_LOG(LS_VERBOSE) << "kWhatSetDataSource";
       AVE_CHECK(source_ == nullptr)
           << "SetDataSource called when source is already set";
-      std::shared_ptr<MessageObject> obj;
-      AVE_CHECK(message->findObject(kContentSource, obj));
-      if (obj != nullptr) {
-        AVE_LOG(LS_INFO) << "set content source: " << obj.get();
+      std::shared_ptr<ContentSource> source;
+      AVE_CHECK(message->findObject(kContentSource, source));
+      if (source != nullptr) {
+        AVE_LOG(LS_INFO) << "set content source: " << source.get();
         // TODO(youfa): maybe need source lock
-        source_ = std::dynamic_pointer_cast<ContentSource>(obj);
+        source_ = source;
       } else {
         AVE_LOG(LS_ERROR) << "no content source found in message";
         err = ave::UNKNOWN_ERROR;
@@ -850,10 +853,8 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
     }
 
     case kWhatSetVideoRender: {
-      std::shared_ptr<MessageObject> obj;
-      message->findObject(kVideoRender, obj);
-      std::shared_ptr<VideoRender> video_render =
-          std::dynamic_pointer_cast<VideoRender>(obj);
+      std::shared_ptr<VideoRender> video_render;
+      message->findObject(kVideoRender, video_render);
       AVE_LOG(LS_INFO) << "kWhatSetVideoRender (" << video_render_sink_.get()
                        << ", "
                        << ((started_ && source_ != nullptr &&

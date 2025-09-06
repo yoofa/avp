@@ -23,7 +23,7 @@ namespace player {
 using ave::media::MediaMeta;
 using ave::media::MediaType;
 
-class ContentSource : public ave::media::MessageObject {
+class ContentSource {
  public:
   enum Flags : int32_t {
     FLAG_CAN_PAUSE = 1,
@@ -98,7 +98,7 @@ class ContentSource : public ave::media::MessageObject {
   };
 
   ContentSource() = default;
-  ~ContentSource() override = default;
+  virtual ~ContentSource() = default;
 
   /**
    * @brief Sets the notify object for the content source.

@@ -14,7 +14,6 @@
 #include "base/logging.h"
 #include "media/codec/codec_id.h"
 #include "media/foundation/media_errors.h"
-#include "media/foundation/message_object.h"
 
 #include "message_def.h"
 
@@ -22,7 +21,6 @@ namespace ave {
 namespace player {
 
 using ave::media::CodecId;
-using ave::media::MessageObject;
 
 AVPTunnelDecoder::AVPTunnelDecoder(std::shared_ptr<CodecFactory> codec_factory,
                                    std::shared_ptr<Message> notify,
@@ -273,7 +271,7 @@ void AVPTunnelDecoder::OnOutputFormatChanged(
     const std::shared_ptr<MediaMeta>& format) {
   auto msg = std::make_shared<Message>(
       AVPTunnelDecoder::kWhatDecodingFormatChange, shared_from_this());
-  msg->setObject(kMediaMeta, std::dynamic_pointer_cast<MessageObject>(format));
+  msg->setObject(kMediaMeta, format);
   msg->post();
 }
 
@@ -293,10 +291,9 @@ void AVPTunnelDecoder::OnFrameRendered(std::shared_ptr<Message> notify) {
 void AVPTunnelDecoder::onMessageReceived(const std::shared_ptr<Message>& msg) {
   switch (msg->what()) {
     case kWhatSetVideoRender: {
-      std::shared_ptr<MessageObject> obj;
-      AVE_CHECK(msg->findObject(kVideoRender, obj));
-      auto sink = std::dynamic_pointer_cast<VideoRender>(obj);
-      OnSetVideoRender(sink);
+      std::shared_ptr<VideoRender> video_render;
+      AVE_CHECK(msg->findObject(kVideoRender, video_render));
+      OnSetVideoRender(video_render);
       break;
     }
 
@@ -316,9 +313,9 @@ void AVPTunnelDecoder::onMessageReceived(const std::shared_ptr<Message>& msg) {
     }
 
     case kWhatDecodingFormatChange: {
-      std::shared_ptr<MessageObject> format;
+      std::shared_ptr<MediaMeta> format;
       AVE_CHECK(msg->findObject(kMediaMeta, format));
-      HandleAnOutputFormatChanged(std::dynamic_pointer_cast<MediaMeta>(format));
+      HandleAnOutputFormatChanged(format);
       break;
     }
     case kWhatDecodingError: {

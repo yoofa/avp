@@ -15,9 +15,6 @@
 #include "media/foundation/media_errors.h"
 #include "media/foundation/media_frame.h"
 #include "media/foundation/media_meta.h"
-#include "media/foundation/message_object.h"
-
-#include "message_def.h"
 
 using ave::media::MediaFrame;
 
@@ -215,9 +212,8 @@ void AVPSubtitleDecoder::onMessageReceived(
     const std::shared_ptr<Message>& msg) {
   switch (msg->what()) {
     case kWhatParseSubtitle: {
-      std::shared_ptr<ave::media::MessageObject> obj;
-      if (msg->findObject("packet", obj)) {
-        auto packet = std::dynamic_pointer_cast<MediaFrame>(obj);
+      std::shared_ptr<ave::media::MediaFrame> packet;
+      if (msg->findObject("packet", packet)) {
         if (packet) {
           ParseSubtitlePacket(packet);
         }

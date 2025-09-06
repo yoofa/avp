@@ -83,7 +83,6 @@ ave_library("avp_render") {
     "//base:logging",
     "//base:task_util",
   ]
-  public_deps = [ "//media/foundation:message_object" ]
 }
 
 ave_library("avp_audio_render") {
