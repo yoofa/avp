@@ -24,6 +24,6 @@ default_args = {
   is_component_build = false
   clang_use_chrome_plugins = false
 
-  #  ffmpeg_branding = "Chrome"
+  ffmpeg_branding = "Chrome"
   libyuv_use_absl_flags = false
 }
