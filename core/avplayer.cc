@@ -278,8 +278,9 @@ void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
     AVE_LOG(LS_ERROR) << "no metadata for either audio or video source";
     source_->Stop();
     source_started_ = false;
-    if (listener_.lock()) {
-      listener_.lock()->OnError(ave::UNKNOWN_ERROR);
+    auto listener = listener_.lock();
+    if (listener) {
+      listener->OnError(ave::UNKNOWN_ERROR);
     }
     return;
   }
@@ -496,7 +497,8 @@ void AvPlayer::FinishResume() {
 }
 
 void AvPlayer::NotifyDriverSeekComplete() {
-  if (listener_.lock()) {
+  auto listener = listener_.lock();
+  if (listener) {
     // TODO: Implement seek complete notification in Listener
     // listener_.lock()->onSeekComplete();
   }
@@ -687,8 +689,10 @@ void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
       status_t err = ave::OK;
       AVE_CHECK(msg->findInt32(kError, &err));
       if (err != ave::OK) {
-        if (listener_.lock())
-          listener_.lock()->OnError(err);
+        auto listener = listener_.lock();
+        if (listener) {
+          listener->OnError(err);
+        }
       } else {
         prepared_ = true;
       }
@@ -711,8 +715,9 @@ void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
     case kWhatSourceVideoSizeChanged: {
       std::shared_ptr<MediaMeta> format;
       if (msg->findObject(kMediaMeta, format)) {
-        if (listener_.lock()) {
-          // listener_.lock()->onVideoSizeChanged(format->width(),
+        auto listener = listener_.lock();
+        if (listener) {
+          // listener->onVideoSizeChanged(format->width(),
           // format->height());
         }
       }
@@ -753,16 +758,18 @@ void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
       break;
     }
     case kWhatSourceCompletion: {
-      if (listener_.lock()) {
-        listener_.lock()->OnCompletion();
+      auto listener = listener_.lock();
+      if (listener) {
+        listener->OnCompletion();
       }
       break;
     }
     case kWhatSourceError: {
       status_t err = ave::UNKNOWN_ERROR;
       msg->findInt32(kError, &err);
-      if (listener_.lock()) {
-        listener_.lock()->OnError(err);
+      auto listener = listener_.lock();
+      if (listener) {
+        listener->OnError(err);
       }
       break;
     }
@@ -783,7 +790,8 @@ void AvPlayer::OnDecoderNotify(const std::shared_ptr<Message>& msg) {
     case AVPDecoder::kWhatVideoSizeChanged: {
       std::shared_ptr<MediaMeta> format;
       msg->findObject(kMediaMeta, format);
-      if (listener_.lock()) {
+      auto listener = listener_.lock();
+      if (listener) {
         // TODO: Implement onVideoSizeChanged in Listener interface
         // listener_.lock()->onVideoSizeChanged(format->width(),
         // format->height());
@@ -804,8 +812,9 @@ void AvPlayer::OnDecoderNotify(const std::shared_ptr<Message>& msg) {
       }
 
       if (audio_eos_ && video_eos_) {
-        if (listener_.lock()) {
-          listener_.lock()->OnCompletion();
+        auto listener = listener_.lock();
+        if (listener) {
+          listener->OnCompletion();
         }
       }
       break;
@@ -813,8 +822,9 @@ void AvPlayer::OnDecoderNotify(const std::shared_ptr<Message>& msg) {
     case AVPDecoder::kWhatError: {
       status_t err = UNKNOWN_ERROR;
       msg->findInt32(kError, &err);
-      if (listener_.lock()) {
-        listener_.lock()->OnError(err);
+      auto listener = listener_.lock();
+      if (listener) {
+        listener->OnError(err);
       }
       break;
     }
@@ -941,9 +951,9 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
 
       scan_sources_pending_ = false;
 
-      AVE_LOG(LS_INFO) << "scaning sources, has audio: "
-                       << (audio_decoder_ == nullptr)
-                       << ", has video: " << (video_decoder_ == nullptr);
+      AVE_LOG(LS_INFO) << "scaning sources, already has audio: "
+                       << (audio_decoder_ != nullptr)
+                       << ", has video: " << (video_decoder_ != nullptr);
 
       bool rescan = false;
       if (video_render_sink_ != nullptr && video_decoder_ == nullptr) {
