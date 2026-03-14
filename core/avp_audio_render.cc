@@ -246,10 +246,11 @@ uint64_t AVPAudioRender::RenderFrameInternal(
       cached_frame_->setRange(new_offset, new_size);
     }
   } else if (bytes_written == 0) {
-    // ALSA buffer full (non-blocking write returned 0).
-    // Clear the cache and keep the frame in the queue for retry.
+    // ALSA buffer full, non-blocking write couldn't accept any data.
+    // Keep frame in queue and retry after a short delay.
     cached_frame_.reset();
     consumed = false;
+    return 5000;  // retry in 5ms
   }
 
   // Calculate next frame delay based on real playback latency
@@ -432,9 +433,7 @@ ssize_t AVPAudioRender::WriteAudioData(
     return -1;
   }
 
-  // Write data to audio track (blocking: throttles decoder naturally)
-  ssize_t bytes_written =
-      audio_track_->Write(data, size, true);
+  ssize_t bytes_written = audio_track_->Write(data, size, false);
 
   if (bytes_written < 0) {
     AVE_LOG(LS_WARNING) << "Audio track write failed: " << bytes_written;
