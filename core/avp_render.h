@@ -120,6 +120,17 @@ class AVPRender {
    */
   virtual void Flush() EXCLUDES(mutex_);
 
+  /**
+   * @brief Enables or disables A/V sync. When disabled, frames are rendered
+   *        immediately without checking the master clock (useful for file output
+   *        or testing where real-time pacing is not required).
+   * @param enabled True to enable A/V sync (default), false to disable.
+   */
+  void SetSyncEnabled(bool enabled) EXCLUDES(mutex_) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    sync_enabled_ = enabled;
+  }
+
  protected:
   struct QueueEntry {
     std::shared_ptr<media::MediaFrame> frame;
@@ -196,6 +207,7 @@ class AVPRender {
   int64_t update_generation_ GUARDED_BY(mutex_);
   bool running_ GUARDED_BY(mutex_);
   bool paused_ GUARDED_BY(mutex_);
+  bool sync_enabled_ GUARDED_BY(mutex_) = true;
 
   static constexpr size_t kMaxQueueSize = 100;  // Prevent memory overflow
                                                 // Frame queue management

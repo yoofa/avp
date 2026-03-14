@@ -18,6 +18,7 @@ extern "C" {
 #include "third_party/ffmpeg/libavformat/avformat.h"
 #include "third_party/ffmpeg/libavformat/avio.h"
 #include "third_party/ffmpeg/libavutil/avutil.h"
+#include "third_party/ffmpeg/libavcodec/bsf.h"
 }
 
 namespace ave {
@@ -56,6 +57,8 @@ class FFmpegDemuxer : public Demuxer {
     std::shared_ptr<ave::media::MediaMeta> meta;
     std::shared_ptr<FFmpegSource> source;
     std::list<std::shared_ptr<ave::media::MediaFrame>> packets;
+    // Bitstream filter for AVCC→Annex-B conversion (H.264/HEVC in MP4)
+    AVBSFContext* bsf_ctx = nullptr;
 
     size_t PacketSize();
     status_t EnqueuePacket(std::shared_ptr<MediaFrame> packet);

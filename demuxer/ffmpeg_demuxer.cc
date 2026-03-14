@@ -26,15 +26,27 @@ namespace {
 
 void AppendTrackInfoToPacket(std::shared_ptr<MediaFrame>& packet,
                              std::shared_ptr<MediaMeta>& track_meta) {
-  switch (packet->stream_type()) {
+  // Save PTS/DTS/duration before changing stream type (SetStreamType resets info)
+  auto saved_pts = packet->pts();
+  auto saved_dts = packet->dts();
+  auto saved_duration = packet->duration();
+
+  // Set the correct stream type from the track metadata
+  packet->SetStreamType(track_meta->stream_type());
+
+  // Re-apply timestamps after stream type change
+  if (!saved_pts.IsMinusInfinity()) {
+    packet->SetPts(saved_pts);
+  }
+  if (!saved_dts.IsMinusInfinity()) {
+    packet->SetDts(saved_dts);
+  }
+  if (!saved_duration.IsMinusInfinity()) {
+    packet->SetDuration(saved_duration);
+  }
+
+  switch (track_meta->stream_type()) {
     case media::MediaType::AUDIO: {
-      // AVE_LOG(LS_VERBOSE) << "AppendTrackInfoToPacket, sample_rate:"
-      //                     << packet->sample_rate()
-      //                     << ", meta.sample_rate:" <<
-      //                     track_meta->sample_rate()
-      //                     << ", channel_layout:" << packet->channel_layout()
-      //                     << ", meta.channel_layout:"
-      //                     << track_meta->channel_layout();
       packet->SetChannelLayout(track_meta->channel_layout());
       packet->SetSampleRate(track_meta->sample_rate());
       packet->SetBitsPerSample(track_meta->bits_per_sample());
@@ -151,7 +163,11 @@ FFmpegDemuxer::TrackInfo::TrackInfo(size_t index,
                                     std::shared_ptr<FFmpegSource> source)
     : track_index(index), meta(std::move(meta)), source(std::move(source)) {}
 
-FFmpegDemuxer::TrackInfo::~TrackInfo() = default;
+FFmpegDemuxer::TrackInfo::~TrackInfo() {
+  if (bsf_ctx) {
+    av_bsf_free(&bsf_ctx);
+  }
+}
 
 size_t FFmpegDemuxer::TrackInfo::PacketSize() {
   return packets.size();
@@ -228,6 +244,26 @@ status_t FFmpegDemuxer::AddTrack(const AVStream* avStream, size_t index) {
       std::make_shared<FFmpegSource>(this, index, meta));
   tracks_.emplace_back(index, meta, source);
 
+  // Set up AVCC→Annex-B bitstream filter for H.264/HEVC video tracks
+  auto& track = tracks_.back();
+  const char* bsf_name = nullptr;
+  if (avStream->codecpar->codec_id == AV_CODEC_ID_H264) {
+    bsf_name = "h264_mp4toannexb";
+  } else if (avStream->codecpar->codec_id == AV_CODEC_ID_HEVC) {
+    bsf_name = "hevc_mp4toannexb";
+  }
+  if (bsf_name) {
+    const AVBitStreamFilter* bsf = av_bsf_get_by_name(bsf_name);
+    if (bsf && av_bsf_alloc(bsf, &track.bsf_ctx) == 0) {
+      avcodec_parameters_copy(track.bsf_ctx->par_in, avStream->codecpar);
+      track.bsf_ctx->time_base_in = avStream->time_base;
+      if (av_bsf_init(track.bsf_ctx) < 0) {
+        av_bsf_free(&track.bsf_ctx);
+        track.bsf_ctx = nullptr;
+      }
+    }
+  }
+
   return ave::OK;
 }
 
@@ -286,19 +322,34 @@ status_t FFmpegDemuxer::ReadAnAvPacket(size_t index) {
 
     if (pkt.stream_index >= 0 &&
         pkt.stream_index < static_cast<int>(tracks_.size())) {
-      auto packet = media::ffmpeg_utils::CreateMediaFrameFromAVPacket(&pkt);
-      // append track info to packet
-      AppendTrackInfoToPacket(packet, tracks_[pkt.stream_index].meta);
-      // AVE_LOG(LS_VERBOSE) << "readAnAvPacket, index:" << pkt.stream_index
-      //                     << ", packet size:" << packet->size()
-      //                     << ", sample_rate:" << packet->sample_rate()
-      //                     << ", meta.sample_rate:"
-      //                     << tracks_[pkt.stream_index].meta->sample_rate()
-      //                     << ", channel_layout:" << packet->sample_rate()
-      //                     << "meta.channel_layout:"
-      //                     <<
-      //                     tracks_[pkt.stream_index].meta->channel_layout();
-      tracks_[pkt.stream_index].EnqueuePacket(packet);
+      auto& track = tracks_[pkt.stream_index];
+      // Apply bitstream filter (e.g. AVCC→Annex-B for H.264/HEVC)
+      if (track.bsf_ctx) {
+        AVPacket* filtered_pkt = av_packet_alloc();
+        av_bsf_send_packet(track.bsf_ctx, &pkt);
+        if (av_bsf_receive_packet(track.bsf_ctx, filtered_pkt) == 0) {
+          // av_bsf_receive_packet may not set time_base; use bsf output time_base
+          if (filtered_pkt->time_base.den == 0 ||
+              filtered_pkt->time_base.num == 0) {
+            filtered_pkt->time_base = track.bsf_ctx->time_base_out;
+          }
+          auto packet =
+              media::ffmpeg_utils::CreateMediaFrameFromAVPacket(filtered_pkt);
+          AppendTrackInfoToPacket(packet, track.meta);
+          track.EnqueuePacket(packet);
+        }
+        av_packet_free(&filtered_pkt);
+      } else {
+        // av_read_frame may not set pkt.time_base; use stream time_base
+        if (pkt.time_base.den == 0 || pkt.time_base.num == 0) {
+          pkt.time_base =
+              av_format_context_->streams[pkt.stream_index]->time_base;
+        }
+        auto packet = media::ffmpeg_utils::CreateMediaFrameFromAVPacket(&pkt);
+        // append track info to packet
+        AppendTrackInfoToPacket(packet, track.meta);
+        track.EnqueuePacket(packet);
+      }
     }
     if (static_cast<size_t>(pkt.stream_index) == index) {
       break;

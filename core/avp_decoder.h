@@ -66,6 +66,8 @@ class AVPDecoder : public AVPDecoderBase, public CodecCallback {
     kWhatDecodingFormatChange = 'fmtC',
     kWhatDecodingError = 'ddEr',
     kWhatFrameRendered = 'frRd',
+    // retry when no input data was available
+    kWhatRetryInputBuffer = 'retI',
   };
 
   void OnConfigure(const std::shared_ptr<MediaMeta>& format) override;

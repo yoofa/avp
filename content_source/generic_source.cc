@@ -230,10 +230,16 @@ status_t GenericSource::DequeueAccessUnit(
 
   int64_t time_us = 0;
   if (access_unit->stream_type() == MediaType::VIDEO) {
-    time_us = access_unit->video_info()->pts.us();
+    auto pts = access_unit->video_info()->pts;
+    if (pts.IsFinite()) {
+      time_us = pts.us();
+    }
     video_last_dequeue_time_us_ = time_us;
   } else {
-    time_us = access_unit->audio_info()->pts.us();
+    auto pts = access_unit->audio_info()->pts;
+    if (pts.IsFinite()) {
+      time_us = pts.us();
+    }
     audio_last_dequeue_time_us_ = time_us;
   }
 

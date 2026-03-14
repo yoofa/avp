@@ -113,6 +113,15 @@ status_t AvPlayer::SetVideoRender(std::shared_ptr<VideoRender> video_render) {
   return ave::OK;
 }
 
+void AvPlayer::SetSyncEnabled(bool enabled) {
+  // video_render_ may not be created yet (created during Prepare/Start).
+  // Store the flag and apply it when the render is created.
+  sync_enabled_ = enabled;
+  if (video_render_) {
+    video_render_->SetSyncEnabled(enabled);
+  }
+}
+
 status_t AvPlayer::Prepare() {
   auto msg = std::make_shared<Message>(kWhatPrepare, shared_from_this());
   msg->post();
@@ -225,6 +234,7 @@ status_t AvPlayer::InstantiateDecoder(
     video_render_ = std::make_shared<AVPVideoRender>(task_runner_factory_.get(),
                                                      sync_controller_.get());
     video_render_->SetSink(video_render_sink_);
+    video_render_->SetSyncEnabled(sync_enabled_);
     decoder = AVPDecoderFactory::CreateDecoder(codec_factory_, notify, source_,
                                                video_render_, format,
                                                video_render_sink_);

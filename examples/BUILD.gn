@@ -8,14 +8,25 @@ ave_executable("avplay") {
   sources = [
     "avplay/av_play.cc",
     "avplay/av_play.h",
+    "avplay/file_sink.cc",
+    "avplay/file_sink.h",
   ]
   deps = [
-    ":gtk_window",
+    "../api:player_interface",
     "../base:logging",
     "../core:avplayer_builder",
+    "../media/audio:audio_device_base",
+    "../media/audio:audio_channel_layout",
+    "../media/video:video_render",
+    "../media/foundation",
   ]
 
-  deps += [ "gtk" ]
+  if (is_linux) {
+    deps += [
+      ":gtk_window",
+      "gtk",
+    ]
+  }
 }
 
 ave_library("gtk_window") {
@@ -33,5 +44,7 @@ ave_library("gtk_window") {
     "//third_party/libyuv",
   ]
 
-  deps += [ "gtk" ]
+  if (is_linux) {
+    deps += [ "gtk" ]
+  }
 }

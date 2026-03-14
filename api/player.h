@@ -186,6 +186,14 @@ class Player {
       std::shared_ptr<ave::media::VideoRender> video_render) = 0;
 
   /**
+   * @brief Enables or disables A/V synchronization.
+   *        When disabled, frames are rendered immediately without clock-based
+   *        pacing (useful for file output or testing).
+   * @param enabled True to enable A/V sync (default), false to disable.
+   */
+  virtual void SetSyncEnabled(bool enabled) = 0;
+
+  /**
    * @brief Prepares the player for playback.
    * @return The status of the preparation.
    */

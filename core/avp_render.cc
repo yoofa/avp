@@ -151,12 +151,12 @@ int64_t AVPRender::CalculateRenderLateUs(
   int64_t frame_pts_us = 0;
   if (frame->stream_type() == media::MediaType::AUDIO) {
     auto* audio_info = frame->audio_info();
-    if (audio_info) {
+    if (audio_info && audio_info->pts.IsFinite()) {
       frame_pts_us = audio_info->pts.us();
     }
   } else if (frame->stream_type() == media::MediaType::VIDEO) {
     auto* video_info = frame->video_info();
-    if (video_info) {
+    if (video_info && video_info->pts.IsFinite()) {
       frame_pts_us = video_info->pts.us();
     }
   }
@@ -205,9 +205,9 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
   } else {
     // For video/subtitle, use original logic with drop frame behavior
     // Calculate delay within mutex lock
-    int64_t late_us = CalculateRenderLateUs(frame);
+    int64_t late_us = sync_enabled_ ? CalculateRenderLateUs(frame) : 0;
 
-    if (late_us > 40000) {
+    if (sync_enabled_ && late_us > 40000) {
       // too late, drop the frame
       AVE_LOG(LS_INFO) << "Dropping frame, delay: " << late_us << "us";
       ReleaseFrame(entry, false);

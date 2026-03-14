@@ -205,7 +205,7 @@ void AVPTunnelDecoder::HandleAnInputBuffer(size_t index) {
 
   FillCodecBuffer(codec_buffer);
 
-  status_t err = decoder_->QueueInputBuffer(codec_buffer);
+  status_t err = decoder_->QueueInputBuffer(index);
   if (err != OK) {
     AVE_LOG(LS_ERROR) << "Tunnel QueueInputBuffer failed: " << err;
     ReportError(err);
@@ -237,7 +237,7 @@ void AVPTunnelDecoder::HandleAnOutputBuffer(size_t index) {
 
   // In tunnel mode, the hardware automatically renders the frame
   // We just need to release the buffer with render=true
-  decoder_->ReleaseOutputBuffer(buffer, true);
+  decoder_->ReleaseOutputBuffer(index, true);
 }
 
 void AVPTunnelDecoder::HandleAnOutputFormatChanged(

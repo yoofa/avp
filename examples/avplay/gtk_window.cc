@@ -9,11 +9,13 @@
 
 #include <gtk/gtk.h>
 #include <memory>
+#include <string>
 
 #include "base/checks.h"
 #include "base/logging.h"
 #include "third_party/libyuv/include/libyuv/convert.h"
 #include "third_party/libyuv/include/libyuv/convert_from.h"
+#include "api/player.h"
 
 namespace {
 
@@ -177,4 +179,49 @@ void GtkWnd::GtkVideoRender::setSize(int width, int height) {
   height_ = height;
   image_.reset(new uint8_t[width * height * 4]);
   GDK_THREADS_LEAVE();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GTK display mode entry point called from av_play.cc
+// ─────────────────────────────────────────────────────────────────────────────
+
+namespace ave {
+namespace player {
+
+class GtkExListener : public ave::player::Player::Listener {
+ public:
+  GtkExListener() = default;
+  void OnCompletion() override {
+    AVE_LOG(base::LS_INFO) << "onCompletion";
+    gtk_main_quit();
+  }
+  void OnError(ave::status_t error) override {
+    AVE_LOG(base::LS_ERROR) << "onError: " << error;
+    gtk_main_quit();
+  }
+};
+
+}  // namespace player
+}  // namespace ave
+
+void gtk_main_avplay(const std::string& url,
+                     std::shared_ptr<ave::player::Player::Listener> listener) {
+  int fake_argc = 0;
+  gtk_init(&fake_argc, nullptr);
+
+  std::unique_ptr<GtkWnd> gtkWindow(std::make_unique<GtkWnd>());
+  gtkWindow->create();
+
+  auto player = ave::player::Player::Builder().build();
+  AVE_DCHECK(player->SetListener(listener) == ave::OK);
+  AVE_DCHECK(player->Init() == ave::OK);
+  gtkWindow->addVideoRender();
+  AVE_DCHECK(player->SetVideoRender(gtkWindow->videoRender()) == ave::OK);
+  AVE_DCHECK(player->SetDataSource(url.c_str(), {}) == ave::OK);
+  AVE_DCHECK(player->Prepare() == ave::OK);
+  sleep(2);
+  player->Start();
+  gtk_main();
+  player->Stop();
+  player.reset();
 }

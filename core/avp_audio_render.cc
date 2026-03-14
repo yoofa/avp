@@ -174,14 +174,29 @@ uint64_t AVPAudioRender::RenderFrameInternal(
     return 0;
   }
 
-  if (!audio_sink_ready_ || !audio_track_) {
-    AVE_LOG(LS_WARNING) << "Audio sink not ready, dropping frame";
-    return 0;
-  }
-
   auto* audio_info = frame->audio_info();
   if (!audio_info) {
     AVE_LOG(LS_WARNING) << "No audio info in frame";
+    return 0;
+  }
+
+  // Initialize audio track from the first frame if not yet done
+  if (!format_initialized_) {
+    current_audio_config_ = ConvertToAudioConfig(frame);
+    AVE_LOG(LS_INFO) << "First frame: creating audio track - sample_rate: "
+                     << current_audio_config_.sample_rate << ", channels: "
+                     << static_cast<int>(current_audio_config_.channel_layout);
+    status_t result = CreateAudioTrack();
+    if (result != OK) {
+      AVE_LOG(LS_ERROR) << "Failed to create audio track from first frame";
+      return 0;
+    }
+    format_initialized_ = true;
+    audio_sink_ready_ = true;
+  }
+
+  if (!audio_sink_ready_ || !audio_track_) {
+    AVE_LOG(LS_WARNING) << "Audio sink not ready, dropping frame";
     return 0;
   }
 
@@ -235,9 +250,11 @@ uint64_t AVPAudioRender::RenderFrameInternal(
   // Calculate next frame delay based on real playback latency
   // This should be based on the audio track's buffer state and sample rate
   int64_t next_delay_us = CalculateNextAudioFrameDelay();
-  last_audio_pts_us_ = audio_info->pts.us();
-  AVE_LOG(LS_WARNING) << "Wrote " << bytes_written
-                      << " bytes to audio track, next delay: " << next_delay_us;
+  if (audio_info->pts.IsFinite()) {
+    last_audio_pts_us_ = audio_info->pts.us();
+  }
+  AVE_LOG(LS_VERBOSE) << "Wrote " << bytes_written
+                      << " bytes to audio track";
   return next_delay_us;
 }
 
@@ -247,6 +264,7 @@ status_t AVPAudioRender::CreateAudioTrack() {
     return UNKNOWN_ERROR;
   }
 
+  AVE_LOG(LS_DEBUG) << "CreateAudioTrack: creating audio track object";
   audio_track_ = audio_device_->CreateAudioTrack();
   if (!audio_track_) {
     AVE_LOG(LS_ERROR) << "Failed to create audio track";
@@ -254,7 +272,12 @@ status_t AVPAudioRender::CreateAudioTrack() {
   }
 
   // Open the audio track with current configuration
+  AVE_LOG(LS_DEBUG) << "CreateAudioTrack: calling Open() with sr="
+                    << current_audio_config_.sample_rate << " ch="
+                    << static_cast<int>(current_audio_config_.channel_layout)
+                    << " fmt=" << static_cast<int>(current_audio_config_.format);
   status_t result = audio_track_->Open(current_audio_config_);
+  AVE_LOG(LS_DEBUG) << "CreateAudioTrack: Open() returned " << result;
   if (result != OK) {
     AVE_LOG(LS_ERROR) << "Failed to open audio track, error: " << result;
     audio_track_.reset();
@@ -426,8 +449,14 @@ void AVPAudioRender::UpdateSyncAnchor(
     return;
   }
 
+  if (!audio_info->pts.IsFinite()) {
+    return;
+  }
+
   int64_t frame_pts_us = audio_info->pts.us();
-  int64_t frame_duration_us = audio_info->duration.us();
+  int64_t frame_duration_us = audio_info->duration.IsFinite()
+                                  ? audio_info->duration.us()
+                                  : 0;
   int64_t current_sys_time_us = base::TimeMicros();
 
   // Calculate the end time of this audio frame
@@ -484,8 +513,6 @@ int64_t AVPAudioRender::CalculateNextAudioFrameDelay() {
   uint32_t frames_written = 0;
   audio_track_->GetFramesWritten(&frames_written);
 
-  auto played_out_duration_us = audio_track_->GetPlayedOutDurationUs(0);
-
   // Get the latency of the audio track
   uint32_t latency_ms = audio_track_->latency();
   int64_t latency_us = latency_ms * 1000LL;
@@ -494,19 +521,9 @@ int64_t AVPAudioRender::CalculateNextAudioFrameDelay() {
   float msecs_per_frame = audio_track_->msecsPerFrame();
   auto frame_duration_us = static_cast<int64_t>(msecs_per_frame * 1000.0f);
 
-  // If buffer is nearly full, we need to wait longer
-  // If buffer is nearly empty, we can write more data
-  // For now, use a simple approach: schedule next frame after one frame
-  // duration In a real implementation, you'd want to maintain a target buffer
-  // level
-
-  int64_t next_delay_us = frame_duration_us;
-
-  AVE_LOG(LS_INFO) << __FUNCTION__ << ", frames_written: " << frames_written
-                   << ", played_out_duration_us: " << played_out_duration_us
-                   << ", latency_us: " << latency_us
-                   << ", frame_duration_us: " << frame_duration_us
-                   << ", next_delay_us: " << next_delay_us;
+  AVE_LOG(LS_VERBOSE) << __FUNCTION__ << ", frames_written: " << frames_written
+                      << ", latency_us: " << latency_us
+                      << ", frame_duration_us: " << frame_duration_us;
 
   return latency_us / 2;
 }

@@ -66,6 +66,7 @@ AVE_EXPORT class AvPlayer : public Player,
   status_t SetDataSource(std::shared_ptr<ave::DataSource> data_source) override;
   status_t SetDataSource(std::shared_ptr<ContentSource> source) override;
   status_t SetVideoRender(std::shared_ptr<VideoRender> video_render) override;
+  void SetSyncEnabled(bool enabled) override;
 
   // High-level control similar to ExoPlayer/NuPlayer
   status_t Prepare() override;
@@ -277,6 +278,7 @@ AVE_EXPORT class AvPlayer : public Player,
   bool prepared_;
   bool paused_;
   bool paused_for_buffering_;
+  bool sync_enabled_ = true;
   bool paused_by_client_;
   bool source_started_;
   bool scan_sources_pending_;

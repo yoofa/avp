@@ -15,6 +15,7 @@
 #include "base/logging.h"
 #include "media/codec/codec_id.h"
 #include "media/foundation/media_errors.h"
+#include "media/foundation/media_meta.h"
 
 #include "message_def.h"
 
@@ -189,15 +190,21 @@ void AVPDecoder::FillCodecBuffer(std::shared_ptr<CodecBuffer>& buffer) {
   auto packet = input_packet_queue_.front();
   input_packet_queue_.pop_front();
 
-  // TODO: Set metadata when CodecBuffer supports it
-  // buffer->meta()->setInt64("pts", packet->pts());
-  // buffer->meta()->setInt32("flags", packet->flags());
   buffer->SetRange(0, packet->size());
   memcpy(buffer->data(), packet->data(), packet->size());
+
+  // Pass the PTS from input packet so the codec can stamp output frames
+  auto meta = media::MediaMeta::CreatePtr(
+      is_audio_ ? MediaType::AUDIO : MediaType::VIDEO,
+      media::MediaMeta::FormatType::kSample);
+  auto pkt_pts = packet->pts();
+  meta->SetPts(pkt_pts);
+  buffer->format() = meta;
 }
 
 /************* CodecCallback event handler *************/
 void AVPDecoder::HandleAnInputBuffer(size_t index) {
+  AVE_LOG(LS_VERBOSE) << "HandleAnInputBuffer, index:" << index;
   if (decoder_ == nullptr) {
     AVE_LOG(LS_ERROR) << "HandleAnInputBuffer: decoder is nullptr";
     ReportError(ave::NO_INIT);
@@ -212,16 +219,26 @@ void AVPDecoder::HandleAnInputBuffer(size_t index) {
     return;
   }
 
+  // Refill packet queue before filling the codec buffer
+  OnRequestInputBuffers();
+
+  if (input_packet_queue_.empty()) {
+    // No data yet; schedule a retry so we don't send an empty (EOS) buffer
+    auto retry_msg = std::make_shared<Message>(kWhatRetryInputBuffer,
+                                               shared_from_this());
+    retry_msg->setInt32(kIndex, static_cast<int32_t>(index));
+    retry_msg->post(5 * 1000LL);  // 5 ms
+    return;
+  }
+
   FillCodecBuffer(codec_buffer);
 
-  status_t err = decoder_->QueueInputBuffer(codec_buffer);
+  status_t err = decoder_->QueueInputBuffer(index);
   if (err != OK) {
     AVE_LOG(LS_ERROR) << "QueueInputBuffer failed: " << err;
     ReportError(err);
     return;
   }
-
-  OnRequestInputBuffers();
 }
 
 void AVPDecoder::HandleAnOutputBuffer(size_t index) {
@@ -248,25 +265,33 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
   if (is_audio_) {
     frame = media::MediaFrame::CreateSharedAsCopy(
         buffer->data(), buffer->size(), MediaType::AUDIO);
+    // Copy audio format metadata (sample rate, channels, PTS, etc.)
+    if (buffer->format() && buffer->format()->sample_info()) {
+      *frame->audio_info() = buffer->format()->sample_info()->audio();
+    }
   } else {
-    // For video, if the buffer is a texture or handle, still notify render for
-    // AV sync.
-    frame = media::MediaFrame::CreateShared(0, MediaType::VIDEO);
+    // Copy the YUV pixel data from the codec buffer
+    frame = media::MediaFrame::CreateSharedAsCopy(
+        buffer->data(), buffer->size(), MediaType::VIDEO);
+    // Copy video format metadata using direct setters (frame is kTrack type)
+    if (buffer->format() && buffer->format()->sample_info()) {
+      const auto& vinfo = buffer->format()->sample_info()->video();
+      frame->SetWidth(vinfo.width);
+      frame->SetHeight(vinfo.height);
+      frame->SetStride(vinfo.stride);
+      frame->SetPixelFormat(vinfo.pixel_format);
+      if (!vinfo.pts.IsMinusInfinity()) {
+        frame->SetPts(vinfo.pts);
+      }
+    }
   }
-  // TODO: Set PTS from buffer metadata when available
 
   if (avp_render_) {
     // Release the codec buffer after the frame has been rendered or dropped
-    auto buffer_to_release = buffer;
-    avp_render_->RenderFrame(frame, [this, buffer_to_release](bool rendered) {
-      if (decoder_) {
-        auto buf = buffer_to_release;  // copy to mutable for API
-        decoder_->ReleaseOutputBuffer(buf, rendered);
-      }
-    });
+    decoder_->ReleaseOutputBuffer(index, false);
+    avp_render_->RenderFrame(frame, [](bool /*rendered*/) {});
   } else {
-    // If no renderer, just release the buffer
-    decoder_->ReleaseOutputBuffer(buffer, false);
+    decoder_->ReleaseOutputBuffer(index, false);
   }
 }
 
@@ -359,6 +384,13 @@ void AVPDecoder::onMessageReceived(const std::shared_ptr<Message>& msg) {
       status_t err = 0;
       AVE_CHECK(msg->findInt32(kError, &err));
       HandleAnCodecError(err);
+      break;
+    }
+
+    case kWhatRetryInputBuffer: {
+      int32_t index = 0;
+      AVE_CHECK(msg->findInt32(kIndex, &index));
+      HandleAnInputBuffer(static_cast<size_t>(index));
       break;
     }
 
