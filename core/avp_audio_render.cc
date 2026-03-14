@@ -245,6 +245,11 @@ uint64_t AVPAudioRender::RenderFrameInternal(
       auto new_size = cached_frame_->size() - bytes_written;
       cached_frame_->setRange(new_offset, new_size);
     }
+  } else if (bytes_written == 0) {
+    // ALSA buffer full (non-blocking write returned 0).
+    // Clear the cache and keep the frame in the queue for retry.
+    cached_frame_.reset();
+    consumed = false;
   }
 
   // Calculate next frame delay based on real playback latency
@@ -427,9 +432,9 @@ ssize_t AVPAudioRender::WriteAudioData(
     return -1;
   }
 
-  // Write data to audio track
+  // Write data to audio track (blocking: throttles decoder naturally)
   ssize_t bytes_written =
-      audio_track_->Write(data, size, false);  // Non-blocking write
+      audio_track_->Write(data, size, true);
 
   if (bytes_written < 0) {
     AVE_LOG(LS_WARNING) << "Audio track write failed: " << bytes_written;
@@ -466,6 +471,8 @@ void AVPAudioRender::UpdateSyncAnchor(
   GetAVSyncController()->UpdateAnchor(frame_pts_us, current_sys_time_us,
                                       frame_end_pts_us);
 
+  AVE_LOG(LS_VERBOSE) << "UpdateSyncAnchor PTS=" << frame_pts_us / 1000
+                     << "ms sys=" << current_sys_time_us / 1000 << "ms";
   AVE_LOG(LS_VERBOSE) << "Updated sync anchor - PTS: " << frame_pts_us
                       << "us, sys_time: " << current_sys_time_us
                       << "us, max_time: " << frame_end_pts_us << "us";
@@ -522,6 +529,7 @@ int64_t AVPAudioRender::CalculateNextAudioFrameDelay() {
   auto frame_duration_us = static_cast<int64_t>(msecs_per_frame * 1000.0f);
 
   AVE_LOG(LS_VERBOSE) << __FUNCTION__ << ", frames_written: " << frames_written
+                      << ", latency_ms: " << latency_ms
                       << ", latency_us: " << latency_us
                       << ", frame_duration_us: " << frame_duration_us;
 

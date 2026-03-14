@@ -51,10 +51,12 @@ void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame,
   }
 
   // Add frame to queue
+  bool was_empty = frame_queue_.empty();
   frame_queue_.push(QueueEntry{std::move(frame), std::move(render_event)});
 
-  // Schedule next frame if not already scheduling and not paused
-  if (!paused_) {
+  // Only schedule a new task when the queue was empty; if frames already
+  // exist, the in-flight OnRenderTask will self-schedule after processing.
+  if (!paused_ && was_empty) {
     ScheduleNextFrame();
   }
 }

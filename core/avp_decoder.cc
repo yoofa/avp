@@ -287,9 +287,13 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
   }
 
   if (avp_render_) {
-    // Release the codec buffer after the frame has been rendered or dropped
-    decoder_->ReleaseOutputBuffer(index, false);
-    avp_render_->RenderFrame(frame, [](bool /*rendered*/) {});
+    // Release the codec output buffer only after the frame is consumed from the
+    // render queue. This creates backpressure: the decoder can't produce more
+    // frames than the renderer consumes, preventing queue overflow.
+    auto decoder = decoder_;
+    avp_render_->RenderFrame(frame, [decoder, index](bool /*rendered*/) {
+      decoder->ReleaseOutputBuffer(index, false);
+    });
   } else {
     decoder_->ReleaseOutputBuffer(index, false);
   }

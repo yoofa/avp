@@ -9,5 +9,7 @@ ave_library("generic_content_source") {
     "../core:packet_source",
     "//api:api_content_source",
     "//base/data_source:file_source",
+    "//media/foundation:handler",
+    "//media/foundation:media_source",
   ]
 }

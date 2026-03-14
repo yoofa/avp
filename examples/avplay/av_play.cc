@@ -25,13 +25,12 @@
 using namespace ave;
 using ave::player::Player;
 using ave::player::YuvFileVideoRender;
-using ave::player::FileAudioDevice;
 
 void printHelp() {
   std::cout << "help:\n"
                "  -f/--file <file>   : file to play\n"
-               "  -o/--output <base> : write output to <base>.yuv and <base>.wav\n"
-               "                       (headless mode, no display needed)\n"
+               "  -o/--output <base> : write video to <base>.yuv, play audio via\n"
+               "                       ALSA/PulseAudio (no display needed)\n"
                "  -d/--duration <s>  : stop after <s> seconds (default: full)\n"
                "  -h/--help\n";
   exit(1);
@@ -98,25 +97,20 @@ int main(int argc, char* argv[]) {
   bool headless = !output_base.empty();
 
   if (headless) {
-    // ── Headless file-output mode ────────────────────────────────────────────
+    // ── File-video + ALSA-audio mode ─────────────────────────────────────────
+    // Video is written to a YUV file; audio plays through ALSA/PulseAudio.
+    // A/V sync is enabled (audio hardware provides the real-time reference).
     std::string yuv_path = output_base + ".yuv";
-    std::string wav_path = output_base + ".wav";
-    std::cout << "Headless mode: writing video to " << yuv_path
-              << ", audio to " << wav_path << std::endl;
+    std::cout << "Video-to-file mode: writing video to " << yuv_path
+              << ", audio via ALSA/PulseAudio" << std::endl;
 
     auto video_render = std::make_shared<YuvFileVideoRender>(yuv_path);
-    auto audio_device = std::make_shared<FileAudioDevice>(wav_path);
 
-    std::shared_ptr<Player> player =
-        Player::Builder()
-            .setAudioDeviceFactory(audio_device)
-            .build();
+    // Use default system audio device (ALSA or PulseAudio).
+    std::shared_ptr<Player> player = Player::Builder().build();
 
     AVE_DCHECK(player->SetListener(listener) == ave::OK);
     AVE_DCHECK(player->Init() == ave::OK);
-    // File output mode: disable A/V sync so all frames are rendered immediately
-    // without clock-based pacing (audio writes too fast in file mode).
-    player->SetSyncEnabled(false);
     AVE_DCHECK(player->SetVideoRender(video_render) == ave::OK);
     AVE_DCHECK(player->SetDataSource(url.c_str(), {}) == ave::OK);
     AVE_DCHECK(player->Prepare() == ave::OK);
