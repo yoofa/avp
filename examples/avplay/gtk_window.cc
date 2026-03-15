@@ -85,6 +85,7 @@ void GtkWnd::addVideoRender() {
 
 void GtkWnd::onDestroyed(GtkWidget* widget) {
   AVE_LOG(ave::LS_INFO) << "onDestroyed";
+  gtk_main_quit();
 }
 
 void GtkWnd::onKeyPress(GtkWidget* widget, GdkEventKey* key) {
