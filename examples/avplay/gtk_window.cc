@@ -156,9 +156,15 @@ GtkWnd::GtkVideoRender::GtkVideoRender(GtkWnd* window)
 GtkWnd::GtkVideoRender::~GtkVideoRender() {}
 
 void GtkWnd::GtkVideoRender::OnFrame(const std::shared_ptr<MediaFrame>& frame) {
-  int32_t width = frame->width();
-  int32_t height = frame->height();
-  int32_t stride = frame->stride();
+  auto* vinfo = frame->video_info();
+  if (!vinfo || vinfo->width <= 0 || vinfo->height <= 0) {
+    return;
+  }
+
+  int32_t width = vinfo->width;
+  int32_t height = vinfo->height;
+  // stride == width because the codec packs with alignment=1
+  int32_t stride = vinfo->stride > 0 ? vinfo->stride : width;
 
   setSize(width, height);
 
