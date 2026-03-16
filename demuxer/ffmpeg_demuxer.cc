@@ -72,8 +72,11 @@ int64_t lastVideoTimeUs = 0;
 static int AVIOReadOperation(void* opaque, uint8_t* buf, int size) {
   auto* data_source = reinterpret_cast<DataSource*>(opaque);
   ssize_t result = data_source->Read(buf, size);
+  if (result == 0) {
+    return AVERROR_EOF;
+  }
   if (result < 0) {
-    result = AVERROR(EIO);
+    return AVERROR(EIO);
   }
   return static_cast<int>(result);
 }
@@ -83,10 +86,24 @@ static int64_t AVIOSeekOperation(void* opaque, int64_t offset, int whence) {
   int64_t new_offset = AVERROR(EIO);
   switch (whence) {
     case SEEK_SET:
-    case SEEK_CUR:
-    case SEEK_END:
-      new_offset = data_source->Seek(offset, whence);
+      new_offset = data_source->Seek(offset, SEEK_SET);
       break;
+
+    case SEEK_CUR: {
+      // Translate to absolute position
+      off64_t cur = 0;
+      data_source->GetPosition(&cur);
+      new_offset = data_source->Seek(cur + offset, SEEK_SET);
+      break;
+    }
+
+    case SEEK_END: {
+      // Translate to absolute position from end
+      off64_t size = 0;
+      data_source->GetSize(&size);
+      new_offset = data_source->Seek(size + offset, SEEK_SET);
+      break;
+    }
 
     case AVSEEK_SIZE:
       data_source->GetSize(&new_offset);
@@ -198,7 +215,9 @@ FFmpegDemuxer::FFmpegDemuxer(std::shared_ptr<ave::DataSource> data_source)
   av_io_context_ = avio_alloc_context(
       static_cast<unsigned char*>(av_malloc(kBufferSize)), kBufferSize, 0,
       data_source_.get(), &AVIOReadOperation, nullptr, &AVIOSeekOperation);
-  av_io_context_->seekable = data_source_->Flags() & DataSource::kSeekable;
+  av_io_context_->seekable =
+      (data_source_->Flags() & DataSource::kSeekable) ? AVIO_SEEKABLE_NORMAL
+                                                       : 0;
   av_io_context_->write_flag = 0;
 
   av_format_context_->flags |= AVFMT_FLAG_CUSTOM_IO;
@@ -212,7 +231,16 @@ status_t FFmpegDemuxer::Init() {
   AVIOSeekOperation(av_io_context_->opaque, 0, SEEK_CUR);
   int ret = OK;
   ret = avformat_open_input(&av_format_context_, nullptr, nullptr, nullptr);
+  AVE_LOG(LS_VERBOSE) << "avformat_open_input ret=" << ret;
+
+  // Limit probing so avformat_find_stream_info doesn't try to decode frames
+  // to detect stream parameters.  Container formats like MP4/MKV embed all
+  // codec parameters in their headers, so 1 MB / 1 s is more than enough.
+  av_format_context_->probesize = 1 * 1024 * 1024;        // 1 MB
+  av_format_context_->max_analyze_duration = AV_TIME_BASE; // 1 s
+
   ret = avformat_find_stream_info(av_format_context_, nullptr);
+  AVE_LOG(LS_VERBOSE) << "avformat_find_stream_info ret=" << ret;
   source_format_ = MediaMeta::CreatePtr(ave::media::MediaType::AUDIO,
                                         MediaMeta::FormatType::kTrack);
 
