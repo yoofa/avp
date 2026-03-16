@@ -33,6 +33,10 @@ import io.github.yoofa.media.VideoRenderer;
 public class AvpPlayer {
     private static final String TAG = "AvpPlayer";
 
+    static {
+        System.loadLibrary("avp_android");
+    }
+
     private long nativePlayer;
     private @Nullable OnPreparedListener onPreparedListener;
     private @Nullable OnCompletionListener onCompletionListener;
