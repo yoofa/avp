@@ -1,0 +1,77 @@
+import("//base/build/ave.gni")
+import("//build/config/android/rules.gni")
+import("//third_party/jni_zero/jni_zero.gni")
+
+group("android") {
+  if (is_android) {
+    deps = [
+      ":avp_java",
+      ":avp_jni",
+      ":libavp",
+    ]
+  }
+}
+
+if (is_android) {
+  ave_android_library("avp_java") {
+    visibility = [ "*" ]
+    sources = [
+      "api/io/github/yoofa/avp/AvpPlayer.java",
+    ]
+    deps = [
+      "//base/android:ave_base_java",
+      "//media/android:ave_media_java",
+      "//third_party/androidx:androidx_annotation_annotation_java",
+      "//third_party/jni_zero:jni_zero_java",
+    ]
+  }
+
+  generate_jni("generated_avp_jni") {
+    sources = [
+      "api/io/github/yoofa/avp/AvpPlayer.java",
+    ]
+    namespace = "ave::jni"
+    jni_generator_include = "//base/android/jni/jni_generator_helper.h"
+  }
+
+  ave_library("avp_jni") {
+    visibility = [ "*" ]
+    sources = [
+      "src/jni/avp_player_jni.cc",
+      "src/jni/avp_player_jni.h",
+      "src/jni/jni_onload.cc",
+    ]
+    deps = [
+      ":generated_avp_jni",
+      "//api:player_interface",
+      "//base:logging",
+      "//base/android:ave_jni",
+      "//media/android:ave_media_jni",
+      "//third_party/jni_zero",
+    ]
+  }
+
+  shared_library("libavp") {
+    output_name = "avp_android"
+    sources = []
+    deps = [
+      "//base/android:ave_jni",
+      "//core:avplayer_builder",
+      "//media/android:ave_media_jni",
+      "//third_party/jni_zero",
+    ]
+
+    # Export Java_* symbols for lazy JNI lookup
+    configs -= [ "//build/config/android:hide_all_but_jni_onload" ]
+    configs += [ "//build/config/android:hide_all_but_jni" ]
+
+    # Retain JNI entry points with whole-archive
+    data_deps = [ ":avp_jni" ]
+    ldflags = [
+      "-Wl,--whole-archive",
+      rebase_path("$root_out_dir/obj/sdk/android/libavp_jni.a",
+                  root_build_dir),
+      "-Wl,--no-whole-archive",
+    ]
+  }
+}
