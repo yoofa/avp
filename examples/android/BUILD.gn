@@ -1,0 +1,47 @@
+import("//avp.gni")
+import("//base/build/ave.gni")
+
+if (is_android) {
+  import("//build/config/android/rules.gni")
+
+  group("android") {
+    deps = [ ":AvpDemo" ]
+  }
+
+  ave_android_apk("AvpDemo") {
+    apk_name = "AvpDemo"
+    android_manifest = "AndroidManifest.xml"
+    min_sdk_version = 26
+    target_sdk_version = 34
+
+    deps = [
+      ":avpdemo_java",
+    ]
+
+    # Bundle the native player library
+    shared_libraries = [ "//sdk/android:libavp" ]
+  }
+
+  ave_android_library("avpdemo_java") {
+    sources = [
+      "java/io/github/yoofa/avpdemo/MainActivity.java",
+      "java/io/github/yoofa/avpdemo/PlayerActivity.java",
+    ]
+
+    resources_package = "io.github.yoofa.avpdemo"
+
+    deps = [
+      ":avpdemo_resources",
+      "//sdk/android:avp_java",
+    ]
+  }
+
+  android_resources("avpdemo_resources") {
+    sources = [
+      "java/res/layout/activity_main.xml",
+      "java/res/layout/activity_player.xml",
+      "java/res/values/strings.xml",
+    ]
+    android_manifest = "AndroidManifest.xml"
+  }
+}
