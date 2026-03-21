@@ -45,24 +45,33 @@ void AVPDecoder::OnConfigure(const std::shared_ptr<MediaMeta>& format) {
 
   auto mime = format->mime();
 
-  AVE_LOG(LS_INFO) << "onConfigure, mime:" << mime;
+  AVE_LOG(LS_INFO) << "AVPDecoder::OnConfigure: mime=" << mime
+                   << ", stream_type="
+                   << static_cast<int>(format->stream_type());
 
   is_audio_ = !strncasecmp("audio/", mime.c_str(), 6);
   auto codec_id = ave::media::MimeToCodecId(mime.c_str());
 
   if (codec_id == CodecId::AVE_CODEC_ID_NONE) {
-    AVE_LOG(LS_ERROR) << "unknown codec, mime:" << mime;
+    AVE_LOG(LS_ERROR) << "AVPDecoder::OnConfigure: unknown codec, mime="
+                      << mime;
     ReportError(ave::media::ERROR_UNSUPPORTED);
     return;
   }
 
+  AVE_LOG(LS_INFO) << "AVPDecoder::OnConfigure: codec_id="
+                   << static_cast<int>(codec_id)
+                   << ", creating decoder via factory";
   decoder_ = codec_factory_->CreateCodecByType(codec_id, false);
 
   if (decoder_ == nullptr) {
-    AVE_LOG(LS_ERROR) << "decoder create failed, mime:" << mime;
+    AVE_LOG(LS_ERROR) << "AVPDecoder::OnConfigure: decoder create failed"
+                      << ", mime=" << mime;
     ReportError(ave::media::ERROR_UNSUPPORTED);
     return;
   }
+
+  AVE_LOG(LS_INFO) << "AVPDecoder::OnConfigure: codec created, configuring...";
 
   auto config = std::make_shared<ave::media::CodecConfig>();
   config->format = format;
@@ -75,12 +84,16 @@ void AVPDecoder::OnConfigure(const std::shared_ptr<MediaMeta>& format) {
   status_t err = decoder_->Configure(config);
 
   if (err != ave::OK) {
+    AVE_LOG(LS_ERROR) << "AVPDecoder::OnConfigure: Configure failed, err="
+                      << err;
     decoder_.reset();
     ReportError(err);
     return;
   }
 
+  AVE_LOG(LS_INFO) << "AVPDecoder::OnConfigure: setting callback";
   decoder_->SetCallback(this);
+  AVE_LOG(LS_INFO) << "AVPDecoder::OnConfigure: complete";
 }
 
 void AVPDecoder::OnSetParameters(const std::shared_ptr<Message>& params) {
@@ -101,9 +114,9 @@ void AVPDecoder::OnSetVideoRender(
 }
 
 void AVPDecoder::OnStart() {
-  AVE_LOG(LS_VERBOSE) << "onStart";
+  AVE_LOG(LS_INFO) << "AVPDecoder::OnStart: is_audio=" << is_audio_;
   if (decoder_ == nullptr) {
-    AVE_LOG(LS_ERROR) << "Failed to start decoder, no support decoder";
+    AVE_LOG(LS_ERROR) << "AVPDecoder::OnStart: no decoder";
     ReportError(ave::UNKNOWN_ERROR);
     return;
   }
@@ -111,12 +124,13 @@ void AVPDecoder::OnStart() {
   status_t err = decoder_->Start();
 
   if (err != ave::OK) {
-    AVE_LOG(LS_ERROR) << "Failed to start decoder, err:" << err;
+    AVE_LOG(LS_ERROR) << "AVPDecoder::OnStart: Start failed, err=" << err;
     decoder_.reset();
     ReportError(err);
     return;
   }
 
+  AVE_LOG(LS_INFO) << "AVPDecoder::OnStart: codec started, requesting input";
   OnRequestInputBuffers();
 }
 
@@ -224,8 +238,8 @@ void AVPDecoder::HandleAnInputBuffer(size_t index) {
 
   if (input_packet_queue_.empty()) {
     // No data yet; schedule a retry so we don't send an empty (EOS) buffer
-    auto retry_msg = std::make_shared<Message>(kWhatRetryInputBuffer,
-                                               shared_from_this());
+    auto retry_msg =
+        std::make_shared<Message>(kWhatRetryInputBuffer, shared_from_this());
     retry_msg->setInt32(kIndex, static_cast<int32_t>(index));
     retry_msg->post(5 * 1000LL);  // 5 ms
     return;

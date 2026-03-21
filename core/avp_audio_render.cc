@@ -259,8 +259,7 @@ uint64_t AVPAudioRender::RenderFrameInternal(
   if (audio_info->pts.IsFinite()) {
     last_audio_pts_us_ = audio_info->pts.us();
   }
-  AVE_LOG(LS_VERBOSE) << "Wrote " << bytes_written
-                      << " bytes to audio track";
+  AVE_LOG(LS_VERBOSE) << "Wrote " << bytes_written << " bytes to audio track";
   return next_delay_us;
 }
 
@@ -281,7 +280,8 @@ status_t AVPAudioRender::CreateAudioTrack() {
   AVE_LOG(LS_DEBUG) << "CreateAudioTrack: calling Open() with sr="
                     << current_audio_config_.sample_rate << " ch="
                     << static_cast<int>(current_audio_config_.channel_layout)
-                    << " fmt=" << static_cast<int>(current_audio_config_.format);
+                    << " fmt="
+                    << static_cast<int>(current_audio_config_.format);
   status_t result = audio_track_->Open(current_audio_config_);
   AVE_LOG(LS_DEBUG) << "CreateAudioTrack: Open() returned " << result;
   if (result != OK) {
@@ -458,9 +458,8 @@ void AVPAudioRender::UpdateSyncAnchor(
   }
 
   int64_t frame_pts_us = audio_info->pts.us();
-  int64_t frame_duration_us = audio_info->duration.IsFinite()
-                                  ? audio_info->duration.us()
-                                  : 0;
+  int64_t frame_duration_us =
+      audio_info->duration.IsFinite() ? audio_info->duration.us() : 0;
   int64_t current_sys_time_us = base::TimeMicros();
 
   // Calculate the end time of this audio frame
@@ -471,7 +470,7 @@ void AVPAudioRender::UpdateSyncAnchor(
                                       frame_end_pts_us);
 
   AVE_LOG(LS_VERBOSE) << "UpdateSyncAnchor PTS=" << frame_pts_us / 1000
-                     << "ms sys=" << current_sys_time_us / 1000 << "ms";
+                      << "ms sys=" << current_sys_time_us / 1000 << "ms";
   AVE_LOG(LS_VERBOSE) << "Updated sync anchor - PTS: " << frame_pts_us
                       << "us, sys_time: " << current_sys_time_us
                       << "us, max_time: " << frame_end_pts_us << "us";

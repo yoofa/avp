@@ -122,8 +122,8 @@ class AVPRender {
 
   /**
    * @brief Enables or disables A/V sync. When disabled, frames are rendered
-   *        immediately without checking the master clock (useful for file output
-   *        or testing where real-time pacing is not required).
+   *        immediately without checking the master clock (useful for file
+   * output or testing where real-time pacing is not required).
    * @param enabled True to enable A/V sync (default), false to disable.
    */
   void SetSyncEnabled(bool enabled) EXCLUDES(mutex_) {

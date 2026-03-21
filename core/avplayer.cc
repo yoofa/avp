@@ -303,12 +303,17 @@ status_t AvPlayer::InstantiateDecoder(
       source_->GetTrackInfo(audio ? MediaType::AUDIO : MediaType::VIDEO);
 
   if (format == nullptr) {
+    AVE_LOG(LS_ERROR) << "InstantiateDecoder: no format for "
+                      << (audio ? "audio" : "video");
     return ave::UNKNOWN_ERROR;
   }
 
   std::string mime = format->mime();
-  AVE_LOG(LS_INFO) << "instantiateDecoder, audio:" << audio
-                   << ", mime: " << mime;
+  AVE_LOG(LS_INFO) << "InstantiateDecoder: audio=" << audio << ", mime=" << mime
+                   << ", width=" << format->width()
+                   << ", height=" << format->height()
+                   << ", sample_rate=" << format->sample_rate()
+                   << ", bitrate=" << format->bitrate();
 
   if (audio) {
     auto notify =
@@ -330,15 +335,22 @@ status_t AvPlayer::InstantiateDecoder(
                                                video_render_sink_);
   }
 
-  AVE_CHECK(decoder != nullptr)
-      << "failed to create decoder for mime: " << mime;
+  if (decoder == nullptr) {
+    AVE_LOG(LS_ERROR) << "InstantiateDecoder: failed to create decoder"
+                      << " for mime=" << mime;
+    return ave::UNKNOWN_ERROR;
+  }
 
+  AVE_LOG(LS_INFO) << "InstantiateDecoder: decoder created, initializing...";
   decoder->Init();
 
+  AVE_LOG(LS_INFO) << "InstantiateDecoder: configuring decoder...";
   decoder->Configure(format);
 
+  AVE_LOG(LS_INFO) << "InstantiateDecoder: starting decoder...";
   decoder->Start();
 
+  AVE_LOG(LS_INFO) << "InstantiateDecoder: decoder started for " << mime;
   return ave::OK;
 }
 
@@ -347,14 +359,14 @@ status_t AvPlayer::InstantiateDecoder(
 void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
   if (!prepared_) {
     AVE_LOG(LS_INFO)
-        << "start called before prepared, will start after prepared";
-    // If not prepared yet, we will start after prepared
+        << "OnStart: called before prepared, will start after prepared";
     pending_start_with_prepare_async_ = true;
     return;
   }
-  AVE_LOG(LS_VERBOSE) << "onStart, start_us: " << start_us
-                      << ", seek_mode: " << seek_mode;
+  AVE_LOG(LS_INFO) << "OnStart: start_us=" << start_us
+                   << ", seek_mode=" << seek_mode;
   if (!source_started_) {
+    AVE_LOG(LS_INFO) << "OnStart: starting source";
     source_->Start();
     source_started_ = true;
   }
@@ -374,8 +386,13 @@ void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
   bool has_audio = (source_->GetTrackInfo(MediaType::AUDIO) != nullptr);
   bool has_video = (source_->GetTrackInfo(MediaType::VIDEO) != nullptr);
 
+  AVE_LOG(LS_INFO) << "OnStart: has_audio=" << has_audio
+                   << ", has_video=" << has_video
+                   << ", video_render_sink=" << video_render_sink_.get()
+                   << ", audio_device=" << audio_device_.get();
+
   if (!has_audio && !has_video) {
-    AVE_LOG(LS_ERROR) << "no metadata for either audio or video source";
+    AVE_LOG(LS_ERROR) << "OnStart: no metadata for either audio or video";
     source_->Stop();
     source_started_ = false;
     auto listener = listener_.lock();
@@ -386,17 +403,31 @@ void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
   }
 
   if (has_video && video_decoder_ == nullptr && video_render_sink_ != nullptr) {
+    AVE_LOG(LS_INFO) << "OnStart: instantiating video decoder";
     InstantiateDecoder(false /* audio */, video_decoder_);
+  } else if (has_video) {
+    AVE_LOG(LS_WARNING)
+        << "OnStart: has video but skip decoder: video_decoder_="
+        << video_decoder_.get()
+        << ", video_render_sink_=" << video_render_sink_.get();
   }
+
   if (has_audio && audio_decoder_ == nullptr && audio_device_ != nullptr) {
+    AVE_LOG(LS_INFO) << "OnStart: instantiating audio decoder";
     InstantiateDecoder(true /* audio */, audio_decoder_);
+  } else if (has_audio) {
+    AVE_LOG(LS_WARNING)
+        << "OnStart: has audio but skip decoder: audio_decoder_="
+        << audio_decoder_.get() << ", audio_device_=" << audio_device_.get();
   }
 
   // Start renders to accept frames (ExoPlayer style render lifecycle)
   if (audio_render_) {
+    AVE_LOG(LS_INFO) << "OnStart: starting audio render";
     audio_render_->Start();
   }
   if (video_render_) {
+    AVE_LOG(LS_INFO) << "OnStart: starting video render";
     video_render_->Start();
   }
 
@@ -413,6 +444,7 @@ void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
 
   // In case tracks/sinks appear later, keep scanning
   PostScanSources();
+  AVE_LOG(LS_INFO) << "OnStart: complete";
 }
 
 void AvPlayer::OnStop() {
@@ -781,25 +813,32 @@ void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
   AVE_CHECK(msg->findInt32(kWhat, &what));
   switch (what) {
     case kWhatSourcePrepared: {
-      AVE_LOG(LS_INFO) << "source prepared: " << source_;
+      AVE_LOG(LS_INFO) << "OnSourceNotify: source prepared, source=" << source_;
       if (source_ == nullptr) {
         return;
       }
       status_t err = ave::OK;
       AVE_CHECK(msg->findInt32(kError, &err));
       if (err != ave::OK) {
+        AVE_LOG(LS_ERROR) << "OnSourceNotify: prepare failed, err=" << err;
         auto listener = listener_.lock();
         if (listener) {
           listener->OnError(err);
         }
       } else {
         prepared_ = true;
+        AVE_LOG(LS_INFO) << "OnSourceNotify: prepared=true"
+                         << ", pending_start="
+                         << pending_start_with_prepare_async_;
       }
 
       {
         auto listener = listener_.lock();
+        AVE_LOG(LS_INFO) << "OnSourceNotify: listener lock "
+                         << (listener ? "succeeded" : "FAILED (expired)");
         if (listener) {
           listener->OnPrepared(err);
+          AVE_LOG(LS_INFO) << "OnSourceNotify: OnPrepared callback returned";
         }
       }
 
@@ -973,7 +1012,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
   // make message->what() to 4cc
   char what_str[5] = {0};
   MakeFourCCString(message->what(), what_str);
-  AVE_LOG(LS_VERBOSE) << "AvPlayer::onMessageReceived:" << what_str;
+  AVE_LOG(LS_INFO) << "AvPlayer::onMessageReceived:" << what_str;
   std::lock_guard<std::mutex> l(mutex_);
   status_t err = ave::OK;
   switch (message->what()) {
@@ -1056,7 +1095,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
     }
 
     case kWhatStart: {
-      AVE_LOG(LS_VERBOSE) << "kWhatStart";
+      AVE_LOG(LS_INFO) << "kWhatStart received, started_=" << started_;
       if (started_) {
         // do not resume yet if the source is still buffering
         if (!paused_for_buffering_) {
