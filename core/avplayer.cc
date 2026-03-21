@@ -166,6 +166,96 @@ status_t AvPlayer::Reset() {
   return ave::OK;
 }
 
+status_t AvPlayer::GetDuration(int* msec) {
+  if (!msec) {
+    return ave::BAD_VALUE;
+  }
+  if (!source_) {
+    return ave::INVALID_OPERATION;
+  }
+  int64_t duration_us = 0;
+  status_t err = source_->GetDuration(&duration_us);
+  if (err != ave::OK) {
+    return err;
+  }
+  *msec = static_cast<int>(duration_us / 1000);
+  return ave::OK;
+}
+
+status_t AvPlayer::GetCurrentPosition(int* msec) {
+  if (!msec) {
+    return ave::BAD_VALUE;
+  }
+  if (!sync_controller_) {
+    *msec = 0;
+    return ave::OK;
+  }
+  int64_t position_us = sync_controller_->GetMasterClock();
+  if (position_us < 0) {
+    position_us = 0;
+  }
+  *msec = static_cast<int>(position_us / 1000);
+  return ave::OK;
+}
+
+bool AvPlayer::IsPlaying() const {
+  return started_ && !paused_;
+}
+
+int AvPlayer::GetVideoWidth() const {
+  return video_width_;
+}
+
+int AvPlayer::GetVideoHeight() const {
+  return video_height_;
+}
+
+status_t AvPlayer::SetPlaybackRate(float rate) {
+  if (rate <= 0.0f) {
+    return ave::BAD_VALUE;
+  }
+  if (sync_controller_) {
+    sync_controller_->SetPlaybackRate(rate);
+  }
+  return ave::OK;
+}
+
+float AvPlayer::GetPlaybackRate() const {
+  if (sync_controller_) {
+    return sync_controller_->GetPlaybackRate();
+  }
+  return 1.0f;
+}
+
+status_t AvPlayer::SetVolume(float left_volume, float right_volume) {
+  left_volume_ = left_volume;
+  right_volume_ = right_volume;
+  // TODO(youfa): apply volume to audio_render_ when AudioTrack supports it
+  return ave::OK;
+}
+
+size_t AvPlayer::GetTrackCount() const {
+  if (!source_) {
+    return 0;
+  }
+  return source_->GetTrackCount();
+}
+
+std::shared_ptr<ave::media::MediaMeta> AvPlayer::GetTrackInfo(
+    size_t index) const {
+  if (!source_) {
+    return nullptr;
+  }
+  return source_->GetTrackInfo(index);
+}
+
+status_t AvPlayer::SelectTrack(size_t index, bool select) {
+  if (!source_) {
+    return ave::INVALID_OPERATION;
+  }
+  return source_->SelectTrack(index, select);
+}
+
 ///////////////////////////////////////////
 
 void AvPlayer::PerformSetVideoRender(
@@ -509,8 +599,7 @@ void AvPlayer::FinishResume() {
 void AvPlayer::NotifyDriverSeekComplete() {
   auto listener = listener_.lock();
   if (listener) {
-    // TODO: Implement seek complete notification in Listener
-    // listener_.lock()->onSeekComplete();
+    listener->OnSeekComplete();
   }
 }
 
@@ -707,8 +796,12 @@ void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
         prepared_ = true;
       }
 
-      // TODO(youfa) new msg here
-      // notifyListner(kWhatPrepared, msg);
+      {
+        auto listener = listener_.lock();
+        if (listener) {
+          listener->OnPrepared(err);
+        }
+      }
 
       if (pending_start_with_prepare_async_) {
         pending_start_with_prepare_async_ = false;
@@ -724,11 +817,12 @@ void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
     }
     case kWhatSourceVideoSizeChanged: {
       std::shared_ptr<MediaMeta> format;
-      if (msg->findObject(kMediaMeta, format)) {
+      if (msg->findObject(kMediaMeta, format) && format) {
+        video_width_ = format->width();
+        video_height_ = format->height();
         auto listener = listener_.lock();
         if (listener) {
-          // listener->onVideoSizeChanged(format->width(),
-          // format->height());
+          listener->OnVideoSizeChanged(video_width_, video_height_);
         }
       }
       break;
@@ -747,6 +841,12 @@ void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
       if (video_render_) {
         video_render_->Pause();
       }
+      {
+        auto listener = listener_.lock();
+        if (listener) {
+          listener->OnInfo(/* MEDIA_INFO_BUFFERING_START */ 701, 0);
+        }
+      }
       break;
     }
     case kWhatSourceBufferingEnd: {
@@ -764,6 +864,28 @@ void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
         if (video_render_) {
           video_render_->Resume();
         }
+      }
+      {
+        auto listener = listener_.lock();
+        if (listener) {
+          listener->OnInfo(/* MEDIA_INFO_BUFFERING_END */ 702, 0);
+        }
+      }
+      break;
+    }
+    case kWhatSourceSeekComplete: {
+      auto listener = listener_.lock();
+      if (listener) {
+        listener->OnSeekComplete();
+      }
+      break;
+    }
+    case kWhatSourceBufferingUpdate: {
+      int32_t percent = 0;
+      msg->findInt32(kPercent, &percent);
+      auto listener = listener_.lock();
+      if (listener) {
+        listener->OnBufferingUpdate(percent);
       }
       break;
     }
@@ -800,11 +922,13 @@ void AvPlayer::OnDecoderNotify(const std::shared_ptr<Message>& msg) {
     case AVPDecoder::kWhatVideoSizeChanged: {
       std::shared_ptr<MediaMeta> format;
       msg->findObject(kMediaMeta, format);
-      auto listener = listener_.lock();
-      if (listener) {
-        // TODO: Implement onVideoSizeChanged in Listener interface
-        // listener_.lock()->onVideoSizeChanged(format->width(),
-        // format->height());
+      if (format) {
+        video_width_ = format->width();
+        video_height_ = format->height();
+        auto listener = listener_.lock();
+        if (listener) {
+          listener->OnVideoSizeChanged(video_width_, video_height_);
+        }
       }
       break;
     }

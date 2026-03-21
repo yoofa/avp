@@ -14,12 +14,32 @@
 #include "base/android/jni/jvm.h"
 #include "base/logging.h"
 #include "jni_headers/sdk/android/generated_avp_jni/AvpPlayer_jni.h"
+#include "jni_headers/sdk/android/generated_avp_jni/TrackInfo_jni.h"
 #include "media/android/jni/video_frame_jni.h"
 #include "media/foundation/media_frame.h"
+#include "media/foundation/media_meta.h"
 #include "third_party/jni_zero/jni_zero.h"
 
 namespace ave {
 namespace jni {
+
+namespace {
+
+// Convert native MediaType to Java track type constant
+int MediaTypeToTrackType(media::MediaType type) {
+  switch (type) {
+    case media::MediaType::VIDEO:
+      return 0;  // MEDIA_TRACK_TYPE_VIDEO
+    case media::MediaType::AUDIO:
+      return 1;  // MEDIA_TRACK_TYPE_AUDIO
+    case media::MediaType::SUBTITLE:
+      return 2;  // MEDIA_TRACK_TYPE_SUBTITLE
+    default:
+      return -1;  // MEDIA_TRACK_TYPE_UNKNOWN
+  }
+}
+
+}  // namespace
 
 // --- AvpPlayerJni implementation ---
 
@@ -68,7 +88,7 @@ void AvpPlayerJni::SetVideoRenderer(JNIEnv* env, jboolean has_renderer) {
 
 void AvpPlayerJni::SetSurface(
     JNIEnv* env, const jni_zero::JavaParamRef<jobject>& surface) {
-  // TODO: Implement Surface-based rendering via ANativeWindow
+  // TODO(youfa): Implement Surface-based rendering via ANativeWindow
 }
 
 void AvpPlayerJni::Prepare(JNIEnv* env) {
@@ -96,9 +116,9 @@ void AvpPlayerJni::Stop(JNIEnv* env) {
   player_->Stop();
 }
 
-void AvpPlayerJni::SeekTo(JNIEnv* env, jint msec) {
+void AvpPlayerJni::SeekTo(JNIEnv* env, jint msec, jint mode) {
   if (!player_) return;
-  player_->SeekTo(msec);
+  player_->SeekTo(msec, static_cast<player::SeekMode>(mode));
 }
 
 void AvpPlayerJni::Reset(JNIEnv* env) {
@@ -114,19 +134,120 @@ void AvpPlayerJni::Release(JNIEnv* env) {
   }
 }
 
+jint AvpPlayerJni::GetDuration(JNIEnv* env) {
+  if (!player_) return -1;
+  int msec = 0;
+  if (player_->GetDuration(&msec) != ave::OK) {
+    return -1;
+  }
+  return msec;
+}
+
+jint AvpPlayerJni::GetCurrentPosition(JNIEnv* env) {
+  if (!player_) return 0;
+  int msec = 0;
+  player_->GetCurrentPosition(&msec);
+  return msec;
+}
+
+jboolean AvpPlayerJni::IsPlaying(JNIEnv* env) {
+  if (!player_) return false;
+  return player_->IsPlaying();
+}
+
+jint AvpPlayerJni::GetVideoWidth(JNIEnv* env) {
+  if (!player_) return 0;
+  return player_->GetVideoWidth();
+}
+
+jint AvpPlayerJni::GetVideoHeight(JNIEnv* env) {
+  if (!player_) return 0;
+  return player_->GetVideoHeight();
+}
+
+void AvpPlayerJni::SetPlaybackRate(JNIEnv* env, jfloat rate) {
+  if (!player_) return;
+  player_->SetPlaybackRate(rate);
+}
+
+jfloat AvpPlayerJni::GetPlaybackRate(JNIEnv* env) {
+  if (!player_) return 1.0f;
+  return player_->GetPlaybackRate();
+}
+
+void AvpPlayerJni::SetVolume(JNIEnv* env, jfloat left_volume,
+                              jfloat right_volume) {
+  if (!player_) return;
+  player_->SetVolume(left_volume, right_volume);
+}
+
+jint AvpPlayerJni::GetTrackCount(JNIEnv* env) {
+  if (!player_) return 0;
+  return static_cast<jint>(player_->GetTrackCount());
+}
+
+jni_zero::ScopedJavaLocalRef<jobject> AvpPlayerJni::GetTrackInfo(
+    JNIEnv* env, jint index) {
+  if (!player_) return jni_zero::ScopedJavaLocalRef<jobject>();
+
+  auto meta = player_->GetTrackInfo(static_cast<size_t>(index));
+  if (!meta) return jni_zero::ScopedJavaLocalRef<jobject>();
+
+  int track_type = MediaTypeToTrackType(meta->stream_type());
+  auto j_track_info = Java_TrackInfo_Constructor(env, track_type, index);
+
+  if (j_track_info.obj()) {
+    const std::string& mime = meta->mime();
+    if (!mime.empty()) {
+      auto j_mime = jni_zero::ScopedJavaLocalRef<jstring>::Adopt(
+          env, env->NewStringUTF(mime.c_str()));
+      Java_TrackInfo_setMimeType(env, j_track_info, j_mime);
+    }
+  }
+
+  return j_track_info;
+}
+
+void AvpPlayerJni::SelectTrack(JNIEnv* env, jint index, jboolean select) {
+  if (!player_) return;
+  player_->SelectTrack(static_cast<size_t>(index), select);
+}
+
+// --- Player::Listener callbacks ---
+
+void AvpPlayerJni::OnPrepared(status_t err) {
+  JNIEnv* env = AttachCurrentThreadIfNeeded();
+  Java_AvpPlayer_onNativePrepared(env, j_player_, static_cast<int>(err));
+}
+
 void AvpPlayerJni::OnCompletion() {
   JNIEnv* env = AttachCurrentThreadIfNeeded();
   Java_AvpPlayer_onNativeCompletion(env, j_player_);
 }
 
-void AvpPlayerJni::OnPrepared() {
-  JNIEnv* env = AttachCurrentThreadIfNeeded();
-  Java_AvpPlayer_onNativePrepared(env, j_player_);
-}
-
 void AvpPlayerJni::OnError(status_t error) {
   JNIEnv* env = AttachCurrentThreadIfNeeded();
   Java_AvpPlayer_onNativeError(env, j_player_, static_cast<int>(error));
+}
+
+void AvpPlayerJni::OnSeekComplete() {
+  JNIEnv* env = AttachCurrentThreadIfNeeded();
+  Java_AvpPlayer_onNativeSeekComplete(env, j_player_);
+}
+
+void AvpPlayerJni::OnBufferingUpdate(int percent) {
+  JNIEnv* env = AttachCurrentThreadIfNeeded();
+  Java_AvpPlayer_onNativeBufferingUpdate(env, j_player_, percent);
+}
+
+void AvpPlayerJni::OnVideoSizeChanged(int width, int height) {
+  JNIEnv* env = AttachCurrentThreadIfNeeded();
+  Java_AvpPlayer_onNativeVideoSizeChanged(env, j_player_, width, height);
+}
+
+void AvpPlayerJni::OnInfo(int what, int extra) {
+  JNIEnv* env = AttachCurrentThreadIfNeeded();
+  Java_AvpPlayer_onNativeInfo(env, j_player_, what, extra);
 }
 
 void AvpPlayerJni::OnFrame(const std::shared_ptr<media::MediaFrame>& frame) {

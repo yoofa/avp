@@ -8,12 +8,14 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
+#include <cstddef>
 #include <memory>
 
 #include "base/data_source/data_source.h"
 #include "base/errors.h"
 #include "media/audio/audio_device.h"
 #include "media/codec/codec_factory.h"
+#include "media/foundation/media_meta.h"
 #include "media/video/video_render.h"
 
 #include "api/content_source/content_source.h"
@@ -115,8 +117,47 @@ class Player {
     virtual ~Listener() = default;
 
    public:
+    /**
+     * @brief Called when the player is prepared and ready for playback.
+     * @param err OK on success, or an error code on failure.
+     */
+    virtual void OnPrepared(status_t err) {}
+
+    /**
+     * @brief Called when playback reaches the end of stream.
+     */
     virtual void OnCompletion() {}
+
+    /**
+     * @brief Called when an error occurs during playback.
+     * @param error The error code.
+     */
     virtual void OnError(status_t error) {}
+
+    /**
+     * @brief Called when a seek operation is completed.
+     */
+    virtual void OnSeekComplete() {}
+
+    /**
+     * @brief Called to report buffering progress.
+     * @param percent The buffering progress in percentage (0-100).
+     */
+    virtual void OnBufferingUpdate(int percent) {}
+
+    /**
+     * @brief Called when the video size changes.
+     * @param width The new video width in pixels.
+     * @param height The new video height in pixels.
+     */
+    virtual void OnVideoSizeChanged(int width, int height) {}
+
+    /**
+     * @brief Called to report informational events.
+     * @param what The info type code.
+     * @param extra Extra info code, specific to the info type.
+     */
+    virtual void OnInfo(int what, int extra) {}
   };
 
   /**
@@ -246,6 +287,81 @@ class Player {
    * @return The status of the operation.
    */
   virtual status_t Reset() = 0;
+
+  /**
+   * @brief Gets the duration of the media content.
+   * @param msec Output parameter for duration in milliseconds.
+   * @return OK on success, or an error code.
+   */
+  virtual status_t GetDuration(int* msec) = 0;
+
+  /**
+   * @brief Gets the current playback position.
+   * @param msec Output parameter for position in milliseconds.
+   * @return OK on success, or an error code.
+   */
+  virtual status_t GetCurrentPosition(int* msec) = 0;
+
+  /**
+   * @brief Returns whether the player is currently playing.
+   * @return True if playing, false otherwise.
+   */
+  virtual bool IsPlaying() const = 0;
+
+  /**
+   * @brief Gets the video width in pixels.
+   * @return The video width, or 0 if not available.
+   */
+  virtual int GetVideoWidth() const = 0;
+
+  /**
+   * @brief Gets the video height in pixels.
+   * @return The video height, or 0 if not available.
+   */
+  virtual int GetVideoHeight() const = 0;
+
+  /**
+   * @brief Sets the playback rate.
+   * @param rate The playback rate (1.0 = normal speed).
+   * @return OK on success, or an error code.
+   */
+  virtual status_t SetPlaybackRate(float rate) = 0;
+
+  /**
+   * @brief Gets the current playback rate.
+   * @return The current playback rate.
+   */
+  virtual float GetPlaybackRate() const = 0;
+
+  /**
+   * @brief Sets the volume for left and right channels.
+   * @param left_volume Left channel volume (0.0 to 1.0).
+   * @param right_volume Right channel volume (0.0 to 1.0).
+   * @return OK on success, or an error code.
+   */
+  virtual status_t SetVolume(float left_volume, float right_volume) = 0;
+
+  /**
+   * @brief Gets the number of tracks in the media.
+   * @return The number of tracks.
+   */
+  virtual size_t GetTrackCount() const = 0;
+
+  /**
+   * @brief Gets the media metadata for the specified track.
+   * @param index The track index.
+   * @return Shared pointer to MediaMeta, or nullptr if not found.
+   */
+  virtual std::shared_ptr<ave::media::MediaMeta> GetTrackInfo(
+      size_t index) const = 0;
+
+  /**
+   * @brief Selects or deselects the specified track.
+   * @param index The track index.
+   * @param select True to select, false to deselect.
+   * @return OK on success, or an error code.
+   */
+  virtual status_t SelectTrack(size_t index, bool select) = 0;
 
  protected:
   /**

@@ -14,6 +14,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import io.github.yoofa.avp.AvpPlayer;
+import io.github.yoofa.avp.SeekMode;
 
 /**
  * Fullscreen video player activity using the AVP native SDK.
@@ -23,19 +24,22 @@ public class PlayerActivity extends Activity {
     private static final String TAG = "PlayerActivity";
     public static final String EXTRA_FILE_PATH = "file_path";
     private static final long CONTROL_HIDE_DELAY_MS = 4000;
+    private static final long POSITION_UPDATE_INTERVAL_MS = 500;
 
     private SurfaceView surfaceView;
     private View topBar;
     private View controlsOverlay;
     private TextView tvTitle;
     private TextView tvPosition;
+    private TextView tvDuration;
     private SeekBar seekBar;
     private TextView btnPlayPause;
     private View btnBack;
 
     private AvpPlayer player;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private boolean isPlaying;
+    private boolean isSeeking;
+    private int duration;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,6 +62,7 @@ public class PlayerActivity extends Activity {
         controlsOverlay = findViewById(R.id.controlsOverlay);
         tvTitle = findViewById(R.id.tvTitle);
         tvPosition = findViewById(R.id.tvPosition);
+        tvDuration = findViewById(R.id.tvDuration);
         seekBar = findViewById(R.id.seekBar);
         btnPlayPause = findViewById(R.id.btnPlayPause);
         btnBack = findViewById(R.id.btnBack);
@@ -97,17 +102,23 @@ public class PlayerActivity extends Activity {
 
             player.setOnPreparedListener(p -> {
                 Log.d(TAG, "Player prepared");
-                runOnUiThread(() -> updatePlayPauseButton(true));
+                duration = p.getDuration();
+                runOnUiThread(() -> {
+                    seekBar.setMax(duration > 0 ? duration : 0);
+                    tvDuration.setText(formatDuration(duration));
+                    updatePlayPauseButton(true);
+                });
                 p.start();
-                isPlaying = true;
+                startPositionUpdates();
             });
 
             player.setOnCompletionListener(p -> {
                 Log.d(TAG, "Playback completed");
-                isPlaying = false;
+                stopPositionUpdates();
                 runOnUiThread(() -> {
                     updatePlayPauseButton(false);
                     seekBar.setProgress(0);
+                    tvPosition.setText(formatDuration(0));
                 });
             });
 
@@ -117,6 +128,18 @@ public class PlayerActivity extends Activity {
                         "Playback error: " + errorCode, Toast.LENGTH_SHORT).show());
                 return true;
             });
+
+            player.setOnSeekCompleteListener(p -> {
+                Log.d(TAG, "Seek complete");
+                isSeeking = false;
+            });
+
+            player.setOnVideoSizeChangedListener((p, width, height) ->
+                    Log.d(TAG, "Video size: " + width + "x" + height));
+
+            player.setOnBufferingUpdateListener((p, percent) ->
+                    runOnUiThread(() -> seekBar.setSecondaryProgress(
+                            seekBar.getMax() * percent / 100)));
 
             player.prepare();
 
@@ -133,13 +156,13 @@ public class PlayerActivity extends Activity {
 
         btnPlayPause.setOnClickListener(v -> {
             if (player == null) return;
-            if (isPlaying) {
+            if (player.isPlaying()) {
                 player.pause();
-                isPlaying = false;
+                stopPositionUpdates();
                 updatePlayPauseButton(false);
             } else {
                 player.resume();
-                isPlaying = true;
+                startPositionUpdates();
                 updatePlayPauseButton(true);
             }
             showControls();
@@ -152,17 +175,42 @@ public class PlayerActivity extends Activity {
             }
 
             @Override
-            public void onStartTrackingTouch(SeekBar seekBar) { }
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                isSeeking = true;
+            }
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                if (player != null) player.seekTo(seekBar.getProgress());
+                if (player != null) {
+                    player.seekTo(seekBar.getProgress(), SeekMode.SEEK_CLOSEST_SYNC);
+                }
             }
         });
 
         btnBack.setOnClickListener(v -> finish());
 
         showControls();
+    }
+
+    private final Runnable positionUpdateRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (player != null && player.isPlaying() && !isSeeking) {
+                int pos = player.getCurrentPosition();
+                seekBar.setProgress(pos);
+                tvPosition.setText(formatDuration(pos));
+            }
+            handler.postDelayed(this, POSITION_UPDATE_INTERVAL_MS);
+        }
+    };
+
+    private void startPositionUpdates() {
+        handler.removeCallbacks(positionUpdateRunnable);
+        handler.post(positionUpdateRunnable);
+    }
+
+    private void stopPositionUpdates() {
+        handler.removeCallbacks(positionUpdateRunnable);
     }
 
     private void updatePlayPauseButton(boolean playing) {
@@ -192,6 +240,7 @@ public class PlayerActivity extends Activity {
     private final Runnable hideControlsRunnable = this::hideControls;
 
     private void releasePlayer() {
+        stopPositionUpdates();
         handler.removeCallbacksAndMessages(null);
         if (player != null) {
             player.release();
@@ -202,9 +251,9 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        if (player != null) {
+        if (player != null && player.isPlaying()) {
             player.pause();
-            isPlaying = false;
+            stopPositionUpdates();
             runOnUiThread(() -> updatePlayPauseButton(false));
         }
     }

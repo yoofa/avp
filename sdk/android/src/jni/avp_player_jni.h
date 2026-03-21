@@ -40,16 +40,37 @@ class AvpPlayerJni : public player::Player::Listener,
   void Pause(JNIEnv* env);
   void Resume(JNIEnv* env);
   void Stop(JNIEnv* env);
-  void SeekTo(JNIEnv* env, jint msec);
+  void SeekTo(JNIEnv* env, jint msec, jint mode);
   void Reset(JNIEnv* env);
   void Release(JNIEnv* env);
 
+  // Query methods
+  jint GetDuration(JNIEnv* env);
+  jint GetCurrentPosition(JNIEnv* env);
+  jboolean IsPlaying(JNIEnv* env);
+  jint GetVideoWidth(JNIEnv* env);
+  jint GetVideoHeight(JNIEnv* env);
+
+  // Playback rate
+  void SetPlaybackRate(JNIEnv* env, jfloat rate);
+  jfloat GetPlaybackRate(JNIEnv* env);
+
+  // Volume
+  void SetVolume(JNIEnv* env, jfloat left_volume, jfloat right_volume);
+
+  // Track management
+  jint GetTrackCount(JNIEnv* env);
+  jni_zero::ScopedJavaLocalRef<jobject> GetTrackInfo(JNIEnv* env, jint index);
+  void SelectTrack(JNIEnv* env, jint index, jboolean select);
+
   // Player::Listener
+  void OnPrepared(status_t err) override;
   void OnCompletion() override;
   void OnError(status_t error) override;
-
-  // Called when player is prepared (TODO: wire to Player::Listener::OnPrepared)
-  void OnPrepared();
+  void OnSeekComplete() override;
+  void OnBufferingUpdate(int percent) override;
+  void OnVideoSizeChanged(int width, int height) override;
+  void OnInfo(int what, int extra) override;
 
   // VideoRender (MediaFrameSink)
   void OnFrame(const std::shared_ptr<media::MediaFrame>& frame) override;

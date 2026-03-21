@@ -17,6 +17,8 @@ if (is_android) {
     visibility = [ "*" ]
     sources = [
       "api/io/github/yoofa/avp/AvpPlayer.java",
+      "api/io/github/yoofa/avp/SeekMode.java",
+      "api/io/github/yoofa/avp/TrackInfo.java",
     ]
     deps = [
       "//base/android:ave_base_java",
@@ -29,6 +31,7 @@ if (is_android) {
   generate_jni("generated_avp_jni") {
     sources = [
       "api/io/github/yoofa/avp/AvpPlayer.java",
+      "api/io/github/yoofa/avp/TrackInfo.java",
     ]
     namespace = "ave::jni"
     jni_generator_include = "//base/android/jni/jni_generator_helper.h"
@@ -47,6 +50,7 @@ if (is_android) {
       "//base:logging",
       "//base/android:ave_jni",
       "//media/android:ave_media_jni",
+      "//media/foundation:media_meta",
       "//third_party/jni_zero",
     ]
   }

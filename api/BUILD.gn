@@ -56,5 +56,6 @@ ave_library("player_interface") {
   deps = [
     ":api_content_source",
     ":api_demuxer",
+    "//media/foundation:media_meta",
   ]
 }

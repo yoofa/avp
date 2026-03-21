@@ -78,6 +78,26 @@ AVE_EXPORT class AvPlayer : public Player,
   status_t SeekTo(int msec, SeekMode mode) override;
   status_t Reset() override;
 
+  // Query methods
+  status_t GetDuration(int* msec) override;
+  status_t GetCurrentPosition(int* msec) override;
+  bool IsPlaying() const override;
+  int GetVideoWidth() const override;
+  int GetVideoHeight() const override;
+
+  // Playback rate
+  status_t SetPlaybackRate(float rate) override;
+  float GetPlaybackRate() const override;
+
+  // Volume
+  status_t SetVolume(float left_volume, float right_volume) override;
+
+  // Track management
+  size_t GetTrackCount() const override;
+  std::shared_ptr<ave::media::MediaMeta> GetTrackInfo(
+      size_t index) const override;
+  status_t SelectTrack(size_t index, bool select) override;
+
  private:
   enum {
     kWhatSetDataSource = '=DaS',
@@ -289,6 +309,10 @@ AVE_EXPORT class AvPlayer : public Player,
   int64_t previous_seek_time_us_;
   int32_t scan_sources_generation_;
   int32_t poll_duration_generation_;
+  int video_width_ = 0;
+  int video_height_ = 0;
+  float left_volume_ = 1.0f;
+  float right_volume_ = 1.0f;
 
   // Deferred actions for state management
   std::vector<std::shared_ptr<Action>> deferred_actions_;
