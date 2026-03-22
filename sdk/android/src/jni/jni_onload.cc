@@ -7,9 +7,9 @@
 
 #include <jni.h>
 
-#include "base/logging.h"
 #include "base/android/jni/class_loader.h"
 #include "base/android/jni/jvm.h"
+#include "base/logging.h"
 
 #undef JNIEXPORT
 #define JNIEXPORT __attribute__((visibility("default")))

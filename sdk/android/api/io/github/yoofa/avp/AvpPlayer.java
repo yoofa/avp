@@ -6,6 +6,7 @@
 
 package io.github.yoofa.avp;
 
+import android.util.Log;
 import android.view.Surface;
 
 import androidx.annotation.Nullable;
@@ -468,9 +469,11 @@ public class AvpPlayer {
 
     @CalledByNative
     private void onNativePrepared(int error) {
-        Logging.d(TAG, "onNativePrepared, error=" + error);
+        Log.i(TAG, "onNativePrepared, error=" + error);
         if (onPreparedListener != null && error == 0) {
+            Log.i(TAG, "onNativePrepared: calling onPreparedListener");
             onPreparedListener.onPrepared(this);
+            Log.i(TAG, "onNativePrepared: onPreparedListener returned");
         } else if (error != 0 && onErrorListener != null) {
             onErrorListener.onError(this, error);
         }
@@ -478,7 +481,7 @@ public class AvpPlayer {
 
     @CalledByNative
     private void onNativeCompletion() {
-        Logging.d(TAG, "onNativeCompletion");
+        Log.i(TAG, "onNativeCompletion");
         if (looping) {
             seekTo(0);
             start();
@@ -491,7 +494,7 @@ public class AvpPlayer {
 
     @CalledByNative
     private void onNativeError(int errorCode) {
-        Logging.e(TAG, "onNativeError: " + errorCode);
+        Log.e(TAG, "onNativeError: " + errorCode);
         if (onErrorListener != null) {
             onErrorListener.onError(this, errorCode);
         }
@@ -499,7 +502,7 @@ public class AvpPlayer {
 
     @CalledByNative
     private void onNativeSeekComplete() {
-        Logging.d(TAG, "onNativeSeekComplete");
+        Log.i(TAG, "onNativeSeekComplete");
         if (onSeekCompleteListener != null) {
             onSeekCompleteListener.onSeekComplete(this);
         }
@@ -514,7 +517,7 @@ public class AvpPlayer {
 
     @CalledByNative
     private void onNativeVideoSizeChanged(int width, int height) {
-        Logging.d(TAG, "onNativeVideoSizeChanged: " + width + "x" + height);
+        Log.i(TAG, "onNativeVideoSizeChanged: " + width + "x" + height);
         if (onVideoSizeChangedListener != null) {
             onVideoSizeChangedListener.onVideoSizeChanged(this, width, height);
         }

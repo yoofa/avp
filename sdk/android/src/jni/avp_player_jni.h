@@ -11,6 +11,8 @@
 #include <jni.h>
 #include <memory>
 
+#include <android/native_window.h>
+
 #include "api/player.h"
 #include "media/video/video_render.h"
 #include "third_party/jni_zero/java_refs.h"
@@ -29,12 +31,10 @@ class AvpPlayerJni : public player::Player::Listener,
   ~AvpPlayerJni() override;
 
   // Player control methods (called from auto-generated JNI dispatch)
-  void SetDataSource(JNIEnv* env,
-                     const jni_zero::JavaParamRef<jstring>& path);
+  void SetDataSource(JNIEnv* env, const jni_zero::JavaParamRef<jstring>& path);
   void SetDataSourceFd(JNIEnv* env, jint fd, jlong offset, jlong length);
   void SetVideoRenderer(JNIEnv* env, jboolean has_renderer);
-  void SetSurface(JNIEnv* env,
-                  const jni_zero::JavaParamRef<jobject>& surface);
+  void SetSurface(JNIEnv* env, const jni_zero::JavaParamRef<jobject>& surface);
   void Prepare(JNIEnv* env);
   void Start(JNIEnv* env);
   void Pause(JNIEnv* env);
@@ -78,6 +78,10 @@ class AvpPlayerJni : public player::Player::Listener,
  private:
   jni_zero::ScopedJavaGlobalRef<jobject> j_player_;
   std::shared_ptr<player::Player> player_;
+  // Must keep a strong reference to the listener shared_ptr so that
+  // the weak_ptr stored inside AvPlayer doesn't expire immediately.
+  std::shared_ptr<player::Player::Listener> self_as_listener_;
+  ANativeWindow* native_window_ = nullptr;
   bool has_video_renderer_ = false;
 };
 

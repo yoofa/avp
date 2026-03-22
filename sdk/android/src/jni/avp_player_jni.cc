@@ -11,6 +11,9 @@
 #include <string>
 #include <unordered_map>
 
+#include <android/native_window.h>
+#include <android/native_window_jni.h>
+
 #include "base/android/jni/jvm.h"
 #include "base/logging.h"
 #include "jni_headers/sdk/android/generated_avp_jni/AvpPlayer_jni.h"
@@ -39,17 +42,69 @@ int MediaTypeToTrackType(media::MediaType type) {
   }
 }
 
+inline uint8_t Clamp(int val) {
+  return static_cast<uint8_t>(val < 0 ? 0 : (val > 255 ? 255 : val));
+}
+
+// Render YUV420P frame data to ANativeWindow
+void RenderYuv420pToWindow(ANativeWindow* window,
+                           const uint8_t* data,
+                           int width,
+                           int height) {
+  ANativeWindow_setBuffersGeometry(window, width, height,
+                                   WINDOW_FORMAT_RGBA_8888);
+  ANativeWindow_Buffer buffer;
+  if (ANativeWindow_lock(window, &buffer, nullptr) != 0) {
+    AVE_LOG(LS_ERROR) << "ANativeWindow_lock failed";
+    return;
+  }
+
+  const uint8_t* y_plane = data;
+  const uint8_t* u_plane = data + width * height;
+  const uint8_t* v_plane = u_plane + (width / 2) * (height / 2);
+
+  auto* dst = static_cast<uint8_t*>(buffer.bits);
+  int dst_stride = buffer.stride * 4;  // RGBA = 4 bytes per pixel
+
+  for (int row = 0; row < height; row++) {
+    for (int col = 0; col < width; col++) {
+      int y = y_plane[row * width + col];
+      int u = u_plane[(row / 2) * (width / 2) + (col / 2)];
+      int v = v_plane[(row / 2) * (width / 2) + (col / 2)];
+
+      int c = y - 16;
+      int d = u - 128;
+      int e = v - 128;
+      uint8_t* pixel = dst + row * dst_stride + col * 4;
+      pixel[0] = Clamp((298 * c + 409 * e + 128) >> 8);            // R
+      pixel[1] = Clamp((298 * c - 100 * d - 208 * e + 128) >> 8);  // G
+      pixel[2] = Clamp((298 * c + 516 * d + 128) >> 8);            // B
+      pixel[3] = 255;                                              // A
+    }
+  }
+
+  ANativeWindow_unlockAndPost(window);
+}
+
 }  // namespace
 
 // --- AvpPlayerJni implementation ---
 
 AvpPlayerJni::AvpPlayerJni(JNIEnv* env, jobject j_player)
-    : j_player_(env, j_player) {
+    : j_player_(env, j_player), native_window_(nullptr) {
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::AvpPlayerJni created";
   player_ = player::Player::Builder().build();
   if (player_) {
     player_->Init();
-    player_->SetListener(
-        std::shared_ptr<player::Player::Listener>(this, [](auto*) {}));
+    // Create a non-owning shared_ptr and store it as a member to keep
+    // the strong reference alive. AvPlayer stores listener as weak_ptr,
+    // so without this the weak_ptr would expire immediately.
+    self_as_listener_ =
+        std::shared_ptr<player::Player::Listener>(this, [](auto*) {});
+    player_->SetListener(self_as_listener_);
+    AVE_LOG(LS_INFO) << "AvpPlayerJni: player initialized, listener set";
+  } else {
+    AVE_LOG(LS_ERROR) << "AvpPlayerJni: failed to create player";
   }
 }
 
@@ -58,26 +113,36 @@ AvpPlayerJni::~AvpPlayerJni() {
     player_->Stop();
     player_->Reset();
   }
+  if (native_window_) {
+    ANativeWindow_release(native_window_);
+    native_window_ = nullptr;
+  }
 }
 
 void AvpPlayerJni::SetDataSource(
-    JNIEnv* env, const jni_zero::JavaParamRef<jstring>& j_path) {
-  if (!player_) return;
+    JNIEnv* env,
+    const jni_zero::JavaParamRef<jstring>& j_path) {
+  if (!player_)
+    return;
   const char* c_path = env->GetStringUTFChars(j_path.obj(), nullptr);
   std::unordered_map<std::string, std::string> headers;
   player_->SetDataSource(c_path, headers);
   env->ReleaseStringUTFChars(j_path.obj(), c_path);
 }
 
-void AvpPlayerJni::SetDataSourceFd(JNIEnv* env, jint fd, jlong offset,
-                                    jlong length) {
-  if (!player_) return;
+void AvpPlayerJni::SetDataSourceFd(JNIEnv* env,
+                                   jint fd,
+                                   jlong offset,
+                                   jlong length) {
+  if (!player_)
+    return;
   player_->SetDataSource(fd, offset, length);
 }
 
 void AvpPlayerJni::SetVideoRenderer(JNIEnv* env, jboolean has_renderer) {
   has_video_renderer_ = has_renderer;
-  if (!player_) return;
+  if (!player_)
+    return;
   if (has_renderer) {
     player_->SetVideoRender(
         std::shared_ptr<media::VideoRender>(this, [](auto*) {}));
@@ -86,56 +151,101 @@ void AvpPlayerJni::SetVideoRenderer(JNIEnv* env, jboolean has_renderer) {
   }
 }
 
-void AvpPlayerJni::SetSurface(
-    JNIEnv* env, const jni_zero::JavaParamRef<jobject>& surface) {
-  // TODO(youfa): Implement Surface-based rendering via ANativeWindow
+void AvpPlayerJni::SetSurface(JNIEnv* env,
+                              const jni_zero::JavaParamRef<jobject>& surface) {
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::SetSurface called";
+
+  // Release existing native window
+  if (native_window_) {
+    ANativeWindow_release(native_window_);
+    native_window_ = nullptr;
+  }
+
+  // Acquire new native window from Java Surface
+  if (surface.obj()) {
+    native_window_ = ANativeWindow_fromSurface(env, surface.obj());
+    AVE_LOG(LS_INFO) << "AvpPlayerJni::SetSurface: native_window="
+                     << native_window_;
+  }
+
+  if (!player_)
+    return;
+
+  if (native_window_) {
+    // Set ourselves as video render sink — OnFrame will render to ANativeWindow
+    player_->SetVideoRender(
+        std::shared_ptr<media::VideoRender>(this, [](auto*) {}));
+    AVE_LOG(LS_INFO) << "AvpPlayerJni::SetSurface: video render set";
+  } else {
+    player_->SetVideoRender(nullptr);
+    AVE_LOG(LS_INFO) << "AvpPlayerJni::SetSurface: video render cleared";
+  }
 }
 
 void AvpPlayerJni::Prepare(JNIEnv* env) {
-  if (!player_) return;
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::Prepare called";
+  if (!player_)
+    return;
   player_->Prepare();
 }
 
 void AvpPlayerJni::Start(JNIEnv* env) {
-  if (!player_) return;
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::Start called";
+  if (!player_) {
+    AVE_LOG(LS_ERROR) << "AvpPlayerJni::Start: player_ is null!";
+    return;
+  }
   player_->Start();
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::Start: player_->Start() returned";
 }
 
 void AvpPlayerJni::Pause(JNIEnv* env) {
-  if (!player_) return;
+  if (!player_)
+    return;
   player_->Pause();
 }
 
 void AvpPlayerJni::Resume(JNIEnv* env) {
-  if (!player_) return;
+  if (!player_)
+    return;
   player_->Resume();
 }
 
 void AvpPlayerJni::Stop(JNIEnv* env) {
-  if (!player_) return;
+  if (!player_)
+    return;
   player_->Stop();
 }
 
 void AvpPlayerJni::SeekTo(JNIEnv* env, jint msec, jint mode) {
-  if (!player_) return;
+  if (!player_)
+    return;
   player_->SeekTo(msec, static_cast<player::SeekMode>(mode));
 }
 
 void AvpPlayerJni::Reset(JNIEnv* env) {
-  if (!player_) return;
+  if (!player_)
+    return;
   player_->Reset();
 }
 
 void AvpPlayerJni::Release(JNIEnv* env) {
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::Release";
   if (player_) {
     player_->Stop();
     player_->Reset();
     player_.reset();
   }
+  self_as_listener_.reset();
+  if (native_window_) {
+    ANativeWindow_release(native_window_);
+    native_window_ = nullptr;
+  }
 }
 
 jint AvpPlayerJni::GetDuration(JNIEnv* env) {
-  if (!player_) return -1;
+  if (!player_)
+    return -1;
   int msec = 0;
   if (player_->GetDuration(&msec) != ave::OK) {
     return -1;
@@ -144,54 +254,65 @@ jint AvpPlayerJni::GetDuration(JNIEnv* env) {
 }
 
 jint AvpPlayerJni::GetCurrentPosition(JNIEnv* env) {
-  if (!player_) return 0;
+  if (!player_)
+    return 0;
   int msec = 0;
   player_->GetCurrentPosition(&msec);
   return msec;
 }
 
 jboolean AvpPlayerJni::IsPlaying(JNIEnv* env) {
-  if (!player_) return false;
+  if (!player_)
+    return false;
   return player_->IsPlaying();
 }
 
 jint AvpPlayerJni::GetVideoWidth(JNIEnv* env) {
-  if (!player_) return 0;
+  if (!player_)
+    return 0;
   return player_->GetVideoWidth();
 }
 
 jint AvpPlayerJni::GetVideoHeight(JNIEnv* env) {
-  if (!player_) return 0;
+  if (!player_)
+    return 0;
   return player_->GetVideoHeight();
 }
 
 void AvpPlayerJni::SetPlaybackRate(JNIEnv* env, jfloat rate) {
-  if (!player_) return;
+  if (!player_)
+    return;
   player_->SetPlaybackRate(rate);
 }
 
 jfloat AvpPlayerJni::GetPlaybackRate(JNIEnv* env) {
-  if (!player_) return 1.0f;
+  if (!player_)
+    return 1.0f;
   return player_->GetPlaybackRate();
 }
 
-void AvpPlayerJni::SetVolume(JNIEnv* env, jfloat left_volume,
-                              jfloat right_volume) {
-  if (!player_) return;
+void AvpPlayerJni::SetVolume(JNIEnv* env,
+                             jfloat left_volume,
+                             jfloat right_volume) {
+  if (!player_)
+    return;
   player_->SetVolume(left_volume, right_volume);
 }
 
 jint AvpPlayerJni::GetTrackCount(JNIEnv* env) {
-  if (!player_) return 0;
+  if (!player_)
+    return 0;
   return static_cast<jint>(player_->GetTrackCount());
 }
 
-jni_zero::ScopedJavaLocalRef<jobject> AvpPlayerJni::GetTrackInfo(
-    JNIEnv* env, jint index) {
-  if (!player_) return jni_zero::ScopedJavaLocalRef<jobject>();
+jni_zero::ScopedJavaLocalRef<jobject> AvpPlayerJni::GetTrackInfo(JNIEnv* env,
+                                                                 jint index) {
+  if (!player_)
+    return jni_zero::ScopedJavaLocalRef<jobject>();
 
   auto meta = player_->GetTrackInfo(static_cast<size_t>(index));
-  if (!meta) return jni_zero::ScopedJavaLocalRef<jobject>();
+  if (!meta)
+    return jni_zero::ScopedJavaLocalRef<jobject>();
 
   int track_type = MediaTypeToTrackType(meta->stream_type());
   auto j_track_info = Java_TrackInfo_Constructor(env, track_type, index);
@@ -209,62 +330,92 @@ jni_zero::ScopedJavaLocalRef<jobject> AvpPlayerJni::GetTrackInfo(
 }
 
 void AvpPlayerJni::SelectTrack(JNIEnv* env, jint index, jboolean select) {
-  if (!player_) return;
+  if (!player_)
+    return;
   player_->SelectTrack(static_cast<size_t>(index), select);
 }
 
 // --- Player::Listener callbacks ---
 
 void AvpPlayerJni::OnPrepared(status_t err) {
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::OnPrepared: err=" << err;
   JNIEnv* env = AttachCurrentThreadIfNeeded();
+  if (!env) {
+    AVE_LOG(LS_ERROR) << "AvpPlayerJni::OnPrepared: failed to attach thread";
+    return;
+  }
+  AVE_LOG(LS_VERBOSE) << "AvpPlayerJni::OnPrepared: calling Java callback"
+                      << ", j_player_.obj()=" << j_player_.obj();
   Java_AvpPlayer_onNativePrepared(env, j_player_, static_cast<int>(err));
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::OnPrepared: Java callback returned";
 }
 
 void AvpPlayerJni::OnCompletion() {
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::OnCompletion";
   JNIEnv* env = AttachCurrentThreadIfNeeded();
   Java_AvpPlayer_onNativeCompletion(env, j_player_);
 }
 
 void AvpPlayerJni::OnError(status_t error) {
+  AVE_LOG(LS_ERROR) << "AvpPlayerJni::OnError: " << error;
   JNIEnv* env = AttachCurrentThreadIfNeeded();
   Java_AvpPlayer_onNativeError(env, j_player_, static_cast<int>(error));
 }
 
 void AvpPlayerJni::OnSeekComplete() {
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::OnSeekComplete";
   JNIEnv* env = AttachCurrentThreadIfNeeded();
   Java_AvpPlayer_onNativeSeekComplete(env, j_player_);
 }
 
 void AvpPlayerJni::OnBufferingUpdate(int percent) {
+  AVE_LOG(LS_VERBOSE) << "AvpPlayerJni::OnBufferingUpdate: " << percent;
   JNIEnv* env = AttachCurrentThreadIfNeeded();
   Java_AvpPlayer_onNativeBufferingUpdate(env, j_player_, percent);
 }
 
 void AvpPlayerJni::OnVideoSizeChanged(int width, int height) {
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::OnVideoSizeChanged: " << width << "x"
+                   << height;
   JNIEnv* env = AttachCurrentThreadIfNeeded();
   Java_AvpPlayer_onNativeVideoSizeChanged(env, j_player_, width, height);
 }
 
 void AvpPlayerJni::OnInfo(int what, int extra) {
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::OnInfo: what=" << what
+                   << ", extra=" << extra;
   JNIEnv* env = AttachCurrentThreadIfNeeded();
   Java_AvpPlayer_onNativeInfo(env, j_player_, what, extra);
 }
 
 void AvpPlayerJni::OnFrame(const std::shared_ptr<media::MediaFrame>& frame) {
-  if (!has_video_renderer_ || !frame) return;
+  if (!frame)
+    return;
 
-  JNIEnv* env = AttachCurrentThreadIfNeeded();
   auto* vinfo = frame->video_info();
-  if (!vinfo) return;
+  if (!vinfo)
+    return;
 
   int width = vinfo->width;
   int height = vinfo->height;
+
+  // Render to ANativeWindow if available
+  if (native_window_ && width > 0 && height > 0 && frame->data()) {
+    RenderYuv420pToWindow(native_window_, frame->data(), width, height);
+    return;
+  }
+
+  // Fallback: send to Java via VideoRenderer callback
+  if (!has_video_renderer_)
+    return;
+
+  JNIEnv* env = AttachCurrentThreadIfNeeded();
   int stride = vinfo->stride > 0 ? vinfo->stride : width;
   int64_t timestamp_us = vinfo->pts.IsFinite() ? vinfo->pts.us() : 0;
 
-  auto j_frame = media::jni::CreateJavaVideoFrame(
-      env, width, height, stride, timestamp_us, 0,
-      frame->data(), frame->size());
+  auto j_frame =
+      media::jni::CreateJavaVideoFrame(env, width, height, stride, timestamp_us,
+                                       0, frame->data(), frame->size());
 
   if (j_frame.obj()) {
     Java_AvpPlayer_onNativeVideoFrame(env, j_player_, j_frame);
@@ -273,7 +424,8 @@ void AvpPlayerJni::OnFrame(const std::shared_ptr<media::MediaFrame>& frame) {
 
 // Called by jni_zero auto-generated JNI_AvpPlayer_Init dispatch
 static jlong JNI_AvpPlayer_Init(
-    JNIEnv* env, const jni_zero::JavaParamRef<jobject>& j_caller) {
+    JNIEnv* env,
+    const jni_zero::JavaParamRef<jobject>& j_caller) {
   auto* player = new AvpPlayerJni(env, j_caller.obj());
   return reinterpret_cast<jlong>(player);
 }

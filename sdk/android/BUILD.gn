@@ -53,6 +53,7 @@ if (is_android) {
       "//media/foundation:media_meta",
       "//third_party/jni_zero",
     ]
+    libs = [ "android" ]
   }
 
   shared_library("libavp") {
@@ -65,6 +66,9 @@ if (is_android) {
       "//third_party/jni_zero",
     ]
 
+    # ANativeWindow APIs
+    libs = [ "android" ]
+
     # Export Java_* symbols for lazy JNI lookup
     configs -= [ "//build/config/android:hide_all_but_jni_onload" ]
     configs += [ "//build/config/android:hide_all_but_jni" ]
@@ -73,8 +77,7 @@ if (is_android) {
     data_deps = [ ":avp_jni" ]
     ldflags = [
       "-Wl,--whole-archive",
-      rebase_path("$root_out_dir/obj/sdk/android/libavp_jni.a",
-                  root_build_dir),
+      rebase_path("$root_out_dir/obj/sdk/android/libavp_jni.a", root_build_dir),
       "-Wl,--no-whole-archive",
     ]
   }
