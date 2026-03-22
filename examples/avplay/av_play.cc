@@ -17,9 +17,9 @@
 #include <memory>
 #include <string>
 
+#include "api/player.h"
 #include "base/checks.h"
 #include "base/logging.h"
-#include "api/player.h"
 #include "examples/avplay/file_sink.h"
 
 using namespace ave;
@@ -27,12 +27,13 @@ using ave::player::Player;
 using ave::player::YuvFileVideoRender;
 
 void printHelp() {
-  std::cout << "help:\n"
-               "  -f/--file <file>   : file to play\n"
-               "  -o/--output <base> : write video to <base>.yuv, play audio via\n"
-               "                       ALSA/PulseAudio (no display needed)\n"
-               "  -d/--duration <s>  : stop after <s> seconds (default: full)\n"
-               "  -h/--help\n";
+  std::cout
+      << "help:\n"
+         "  -f/--file <file>   : file to play\n"
+         "  -o/--output <base> : write video to <base>.yuv, play audio via\n"
+         "                       ALSA/PulseAudio (no display needed)\n"
+         "  -d/--duration <s>  : stop after <s> seconds (default: full)\n"
+         "  -h/--help\n";
   exit(1);
 }
 
@@ -145,4 +146,3 @@ int main(int argc, char* argv[]) {
 
   return 0;
 }
-

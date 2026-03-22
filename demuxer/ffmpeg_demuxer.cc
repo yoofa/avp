@@ -26,7 +26,8 @@ namespace {
 
 void AppendTrackInfoToPacket(std::shared_ptr<MediaFrame>& packet,
                              std::shared_ptr<MediaMeta>& track_meta) {
-  // Save PTS/DTS/duration before changing stream type (SetStreamType resets info)
+  // Save PTS/DTS/duration before changing stream type (SetStreamType resets
+  // info)
   auto saved_pts = packet->pts();
   auto saved_dts = packet->dts();
   auto saved_duration = packet->duration();
@@ -215,9 +216,9 @@ FFmpegDemuxer::FFmpegDemuxer(std::shared_ptr<ave::DataSource> data_source)
   av_io_context_ = avio_alloc_context(
       static_cast<unsigned char*>(av_malloc(kBufferSize)), kBufferSize, 0,
       data_source_.get(), &AVIOReadOperation, nullptr, &AVIOSeekOperation);
-  av_io_context_->seekable =
-      (data_source_->Flags() & DataSource::kSeekable) ? AVIO_SEEKABLE_NORMAL
-                                                       : 0;
+  av_io_context_->seekable = (data_source_->Flags() & DataSource::kSeekable)
+                                 ? AVIO_SEEKABLE_NORMAL
+                                 : 0;
   av_io_context_->write_flag = 0;
 
   av_format_context_->flags |= AVFMT_FLAG_CUSTOM_IO;
@@ -236,8 +237,8 @@ status_t FFmpegDemuxer::Init() {
   // Limit probing so avformat_find_stream_info doesn't try to decode frames
   // to detect stream parameters.  Container formats like MP4/MKV embed all
   // codec parameters in their headers, so 1 MB / 1 s is more than enough.
-  av_format_context_->probesize = 1 * 1024 * 1024;        // 1 MB
-  av_format_context_->max_analyze_duration = AV_TIME_BASE; // 1 s
+  av_format_context_->probesize = 1 * 1024 * 1024;          // 1 MB
+  av_format_context_->max_analyze_duration = AV_TIME_BASE;  // 1 s
 
   ret = avformat_find_stream_info(av_format_context_, nullptr);
   AVE_LOG(LS_VERBOSE) << "avformat_find_stream_info ret=" << ret;
@@ -356,7 +357,8 @@ status_t FFmpegDemuxer::ReadAnAvPacket(size_t index) {
         AVPacket* filtered_pkt = av_packet_alloc();
         av_bsf_send_packet(track.bsf_ctx, &pkt);
         if (av_bsf_receive_packet(track.bsf_ctx, filtered_pkt) == 0) {
-          // av_bsf_receive_packet may not set time_base; use bsf output time_base
+          // av_bsf_receive_packet may not set time_base; use bsf output
+          // time_base
           if (filtered_pkt->time_base.den == 0 ||
               filtered_pkt->time_base.num == 0) {
             filtered_pkt->time_base = track.bsf_ctx->time_base_out;

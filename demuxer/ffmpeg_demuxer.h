@@ -15,10 +15,10 @@
 #include "media/foundation/media_source.h"
 
 extern "C" {
+#include "third_party/ffmpeg/libavcodec/bsf.h"
 #include "third_party/ffmpeg/libavformat/avformat.h"
 #include "third_party/ffmpeg/libavformat/avio.h"
 #include "third_party/ffmpeg/libavutil/avutil.h"
-#include "third_party/ffmpeg/libavcodec/bsf.h"
 }
 
 namespace ave {

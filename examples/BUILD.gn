@@ -19,10 +19,10 @@ ave_executable("avplay") {
     "../api:player_interface",
     "../base:logging",
     "../core:avplayer_builder",
-    "../media/audio:audio_device_base",
     "../media/audio:audio_channel_layout",
-    "../media/video:video_render",
+    "../media/audio:audio_device_base",
     "../media/foundation",
+    "../media/video:video_render",
   ]
 
   if (is_linux) {

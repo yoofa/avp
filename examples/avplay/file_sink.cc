@@ -11,8 +11,8 @@
 #include <cstring>
 
 #include "base/logging.h"
-#include "media/audio/channel_layout.h"
 #include "media/audio/audio_format.h"
+#include "media/audio/channel_layout.h"
 
 namespace ave {
 namespace player {
@@ -28,21 +28,21 @@ constexpr uint32_t kWavAudioFormatFloat = 3;
 
 struct WavHeader {
   // RIFF chunk
-  char     riff[4]     = {'R', 'I', 'F', 'F'};
-  uint32_t riff_size   = 36;  // updated at close
-  char     wave[4]     = {'W', 'A', 'V', 'E'};
+  char riff[4] = {'R', 'I', 'F', 'F'};
+  uint32_t riff_size = 36;  // updated at close
+  char wave[4] = {'W', 'A', 'V', 'E'};
   // fmt sub-chunk
-  char     fmt[4]      = {'f', 'm', 't', ' '};
-  uint32_t fmt_size    = 16;
-  uint16_t audio_fmt   = 1;   // PCM
-  uint16_t channels    = 2;
+  char fmt[4] = {'f', 'm', 't', ' '};
+  uint32_t fmt_size = 16;
+  uint16_t audio_fmt = 1;  // PCM
+  uint16_t channels = 2;
   uint32_t sample_rate = 44100;
-  uint32_t byte_rate   = 0;
+  uint32_t byte_rate = 0;
   uint16_t block_align = 0;
-  uint16_t bits        = 16;
+  uint16_t bits = 16;
   // data sub-chunk
-  char     data[4]     = {'d', 'a', 't', 'a'};
-  uint32_t data_size   = 0;   // updated at close
+  char data[4] = {'d', 'a', 't', 'a'};
+  uint32_t data_size = 0;  // updated at close
 } __attribute__((packed));
 
 }  // namespace
@@ -51,8 +51,7 @@ struct WavHeader {
 // YuvFileVideoRender
 // ─────────────────────────────────────────────────────────────────────────────
 
-YuvFileVideoRender::YuvFileVideoRender(const std::string& path)
-    : path_(path) {
+YuvFileVideoRender::YuvFileVideoRender(const std::string& path) : path_(path) {
   file_ = fopen(path.c_str(), "wb");
   if (!file_) {
     AVE_LOG(LS_ERROR) << "YuvFileVideoRender: cannot open " << path;
@@ -158,13 +157,13 @@ status_t WavFileAudioTrack::Open(media::audio_config_t config,
 
 void WavFileAudioTrack::WriteWavHeader() {
   WavHeader hdr;
-  hdr.channels    = static_cast<uint16_t>(channels_);
+  hdr.channels = static_cast<uint16_t>(channels_);
   hdr.sample_rate = sample_rate_;
-  hdr.bits        = static_cast<uint16_t>(bytes_per_sample_ * 8);
+  hdr.bits = static_cast<uint16_t>(bytes_per_sample_ * 8);
   hdr.block_align = static_cast<uint16_t>(channels_ * bytes_per_sample_);
-  hdr.byte_rate   = sample_rate_ * hdr.block_align;
-  hdr.audio_fmt   = (bytes_per_sample_ == 4) ? kWavAudioFormatFloat
-                                              : kWavAudioFormatPcm;
+  hdr.byte_rate = sample_rate_ * hdr.block_align;
+  hdr.audio_fmt =
+      (bytes_per_sample_ == 4) ? kWavAudioFormatFloat : kWavAudioFormatPcm;
   fwrite(&hdr, sizeof(hdr), 1, file_);
 }
 
@@ -172,8 +171,8 @@ void WavFileAudioTrack::UpdateWavHeader() {
   if (!file_) {
     return;
   }
-  uint32_t data_size   = static_cast<uint32_t>(bytes_written_);
-  uint32_t riff_size   = data_size + sizeof(WavHeader) - 8;
+  uint32_t data_size = static_cast<uint32_t>(bytes_written_);
+  uint32_t riff_size = data_size + sizeof(WavHeader) - 8;
   // Patch riff_size at offset 4
   fseek(file_, 4, SEEK_SET);
   fwrite(&riff_size, 4, 1, file_);
@@ -183,7 +182,8 @@ void WavFileAudioTrack::UpdateWavHeader() {
   fseek(file_, 0, SEEK_END);
 }
 
-ssize_t WavFileAudioTrack::Write(const void* buffer, size_t size,
+ssize_t WavFileAudioTrack::Write(const void* buffer,
+                                 size_t size,
                                  bool /*blocking*/) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (!file_ || !ready_) {
@@ -197,7 +197,9 @@ ssize_t WavFileAudioTrack::Write(const void* buffer, size_t size,
   static uint64_t log_counter = 0;
   if (log_counter++ % 100 == 0) {
     AVE_LOG(LS_INFO) << "WavFileAudioTrack: wrote " << bytes_written_
-                     << " bytes total, ~" << bytes_written_ / (sample_rate_ * channels_ * bytes_per_sample_)
+                     << " bytes total, ~"
+                     << bytes_written_ /
+                            (sample_rate_ * channels_ * bytes_per_sample_)
                      << "s";
   }
   return static_cast<ssize_t>(written);

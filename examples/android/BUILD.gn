@@ -14,9 +14,7 @@ if (is_android) {
     min_sdk_version = 26
     target_sdk_version = 34
 
-    deps = [
-      ":avpdemo_java",
-    ]
+    deps = [ ":avpdemo_java" ]
 
     # Bundle the native player library
     shared_libraries = [ "//sdk/android:libavp" ]
