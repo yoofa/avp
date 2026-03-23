@@ -22,8 +22,12 @@ if (is_android) {
 
   ave_android_library("avpdemo_java") {
     sources = [
+      "java/io/github/yoofa/avpdemo/FileBrowserActivity.java",
+      "java/io/github/yoofa/avpdemo/FileItem.java",
       "java/io/github/yoofa/avpdemo/MainActivity.java",
+      "java/io/github/yoofa/avpdemo/MimeTypeUtils.java",
       "java/io/github/yoofa/avpdemo/PlayerActivity.java",
+      "java/io/github/yoofa/avpdemo/StorageUtils.java",
     ]
 
     resources_package = "io.github.yoofa.avpdemo"
@@ -36,8 +40,11 @@ if (is_android) {
 
   android_resources("avpdemo_resources") {
     sources = [
+      "java/res/layout/activity_file_browser.xml",
       "java/res/layout/activity_main.xml",
       "java/res/layout/activity_player.xml",
+      "java/res/layout/item_file.xml",
+      "java/res/layout/item_storage.xml",
       "java/res/values/strings.xml",
     ]
     android_manifest = "AndroidManifest.xml"
