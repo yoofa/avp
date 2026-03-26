@@ -11,7 +11,6 @@
 #include <string>
 #include <unordered_map>
 
-#include <android/native_window.h>
 #include <android/native_window_jni.h>
 
 #include "base/android/jni/jvm.h"
@@ -42,56 +41,12 @@ int MediaTypeToTrackType(media::MediaType type) {
   }
 }
 
-inline uint8_t Clamp(int val) {
-  return static_cast<uint8_t>(val < 0 ? 0 : (val > 255 ? 255 : val));
-}
-
-// Render YUV420P frame data to ANativeWindow
-void RenderYuv420pToWindow(ANativeWindow* window,
-                           const uint8_t* data,
-                           int width,
-                           int height) {
-  ANativeWindow_setBuffersGeometry(window, width, height,
-                                   WINDOW_FORMAT_RGBA_8888);
-  ANativeWindow_Buffer buffer;
-  if (ANativeWindow_lock(window, &buffer, nullptr) != 0) {
-    AVE_LOG(LS_ERROR) << "ANativeWindow_lock failed";
-    return;
-  }
-
-  const uint8_t* y_plane = data;
-  const uint8_t* u_plane = data + width * height;
-  const uint8_t* v_plane = u_plane + (width / 2) * (height / 2);
-
-  auto* dst = static_cast<uint8_t*>(buffer.bits);
-  int dst_stride = buffer.stride * 4;  // RGBA = 4 bytes per pixel
-
-  for (int row = 0; row < height; row++) {
-    for (int col = 0; col < width; col++) {
-      int y = y_plane[row * width + col];
-      int u = u_plane[(row / 2) * (width / 2) + (col / 2)];
-      int v = v_plane[(row / 2) * (width / 2) + (col / 2)];
-
-      int c = y - 16;
-      int d = u - 128;
-      int e = v - 128;
-      uint8_t* pixel = dst + row * dst_stride + col * 4;
-      pixel[0] = Clamp((298 * c + 409 * e + 128) >> 8);            // R
-      pixel[1] = Clamp((298 * c - 100 * d - 208 * e + 128) >> 8);  // G
-      pixel[2] = Clamp((298 * c + 516 * d + 128) >> 8);            // B
-      pixel[3] = 255;                                              // A
-    }
-  }
-
-  ANativeWindow_unlockAndPost(window);
-}
-
 }  // namespace
 
 // --- AvpPlayerJni implementation ---
 
 AvpPlayerJni::AvpPlayerJni(JNIEnv* env, jobject j_player)
-    : j_player_(env, j_player), native_window_(nullptr) {
+    : j_player_(env, j_player) {
   AVE_LOG(LS_INFO) << "AvpPlayerJni::AvpPlayerJni created";
   player_ = player::Player::Builder().build();
   if (player_) {
@@ -113,10 +68,8 @@ AvpPlayerJni::~AvpPlayerJni() {
     player_->Stop();
     player_->Reset();
   }
-  if (native_window_) {
-    ANativeWindow_release(native_window_);
-    native_window_ = nullptr;
-  }
+  // native_window_render_ shared_ptr destructor releases the ANativeWindow.
+  native_window_render_.reset();
 }
 
 void AvpPlayerJni::SetDataSource(
@@ -155,26 +108,26 @@ void AvpPlayerJni::SetSurface(JNIEnv* env,
                               const jni_zero::JavaParamRef<jobject>& surface) {
   AVE_LOG(LS_INFO) << "AvpPlayerJni::SetSurface called";
 
-  // Release existing native window
-  if (native_window_) {
-    ANativeWindow_release(native_window_);
-    native_window_ = nullptr;
-  }
+  // Release existing surface render (decrements ANativeWindow ref count).
+  native_window_render_.reset();
 
-  // Acquire new native window from Java Surface
   if (surface.obj()) {
-    native_window_ = ANativeWindow_fromSurface(env, surface.obj());
-    AVE_LOG(LS_INFO) << "AvpPlayerJni::SetSurface: native_window="
-                     << native_window_;
+    ANativeWindow* window = ANativeWindow_fromSurface(env, surface.obj());
+    if (window) {
+      native_window_render_ =
+          std::make_shared<media::AndroidNativeWindowRender>(window);
+      // AndroidNativeWindowRender acquired its own reference; release ours.
+      ANativeWindow_release(window);
+      AVE_LOG(LS_INFO) << "AvpPlayerJni::SetSurface: native_window_render="
+                       << native_window_render_.get();
+    }
   }
 
   if (!player_)
     return;
 
-  if (native_window_) {
-    // Set ourselves as video render sink — OnFrame will render to ANativeWindow
-    player_->SetVideoRender(
-        std::shared_ptr<media::VideoRender>(this, [](auto*) {}));
+  if (native_window_render_) {
+    player_->SetVideoRender(native_window_render_);
     AVE_LOG(LS_INFO) << "AvpPlayerJni::SetSurface: video render set";
   } else {
     player_->SetVideoRender(nullptr);
@@ -237,10 +190,7 @@ void AvpPlayerJni::Release(JNIEnv* env) {
     player_.reset();
   }
   self_as_listener_.reset();
-  if (native_window_) {
-    ANativeWindow_release(native_window_);
-    native_window_ = nullptr;
-  }
+  native_window_render_.reset();
 }
 
 jint AvpPlayerJni::GetDuration(JNIEnv* env) {
@@ -389,34 +339,24 @@ void AvpPlayerJni::OnInfo(int what, int extra) {
 }
 
 void AvpPlayerJni::OnFrame(const std::shared_ptr<media::MediaFrame>& frame) {
-  if (!frame)
+  // This path is only reached when SetVideoRenderer() sets AvpPlayerJni as
+  // the video render (no surface). Delegate to Java via VideoRenderer callback.
+  if (!frame || !has_video_renderer_)
     return;
 
   auto* vinfo = frame->video_info();
-  if (!vinfo)
-    return;
-
-  int width = vinfo->width;
-  int height = vinfo->height;
-
-  // Render to ANativeWindow if available
-  if (native_window_ && width > 0 && height > 0 && frame->data()) {
-    RenderYuv420pToWindow(native_window_, frame->data(), width, height);
-    return;
-  }
-
-  // Fallback: send to Java via VideoRenderer callback
-  if (!has_video_renderer_)
+  if (!vinfo || !frame->data())
     return;
 
   JNIEnv* env = AttachCurrentThreadIfNeeded();
+  int width = vinfo->width;
+  int height = vinfo->height;
   int stride = vinfo->stride > 0 ? vinfo->stride : width;
   int64_t timestamp_us = vinfo->pts.IsFinite() ? vinfo->pts.us() : 0;
 
   auto j_frame =
       media::jni::CreateJavaVideoFrame(env, width, height, stride, timestamp_us,
                                        0, frame->data(), frame->size());
-
   if (j_frame.obj()) {
     Java_AvpPlayer_onNativeVideoFrame(env, j_player_, j_frame);
   }

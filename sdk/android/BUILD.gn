@@ -50,6 +50,7 @@ if (is_android) {
       "//base:logging",
       "//base/android:ave_jni",
       "//media/android:ave_media_jni",
+      "//media/codec/android:android_ndk_media_codec",
       "//media/foundation:media_meta",
       "//third_party/jni_zero",
     ]
@@ -63,6 +64,7 @@ if (is_android) {
       "//base/android:ave_jni",
       "//core:avplayer_builder",
       "//media/android:ave_media_jni",
+      "//media/codec/android:android_ndk_media_codec",
       "//third_party/jni_zero",
     ]
 

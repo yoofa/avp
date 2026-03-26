@@ -88,6 +88,9 @@ uint64_t AVPVideoRender::RenderFrameInternal(
   }
 
   // Pass frame to video render sink
+  AVE_LOG(LS_INFO) << "RenderFrameInternal: rendering video frame, pts="
+                   << frame->pts().us_or(-1)
+                   << ", total=" << total_frames_rendered_;
   video_render_->OnFrame(frame);
   total_frames_rendered_++;
   consumed = true;

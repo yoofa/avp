@@ -12,7 +12,7 @@
 #include "api/content_source/default_content_source_factory.h"
 #include "demuxer/ffmpeg_demuxer_factory.h"
 #include "media/audio/audio_device.h"
-#include "media/codec/ffmpeg/ffmpeg_codec_factory.h"
+#include "media/codec/default_codec_factory.h"
 
 namespace ave {
 namespace player {
@@ -23,7 +23,7 @@ std::shared_ptr<Player> Player::Builder::build() {
     audio_device_->Init();
   }
   if (codec_factory_ == nullptr) {
-    codec_factory_ = std::make_shared<media::FFmpegCodecFactory>();
+    codec_factory_ = std::make_shared<media::DefaultCodecFactory>();
   }
 
   if (demuxer_factory_ == nullptr) {

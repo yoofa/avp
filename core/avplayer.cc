@@ -344,6 +344,17 @@ status_t AvPlayer::InstantiateDecoder(
   AVE_LOG(LS_INFO) << "InstantiateDecoder: decoder created, initializing...";
   decoder->Init();
 
+  // For video decoders, pass the raw VideoRender sink (e.g.
+  // AndroidNativeWindowRender) so that Configure() can extract the
+  // ANativeWindow and enable hardware surface rendering. This must be
+  // posted before Configure() so the looper processes it first.
+  if (!audio && video_render_sink_) {
+    AVE_LOG(LS_INFO) << "InstantiateDecoder: setting video render sink on "
+                        "decoder: "
+                     << video_render_sink_.get();
+    decoder->SetVideoRender(video_render_sink_);
+  }
+
   AVE_LOG(LS_INFO) << "InstantiateDecoder: configuring decoder...";
   decoder->Configure(format);
 

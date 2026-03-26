@@ -13,7 +13,7 @@ ave_library("avplayer_builder") {
     "../demuxer",
     "//media/audio",
     "//media/codec",
-    "//media/codec/ffmpeg:ffmpeg_codec",
+    "//media/codec:default_codec_factory",
   ]
 }
 

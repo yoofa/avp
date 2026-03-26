@@ -208,6 +208,10 @@ class AVPRender {
   bool running_ GUARDED_BY(mutex_);
   bool paused_ GUARDED_BY(mutex_);
   bool sync_enabled_ GUARDED_BY(mutex_) = true;
+  // Count of frames actually rendered (not dropped). Used to skip sync-based
+  // dropping for the very first frame, which may arrive late due to codec
+  // startup latency while the audio clock has already advanced.
+  size_t frames_rendered_count_ GUARDED_BY(mutex_) = 0;
 
   static constexpr size_t kMaxQueueSize = 100;  // Prevent memory overflow
                                                 // Frame queue management

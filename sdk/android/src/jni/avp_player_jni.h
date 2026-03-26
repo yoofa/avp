@@ -11,9 +11,8 @@
 #include <jni.h>
 #include <memory>
 
-#include <android/native_window.h>
-
 #include "api/player.h"
+#include "media/codec/android/android_native_window_render.h"
 #include "media/video/video_render.h"
 #include "third_party/jni_zero/java_refs.h"
 
@@ -72,7 +71,7 @@ class AvpPlayerJni : public player::Player::Listener,
   void OnVideoSizeChanged(int width, int height) override;
   void OnInfo(int what, int extra) override;
 
-  // VideoRender (MediaFrameSink)
+  // VideoRender (MediaFrameSink) — handles Java-callback path (no surface)
   void OnFrame(const std::shared_ptr<media::MediaFrame>& frame) override;
 
  private:
@@ -81,7 +80,8 @@ class AvpPlayerJni : public player::Player::Listener,
   // Must keep a strong reference to the listener shared_ptr so that
   // the weak_ptr stored inside AvPlayer doesn't expire immediately.
   std::shared_ptr<player::Player::Listener> self_as_listener_;
-  ANativeWindow* native_window_ = nullptr;
+  // Surface-based rendering. Owned here; lifecycle managed via shared_ptr.
+  std::shared_ptr<media::AndroidNativeWindowRender> native_window_render_;
   bool has_video_renderer_ = false;
 };
 

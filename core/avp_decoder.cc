@@ -79,6 +79,11 @@ void AVPDecoder::OnConfigure(const std::shared_ptr<MediaMeta>& format) {
   config->info.media_type = is_audio_ ? MediaType::AUDIO : MediaType::VIDEO;
   if (video_render_) {
     config->video_render = video_render_;
+    AVE_LOG(LS_INFO) << "AVPDecoder::OnConfigure: video_render set: "
+                     << video_render_.get();
+  } else if (!is_audio_) {
+    AVE_LOG(LS_WARNING)
+        << "AVPDecoder::OnConfigure: video decoder has NO video_render set!";
   }
 
   status_t err = decoder_->Configure(config);
@@ -174,6 +179,8 @@ void AVPDecoder::OnShutdown() {
 /////////////////////
 
 bool AVPDecoder::DoRequestInputBuffers() {
+  AVE_LOG(LS_INFO) << "DoRequestInputBuffers: is_audio=" << is_audio_
+                   << ", current_queue_size=" << input_packet_queue_.size();
   status_t err = OK;
   while (err == OK) {
     std::shared_ptr<MediaFrame> packet;
@@ -194,7 +201,11 @@ bool AVPDecoder::DoRequestInputBuffers() {
     }
     input_packet_queue_.push_back(packet);
   }
-  return (err == WOULD_BLOCK) && (source_->FeedMoreESData() == OK);
+  bool should_retry = (err == WOULD_BLOCK) && (source_->FeedMoreESData() == OK);
+  AVE_LOG(LS_INFO) << "DoRequestInputBuffers done: queued="
+                   << input_packet_queue_.size()
+                   << ", should_retry=" << should_retry;
+  return should_retry;
 }
 
 void AVPDecoder::FillCodecBuffer(std::shared_ptr<CodecBuffer>& buffer) {
@@ -218,7 +229,8 @@ void AVPDecoder::FillCodecBuffer(std::shared_ptr<CodecBuffer>& buffer) {
 
 /************* CodecCallback event handler *************/
 void AVPDecoder::HandleAnInputBuffer(size_t index) {
-  AVE_LOG(LS_VERBOSE) << "HandleAnInputBuffer, index:" << index;
+  AVE_LOG(LS_INFO) << "HandleAnInputBuffer: index=" << index
+                   << ", queue_size=" << input_packet_queue_.size();
   if (decoder_ == nullptr) {
     AVE_LOG(LS_ERROR) << "HandleAnInputBuffer: decoder is nullptr";
     ReportError(ave::NO_INIT);
@@ -247,6 +259,8 @@ void AVPDecoder::HandleAnInputBuffer(size_t index) {
 
   FillCodecBuffer(codec_buffer);
 
+  AVE_LOG(LS_INFO) << "HandleAnInputBuffer: queuing buffer index=" << index
+                   << ", size=" << codec_buffer->size();
   status_t err = decoder_->QueueInputBuffer(index);
   if (err != OK) {
     AVE_LOG(LS_ERROR) << "QueueInputBuffer failed: " << err;
@@ -256,6 +270,7 @@ void AVPDecoder::HandleAnInputBuffer(size_t index) {
 }
 
 void AVPDecoder::HandleAnOutputBuffer(size_t index) {
+  AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: index=" << index;
   if (decoder_ == nullptr) {
     AVE_LOG(LS_ERROR) << "HandleAnOutputBuffer: decoder is nullptr";
     ReportError(ave::NO_INIT);
@@ -276,6 +291,11 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
   }
 
   std::shared_ptr<media::MediaFrame> frame;
+  // Surface mode: codec renders directly to ANativeWindow; buffer has no data.
+  bool is_surface_mode =
+      !is_audio_ && (buffer->data() == nullptr || buffer->size() == 0);
+  bool already_released = false;
+
   if (is_audio_) {
     frame = media::MediaFrame::CreateSharedAsCopy(
         buffer->data(), buffer->size(), MediaType::AUDIO);
@@ -283,33 +303,61 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
     if (buffer->format() && buffer->format()->sample_info()) {
       *frame->audio_info() = buffer->format()->sample_info()->audio();
     }
-  } else {
-    // Copy the YUV pixel data from the codec buffer
-    frame = media::MediaFrame::CreateSharedAsCopy(
-        buffer->data(), buffer->size(), MediaType::VIDEO);
-    // Copy video format metadata using direct setters (frame is kTrack type)
+  } else if (is_surface_mode) {
+    // Surface mode: create a metadata-only frame for AV sync timing.
+    // The actual rendering is done by ReleaseOutputBuffer(index, true).
+    frame = media::MediaFrame::CreateShared(0, MediaType::VIDEO);
     if (buffer->format() && buffer->format()->sample_info()) {
       const auto& vinfo = buffer->format()->sample_info()->video();
       frame->SetWidth(vinfo.width);
       frame->SetHeight(vinfo.height);
-      frame->SetStride(vinfo.stride);
+      if (!vinfo.pts.IsMinusInfinity()) {
+        frame->SetPts(vinfo.pts);
+      }
+    }
+    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: surface mode video frame, pts="
+                     << (frame ? frame->pts().us_or(-1) : -1);
+  } else {
+    // Buffer mode: copy the YUV pixel data from the codec buffer, then
+    // immediately release the codec buffer so the OutputThread is unblocked.
+    frame = media::MediaFrame::CreateSharedAsCopy(
+        buffer->data(), buffer->size(), MediaType::VIDEO);
+    if (buffer->format() && buffer->format()->sample_info()) {
+      const auto& vinfo = buffer->format()->sample_info()->video();
+      frame->SetWidth(vinfo.width);
+      frame->SetHeight(vinfo.height);
+      frame->SetStride(vinfo.stride > 0 ? vinfo.stride : vinfo.width);
       frame->SetPixelFormat(vinfo.pixel_format);
       if (!vinfo.pts.IsMinusInfinity()) {
         frame->SetPts(vinfo.pts);
       }
     }
+    // Data is copied into the frame — release the codec buffer immediately.
+    decoder_->ReleaseOutputBuffer(index, false);
+    already_released = true;
+    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: buffer mode video frame, pts="
+                     << (frame ? frame->pts().us_or(-1) : -1)
+                     << ", size=" << (frame ? frame->size() : 0);
   }
 
   if (avp_render_) {
-    // Release the codec output buffer only after the frame is consumed from the
-    // render queue. This creates backpressure: the decoder can't produce more
-    // frames than the renderer consumes, preventing queue overflow.
     auto decoder = decoder_;
-    avp_render_->RenderFrame(frame, [decoder, index](bool /*rendered*/) {
-      decoder->ReleaseOutputBuffer(index, false);
+    avp_render_->RenderFrame(frame, [decoder, index, is_surface_mode,
+                                     already_released](bool rendered) {
+      if (!already_released) {
+        // Surface mode: render=true causes the codec to blit the decoded
+        // frame to the ANativeWindow at this exact moment.
+        decoder->ReleaseOutputBuffer(index, is_surface_mode && rendered);
+      }
+      // Buffer mode: already released immediately after data copy above.
     });
+    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: queuing frame to render, "
+                     << "surface_mode=" << is_surface_mode
+                     << ", pts=" << (frame ? frame->pts().us_or(-1) : -1);
   } else {
-    decoder_->ReleaseOutputBuffer(index, false);
+    if (!already_released) {
+      decoder_->ReleaseOutputBuffer(index, false);
+    }
   }
 }
 
