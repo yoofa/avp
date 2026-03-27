@@ -297,12 +297,34 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
   bool already_released = false;
 
   if (is_audio_) {
+    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer[AUDIO]: copying buffer, "
+                     << "data=" << (void*)buffer->data()
+                     << ", size=" << buffer->size();
     frame = media::MediaFrame::CreateSharedAsCopy(
         buffer->data(), buffer->size(), MediaType::AUDIO);
+    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer[AUDIO]: frame created, "
+                     << "frame=" << frame.get()
+                     << ", frame_size=" << (frame ? frame->size() : 0);
     // Copy audio format metadata (sample rate, channels, PTS, etc.)
     if (buffer->format() && buffer->format()->sample_info()) {
       *frame->audio_info() = buffer->format()->sample_info()->audio();
+      auto* ai = frame->audio_info();
+      AVE_LOG(LS_INFO) << "HandleAnOutputBuffer[AUDIO]: metadata copied, "
+                       << "sr=" << (ai ? ai->sample_rate_hz : -1)
+                       << ", pts=" << (ai ? ai->pts.us_or(-1) : -1);
+    } else {
+      AVE_LOG(LS_WARNING) << "HandleAnOutputBuffer[AUDIO]: no metadata in "
+                          << "codec buffer, format=" << buffer->format().get();
     }
+    // PCM data is fully copied — release the codec output buffer immediately
+    // so the audio decoder is never starved of output slots while the render
+    // queue drains at AAudio's pace.
+    decoder_->ReleaseOutputBuffer(index, false);
+    already_released = true;
+    auto* ai = frame ? frame->audio_info() : nullptr;
+    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer[AUDIO]: copied+released, "
+                     << "pts=" << (ai ? ai->pts.us_or(-1) : -1)
+                     << ", size=" << (frame ? frame->size() : 0);
   } else if (is_surface_mode) {
     // Surface mode: create a metadata-only frame for AV sync timing.
     // The actual rendering is done by ReleaseOutputBuffer(index, true).
@@ -341,6 +363,10 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
   }
 
   if (avp_render_) {
+    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: calling RenderFrame, "
+                     << "is_audio=" << is_audio_
+                     << ", surface_mode=" << is_surface_mode
+                     << ", already_released=" << already_released;
     auto decoder = decoder_;
     avp_render_->RenderFrame(frame, [decoder, index, is_surface_mode,
                                      already_released](bool rendered) {

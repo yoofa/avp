@@ -35,7 +35,9 @@ void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame,
   std::lock_guard<std::mutex> lock(mutex_);
 
   if (!running_) {
-    AVE_LOG(LS_VERBOSE) << "Renderer not running, dropping frame";
+    AVE_LOG(LS_WARNING) << "RenderFrame: renderer not running, dropping "
+                        << (frame ? static_cast<int>(frame->stream_type()) : -1)
+                        << " frame";
     return;
   }
 
@@ -52,7 +54,15 @@ void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame,
 
   // Add frame to queue
   bool was_empty = frame_queue_.empty();
+  auto stream_type = frame->stream_type();
   frame_queue_.push(QueueEntry{std::move(frame), std::move(render_event)});
+
+  AVE_LOG(LS_INFO) << "RenderFrame: enqueued "
+                   << (stream_type == media::MediaType::AUDIO ? "AUDIO"
+                                                              : "VIDEO")
+                   << " frame, queue_size=" << frame_queue_.size()
+                   << ", was_empty=" << was_empty << ", paused=" << paused_
+                   << ", running=" << running_;
 
   // Only schedule a new task when the queue was empty; if frames already
   // exist, the in-flight OnRenderTask will self-schedule after processing.
@@ -133,10 +143,14 @@ void AVPRender::ScheduleNextFrame(uint32_t delay_us) {
   }
 
   if (frame_queue_.empty()) {
+    AVE_LOG(LS_INFO) << "ScheduleNextFrame: queue empty, not scheduling";
     return;
   }
 
   update_generation_++;
+  AVE_LOG(LS_INFO) << "ScheduleNextFrame: delay=" << delay_us
+                   << "us, generation=" << update_generation_
+                   << ", queue_size=" << frame_queue_.size();
   // Schedule the task with delay
   task_runner_->PostDelayedTask(
       [this, update_generation = update_generation_]() {
@@ -177,16 +191,19 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
 
   // Check if renderer is still in valid state
   if (!running_ || paused_) {
-    AVE_LOG(LS_VERBOSE) << "Renderer not in valid state, dropping frame";
+    AVE_LOG(LS_INFO) << "OnRenderTask: not in valid state, running=" << running_
+                     << ", paused=" << paused_;
     return;
   }
 
   if (update_generation != update_generation_) {
-    // AVE_LOG(LS_VERBOSE) << "Dropping stale render task";
+    AVE_LOG(LS_INFO) << "OnRenderTask: stale task, generation="
+                     << update_generation << ", current=" << update_generation_;
     return;
   }
 
   if (frame_queue_.empty()) {
+    AVE_LOG(LS_INFO) << "OnRenderTask: queue empty";
     return;
   }
 
@@ -200,6 +217,9 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
     // For audio, render immediately and schedule next based on returned delay
 
     next_render_delay_us = RenderFrameInternal(frame, consumed);
+    AVE_LOG(LS_INFO) << "OnRenderTask[AUDIO]: consumed=" << consumed
+                     << ", next_delay=" << next_render_delay_us
+                     << ", queue_size=" << frame_queue_.size();
     if (consumed) {
       ReleaseFrame(entry, true);
       frame_queue_.pop();
@@ -237,7 +257,12 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
   }
   // Schedule next frame if queue is not empty
   if (!frame_queue_.empty()) {
+    AVE_LOG(LS_INFO) << "OnRenderTask: scheduling next, queue_size="
+                     << frame_queue_.size()
+                     << ", delay=" << next_render_delay_us << "us";
     ScheduleNextFrame(next_render_delay_us);  // TODO: Fix for test environment
+  } else {
+    AVE_LOG(LS_INFO) << "OnRenderTask: queue drained, waiting for new frames";
   }
 }
 

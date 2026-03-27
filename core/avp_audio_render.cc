@@ -169,6 +169,13 @@ void AVPAudioRender::Flush() {
 uint64_t AVPAudioRender::RenderFrameInternal(
     std::shared_ptr<media::MediaFrame>& frame,
     bool& consumed) {
+  AVE_LOG(LS_INFO) << "RenderFrameInternal[AUDIO]: enter, "
+                   << "frame_size=" << (frame ? frame->size() : 0)
+                   << ", format_initialized=" << format_initialized_
+                   << ", audio_sink_ready=" << audio_sink_ready_
+                   << ", has_audio_track=" << (audio_track_ != nullptr)
+                   << ", has_cached=" << (cached_frame_ != nullptr);
+
   if (!frame || frame->stream_type() != media::MediaType::AUDIO) {
     AVE_LOG(LS_WARNING) << "Invalid audio frame";
     return 0;
@@ -183,7 +190,7 @@ uint64_t AVPAudioRender::RenderFrameInternal(
   // Initialize audio track from the first frame if not yet done
   if (!format_initialized_) {
     current_audio_config_ = ConvertToAudioConfig(frame);
-    AVE_LOG(LS_INFO) << "First frame: creating audio track - sample_rate: "
+    AVE_LOG(LS_INFO) << "RenderFrameInternal[AUDIO]: lazy init - sample_rate: "
                      << current_audio_config_.sample_rate << ", channels: "
                      << static_cast<int>(current_audio_config_.channel_layout);
     status_t result = CreateAudioTrack();
@@ -191,6 +198,11 @@ uint64_t AVPAudioRender::RenderFrameInternal(
       AVE_LOG(LS_ERROR) << "Failed to create audio track from first frame";
       return 0;
     }
+    // Renderer is already running (we are inside RenderFrameInternal),
+    // so start the track immediately.
+    AVE_LOG(LS_INFO)
+        << "RenderFrameInternal[AUDIO]: starting track after lazy init";
+    audio_track_->Start();
     format_initialized_ = true;
     audio_sink_ready_ = true;
   }
@@ -217,27 +229,36 @@ uint64_t AVPAudioRender::RenderFrameInternal(
     }
   }
 
+  // Track whether we consumed the incoming frame in this call. Used to
+  // correctly revert the consumption if the write fails entirely.
+  bool consumed_frame_this_call = false;
   if (!cached_frame_) {
     cached_frame_ = frame;
     consumed = true;
+    consumed_frame_this_call = true;
+    AVE_LOG(LS_INFO) << "RenderFrameInternal[AUDIO]: consumed new frame, "
+                     << "size=" << cached_frame_->size();
   } else {
     consumed = false;
+    AVE_LOG(LS_INFO) << "RenderFrameInternal[AUDIO]: retrying cached frame, "
+                     << "remaining=" << cached_frame_->size();
   }
 
-  // Write audio data to track
+  // Write audio data to track.  Single-shot write with a short timeout so
+  // the caller's mutex is not held for a long time.  Partial writes are
+  // handled via cached_frame_ and a 0-delay re-schedule.
   ssize_t bytes_written = WriteAudioData(cached_frame_);
   if (bytes_written > 0) {
     total_bytes_written_ += bytes_written;
-    AVE_LOG(LS_VERBOSE) << "Wrote " << bytes_written << " bytes to audio track";
 
-    // Update sync anchor if this is the master stream
-    // and is first time to write thie cache frame
+    // Update sync anchor on first write of this frame (full size means
+    // this is the beginning of the frame, not a partial retry)
     if (master_stream_ &&
         (cached_frame_->size() == cached_frame_->capacity())) {
       UpdateSyncAnchor(cached_frame_);
     }
 
-    if (static_cast<size_t>(bytes_written) == cached_frame_->size()) {
+    if (static_cast<size_t>(bytes_written) >= cached_frame_->size()) {
       cached_frame_.reset();
     } else {
       auto new_offset =
@@ -246,21 +267,36 @@ uint64_t AVPAudioRender::RenderFrameInternal(
       cached_frame_->setRange(new_offset, new_size);
     }
   } else if (bytes_written == 0) {
-    // ALSA buffer full, non-blocking write couldn't accept any data.
-    // Keep frame in queue and retry after a short delay.
+    // AAudio buffer full or temporarily stalled — write timed out.
+    if (consumed_frame_this_call) {
+      // We just took this frame from the queue but wrote nothing.
+      // Revert the consumption so the frame remains in the queue for retry:
+      // release our cached reference (queue still holds it).
+      cached_frame_.reset();
+      consumed = false;
+    }
+    // else: cached_frame_ has partial data from a previous write — keep it.
+    AVE_LOG(LS_INFO) << "RenderFrameInternal[AUDIO]: write stalled, "
+                     << "consumed_this_call=" << consumed_frame_this_call
+                     << ", retry in 5ms";
+    return 5000;
+  } else {
+    // Write error — drop the frame to avoid stalling the pipeline
+    AVE_LOG(LS_WARNING) << "Audio write error: " << bytes_written
+                        << ", dropping frame";
     cached_frame_.reset();
-    consumed = false;
-    return 5000;  // retry in 5ms
+    consumed = true;
+    return 0;
   }
 
-  // Calculate next frame delay based on real playback latency
-  // This should be based on the audio track's buffer state and sample rate
-  int64_t next_delay_us = CalculateNextAudioFrameDelay();
+  AVE_LOG(LS_INFO) << "RenderFrameInternal[AUDIO]: wrote " << bytes_written
+                   << " bytes, total=" << total_bytes_written_
+                   << ", cached=" << (cached_frame_ ? "partial" : "done");
   if (audio_info->pts.IsFinite()) {
     last_audio_pts_us_ = audio_info->pts.us();
   }
-  AVE_LOG(LS_VERBOSE) << "Wrote " << bytes_written << " bytes to audio track";
-  return next_delay_us;
+  // Blocking write provides natural pacing; no extra delay needed.
+  return 0;
 }
 
 status_t AVPAudioRender::CreateAudioTrack() {
@@ -269,7 +305,7 @@ status_t AVPAudioRender::CreateAudioTrack() {
     return UNKNOWN_ERROR;
   }
 
-  AVE_LOG(LS_DEBUG) << "CreateAudioTrack: creating audio track object";
+  AVE_LOG(LS_INFO) << "CreateAudioTrack: creating audio track object";
   audio_track_ = audio_device_->CreateAudioTrack();
   if (!audio_track_) {
     AVE_LOG(LS_ERROR) << "Failed to create audio track";
@@ -277,13 +313,12 @@ status_t AVPAudioRender::CreateAudioTrack() {
   }
 
   // Open the audio track with current configuration
-  AVE_LOG(LS_DEBUG) << "CreateAudioTrack: calling Open() with sr="
-                    << current_audio_config_.sample_rate << " ch="
-                    << static_cast<int>(current_audio_config_.channel_layout)
-                    << " fmt="
-                    << static_cast<int>(current_audio_config_.format);
+  AVE_LOG(LS_INFO) << "CreateAudioTrack: calling Open() with sr="
+                   << current_audio_config_.sample_rate << " ch="
+                   << static_cast<int>(current_audio_config_.channel_layout)
+                   << " fmt=" << static_cast<int>(current_audio_config_.format);
   status_t result = audio_track_->Open(current_audio_config_);
-  AVE_LOG(LS_DEBUG) << "CreateAudioTrack: Open() returned " << result;
+  AVE_LOG(LS_INFO) << "CreateAudioTrack: Open() returned " << result;
   if (result != OK) {
     AVE_LOG(LS_ERROR) << "Failed to open audio track, error: " << result;
     audio_track_.reset();
@@ -298,8 +333,9 @@ status_t AVPAudioRender::CreateAudioTrack() {
       << "Audio track created successfully, supports_playback_rate: "
       << supports_playback_rate_;
 
-  // FIXME(youfa): start test
-  audio_track_->Start();
+  // Remove the FIXME test start: do NOT start the track here.
+  // The track will be started by AVPAudioRender::Start() (for pre-opened
+  // sinks) or immediately after lazy creation in RenderFrameInternal.
 
   return OK;
 }
@@ -419,7 +455,6 @@ media::audio_config_t AVPAudioRender::ConvertToAudioConfig(
 
 ssize_t AVPAudioRender::WriteAudioData(
     const std::shared_ptr<media::MediaFrame>& frame) {
-  AVE_LOG(LS_VERBOSE) << "Writing audio data to track";
   if (!audio_track_ || !audio_track_->ready()) {
     AVE_LOG(LS_WARNING) << "Audio track not ready";
     return -1;
@@ -433,7 +468,12 @@ ssize_t AVPAudioRender::WriteAudioData(
     return -1;
   }
 
-  ssize_t bytes_written = audio_track_->Write(data, size, false);
+  // Use blocking write with 2ms timeout so we make progress without
+  // holding the mutex for an extended period.
+  ssize_t bytes_written = audio_track_->Write(data, size, true);
+
+  AVE_LOG(LS_INFO) << "WriteAudioData: requested=" << size
+                   << " written=" << bytes_written;
 
   if (bytes_written < 0) {
     AVE_LOG(LS_WARNING) << "Audio track write failed: " << bytes_written;
@@ -462,18 +502,21 @@ void AVPAudioRender::UpdateSyncAnchor(
       audio_info->duration.IsFinite() ? audio_info->duration.us() : 0;
   int64_t current_sys_time_us = base::TimeMicros();
 
-  // Calculate the end time of this audio frame
+  // Compensate for AAudio's internal buffer latency: the audio we just wrote
+  // will not be heard until buffer_latency_us from now.  Shifting the anchor
+  // forward by this amount keeps the video renderer in sync with actual audio
+  // playback rather than with the write position.
+  int64_t buffer_latency_us =
+      audio_track_ ? audio_track_->GetBufferDurationInUs() : 0;
+
   int64_t frame_end_pts_us = frame_pts_us + frame_duration_us;
 
-  // Update the sync controller anchor
-  GetAVSyncController()->UpdateAnchor(frame_pts_us, current_sys_time_us,
-                                      frame_end_pts_us);
+  GetAVSyncController()->UpdateAnchor(
+      frame_pts_us, current_sys_time_us + buffer_latency_us, frame_end_pts_us);
 
-  AVE_LOG(LS_VERBOSE) << "UpdateSyncAnchor PTS=" << frame_pts_us / 1000
-                      << "ms sys=" << current_sys_time_us / 1000 << "ms";
-  AVE_LOG(LS_VERBOSE) << "Updated sync anchor - PTS: " << frame_pts_us
-                      << "us, sys_time: " << current_sys_time_us
-                      << "us, max_time: " << frame_end_pts_us << "us";
+  AVE_LOG(LS_INFO) << "UpdateSyncAnchor PTS=" << frame_pts_us / 1000
+                   << "ms sys=" << current_sys_time_us / 1000
+                   << "ms buf_latency=" << buffer_latency_us / 1000 << "ms";
 }
 
 bool AVPAudioRender::SupportsPlaybackRateChange() const {
@@ -510,28 +553,9 @@ void AVPAudioRender::ApplyPlaybackRate() {
 }
 
 int64_t AVPAudioRender::CalculateNextAudioFrameDelay() {
-  if (!audio_track_) {
-    return 0;
-  }
-
-  // Get current buffer state from audio track
-  uint32_t frames_written = 0;
-  audio_track_->GetFramesWritten(&frames_written);
-
-  // Get the latency of the audio track
-  uint32_t latency_ms = audio_track_->latency();
-  int64_t latency_us = latency_ms * 1000LL;
-
-  // Calculate time per frame
-  float msecs_per_frame = audio_track_->msecsPerFrame();
-  auto frame_duration_us = static_cast<int64_t>(msecs_per_frame * 1000.0f);
-
-  AVE_LOG(LS_VERBOSE) << __FUNCTION__ << ", frames_written: " << frames_written
-                      << ", latency_ms: " << latency_ms
-                      << ", latency_us: " << latency_us
-                      << ", frame_duration_us: " << frame_duration_us;
-
-  return latency_us / 2;
+  // Blocking writes in WriteAudioData provide natural pacing, so no
+  // additional delay is needed between frames.
+  return 0;
 }
 
 }  // namespace player
