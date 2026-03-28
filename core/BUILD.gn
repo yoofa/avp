@@ -9,6 +9,7 @@ ave_library("avplayer_builder") {
   deps = [
     ":avplayer",
     "../api:default_content_source_factory",
+    "../api:default_demuxer_factory",
     "../api:player_interface",
     "../demuxer",
     "//media/audio",

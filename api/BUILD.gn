@@ -3,9 +3,7 @@ import("//base/build/ave.gni")
 group("api") {
   deps = [
     ":default_content_source_factory",
-
-    # ffmpeg demuxer not ok
-    #":default_demuxer_factory",
+    ":default_demuxer_factory",
     ":player_interface",
   ]
 }
@@ -43,8 +41,7 @@ ave_library("default_demuxer_factory") {
   ]
   deps = [
     ":api_demuxer",
-    "//demuxer:ave_demuxer_factory",
-    "//demuxer:ffmpeg_demuxer_factory",
+    "//base:logging",
   ]
 }
 

@@ -5,7 +5,10 @@ group("demuxer") {
 }
 
 ave_library("ave_demuxer_factory") {
-  deps = [ ":ffmpeg_demuxer_factory" ]
+  deps = [
+    ":ffmpeg_demuxer_factory",
+    ":internal_demuxer_factory",
+  ]
 }
 
 ave_library("ffmpeg_demuxer_factory") {
@@ -21,5 +24,29 @@ ave_library("ffmpeg_demuxer_factory") {
     "//base:utils",
     "//media/modules/ffmpeg:ffmpeg_utils",
     "//third_party/ffmpeg",
+  ]
+}
+
+ave_library("internal_demuxer_factory") {
+  sources = [
+    "internal_demuxer_factory.cc",
+    "internal_demuxer_factory.h",
+    "mp4_demuxer.cc",
+    "mp4_demuxer.h",
+  ]
+  deps = [
+    "../api:player_interface",
+    "isobmff",
+    "//base:logging",
+    "//base:utils",
+    "//media/audio:audio_channel_layout",
+    "//media/codec:codec_id",
+    "//media/foundation:aac_util",
+    "//media/foundation:avc_util",
+    "//media/foundation:esds",
+    "//media/foundation:media_frame",
+    "//media/foundation:media_meta",
+    "//media/foundation:media_mimes",
+    "//media/foundation:media_source",
   ]
 }

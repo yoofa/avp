@@ -10,7 +10,9 @@
 #include "avplayer.h"
 
 #include "api/content_source/default_content_source_factory.h"
+#include "api/demuxer/default_demuxer_factory.h"
 #include "demuxer/ffmpeg_demuxer_factory.h"
+#include "demuxer/internal_demuxer_factory.h"
 #include "media/audio/audio_device.h"
 #include "media/codec/default_codec_factory.h"
 
@@ -26,8 +28,12 @@ std::shared_ptr<Player> Player::Builder::build() {
     codec_factory_ = std::make_shared<media::DefaultCodecFactory>();
   }
 
+  // demuxer_factory_ = std::make_shared<FFmpegDemuxerFactory>();
+
   if (demuxer_factory_ == nullptr) {
-    demuxer_factory_ = std::make_shared<FFmpegDemuxerFactory>();
+    demuxer_factory_ = std::make_shared<DefaultDemuxerFactory>(
+        std::make_shared<InternalDemuxerFactory>(),
+        std::make_shared<FFmpegDemuxerFactory>());
   }
 
   if (content_source_factory_ == nullptr) {

@@ -1,0 +1,15 @@
+import("//avp.gni")
+
+ave_library("isobmff") {
+  sources = [
+    "box_reader.cc",
+    "box_reader.h",
+    "box_types.h",
+    "sample_table.cc",
+    "sample_table.h",
+  ]
+  deps = [
+    "//base:logging",
+    "//base:utils",
+  ]
+}
