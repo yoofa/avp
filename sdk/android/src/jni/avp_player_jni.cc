@@ -72,15 +72,11 @@ AvpPlayerJni::~AvpPlayerJni() {
   native_window_render_.reset();
 }
 
-void AvpPlayerJni::SetDataSource(
-    JNIEnv* env,
-    const jni_zero::JavaParamRef<jstring>& j_path) {
+void AvpPlayerJni::SetDataSource(JNIEnv* env, const std::string& path) {
   if (!player_)
     return;
-  const char* c_path = env->GetStringUTFChars(j_path.obj(), nullptr);
   std::unordered_map<std::string, std::string> headers;
-  player_->SetDataSource(c_path, headers);
-  env->ReleaseStringUTFChars(j_path.obj(), c_path);
+  player_->SetDataSource(path.c_str(), headers);
 }
 
 void AvpPlayerJni::SetDataSourceFd(JNIEnv* env,
@@ -270,9 +266,7 @@ jni_zero::ScopedJavaLocalRef<jobject> AvpPlayerJni::GetTrackInfo(JNIEnv* env,
   if (j_track_info.obj()) {
     const std::string& mime = meta->mime();
     if (!mime.empty()) {
-      auto j_mime = jni_zero::ScopedJavaLocalRef<jstring>::Adopt(
-          env, env->NewStringUTF(mime.c_str()));
-      Java_TrackInfo_setMimeType(env, j_track_info, j_mime);
+      Java_TrackInfo_setMimeType(env, j_track_info, mime);
     }
   }
 

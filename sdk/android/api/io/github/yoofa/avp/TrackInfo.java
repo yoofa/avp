@@ -9,6 +9,7 @@ package io.github.yoofa.avp;
 import io.github.yoofa.media.MediaFormat;
 
 import org.jni_zero.CalledByNative;
+import org.jni_zero.JniType;
 
 /**
  * Describes a media track (audio, video, or subtitle) in the current media.
@@ -57,7 +58,7 @@ public class TrackInfo {
     }
 
     @CalledByNative
-    public void setMimeType(String mimeType) {
+    public void setMimeType(@JniType("std::string") String mimeType) {
         this.mimeType = mimeType;
     }
 

@@ -12,6 +12,7 @@ import android.view.Surface;
 import androidx.annotation.Nullable;
 
 import org.jni_zero.CalledByNative;
+import org.jni_zero.JniType;
 import org.jni_zero.NativeMethods;
 
 import io.github.yoofa.ContextUtils;
@@ -157,7 +158,7 @@ public class AvpPlayer {
     }
 
     private AvpPlayer() {
-        this.nativePlayer = nativeInit();
+        this.nativePlayer = AvpPlayerJni.get().init(this);
         if (nativePlayer == 0) {
             throw new RuntimeException("Failed to create native player");
         }
@@ -172,7 +173,7 @@ public class AvpPlayer {
      */
     public void setDataSource(String path) {
         checkNotReleased();
-        nativeSetDataSource(nativePlayer, path);
+        AvpPlayerJni.get().setDataSource(nativePlayer, path);
     }
 
     /**
@@ -184,7 +185,7 @@ public class AvpPlayer {
      */
     public void setDataSource(int fd, long offset, long length) {
         checkNotReleased();
-        nativeSetDataSourceFd(nativePlayer, fd, offset, length);
+        AvpPlayerJni.get().setDataSourceFd(nativePlayer, fd, offset, length);
     }
 
     // --- Video output ---
@@ -197,7 +198,7 @@ public class AvpPlayer {
     public void setVideoRenderer(@Nullable VideoRenderer renderer) {
         this.videoRenderer = renderer;
         checkNotReleased();
-        nativeSetVideoRenderer(nativePlayer, renderer != null);
+        AvpPlayerJni.get().setVideoRenderer(nativePlayer, renderer != null);
     }
 
     /**
@@ -207,7 +208,7 @@ public class AvpPlayer {
      */
     public void setSurface(@Nullable Surface surface) {
         checkNotReleased();
-        nativeSetSurface(nativePlayer, surface);
+        AvpPlayerJni.get().setSurface(nativePlayer, surface);
     }
 
     // --- Playback control ---
@@ -218,7 +219,7 @@ public class AvpPlayer {
      */
     public void prepare() {
         checkNotReleased();
-        nativePrepare(nativePlayer);
+        AvpPlayerJni.get().prepare(nativePlayer);
     }
 
     /**
@@ -226,7 +227,7 @@ public class AvpPlayer {
      */
     public void start() {
         checkNotReleased();
-        nativeStart(nativePlayer);
+        AvpPlayerJni.get().start(nativePlayer);
     }
 
     /**
@@ -234,7 +235,7 @@ public class AvpPlayer {
      */
     public void pause() {
         checkNotReleased();
-        nativePause(nativePlayer);
+        AvpPlayerJni.get().pause(nativePlayer);
     }
 
     /**
@@ -242,7 +243,7 @@ public class AvpPlayer {
      */
     public void resume() {
         checkNotReleased();
-        nativeResume(nativePlayer);
+        AvpPlayerJni.get().resume(nativePlayer);
     }
 
     /**
@@ -250,7 +251,7 @@ public class AvpPlayer {
      */
     public void stop() {
         checkNotReleased();
-        nativeStop(nativePlayer);
+        AvpPlayerJni.get().stop(nativePlayer);
     }
 
     /**
@@ -260,7 +261,7 @@ public class AvpPlayer {
      */
     public void seekTo(int msec) {
         checkNotReleased();
-        nativeSeekTo(nativePlayer, msec, SeekMode.SEEK_PREVIOUS_SYNC.getNativeValue());
+        AvpPlayerJni.get().seekTo(nativePlayer, msec, SeekMode.SEEK_PREVIOUS_SYNC.getNativeValue());
     }
 
     /**
@@ -271,7 +272,7 @@ public class AvpPlayer {
      */
     public void seekTo(int msec, SeekMode mode) {
         checkNotReleased();
-        nativeSeekTo(nativePlayer, msec, mode.getNativeValue());
+        AvpPlayerJni.get().seekTo(nativePlayer, msec, mode.getNativeValue());
     }
 
     /**
@@ -280,7 +281,7 @@ public class AvpPlayer {
      */
     public void reset() {
         checkNotReleased();
-        nativeReset(nativePlayer);
+        AvpPlayerJni.get().reset(nativePlayer);
     }
 
     /**
@@ -288,7 +289,7 @@ public class AvpPlayer {
      */
     public void release() {
         if (nativePlayer != 0) {
-            nativeRelease(nativePlayer);
+            AvpPlayerJni.get().release(nativePlayer);
             nativePlayer = 0;
         }
     }
@@ -302,7 +303,7 @@ public class AvpPlayer {
      */
     public int getDuration() {
         checkNotReleased();
-        return nativeGetDuration(nativePlayer);
+        return AvpPlayerJni.get().getDuration(nativePlayer);
     }
 
     /**
@@ -312,7 +313,7 @@ public class AvpPlayer {
      */
     public int getCurrentPosition() {
         checkNotReleased();
-        return nativeGetCurrentPosition(nativePlayer);
+        return AvpPlayerJni.get().getCurrentPosition(nativePlayer);
     }
 
     /**
@@ -322,7 +323,7 @@ public class AvpPlayer {
      */
     public boolean isPlaying() {
         checkNotReleased();
-        return nativeIsPlaying(nativePlayer);
+        return AvpPlayerJni.get().isPlaying(nativePlayer);
     }
 
     /**
@@ -332,7 +333,7 @@ public class AvpPlayer {
      */
     public int getVideoWidth() {
         checkNotReleased();
-        return nativeGetVideoWidth(nativePlayer);
+        return AvpPlayerJni.get().getVideoWidth(nativePlayer);
     }
 
     /**
@@ -342,7 +343,7 @@ public class AvpPlayer {
      */
     public int getVideoHeight() {
         checkNotReleased();
-        return nativeGetVideoHeight(nativePlayer);
+        return AvpPlayerJni.get().getVideoHeight(nativePlayer);
     }
 
     // --- Playback rate ---
@@ -354,7 +355,7 @@ public class AvpPlayer {
      */
     public void setPlaybackRate(float rate) {
         checkNotReleased();
-        nativeSetPlaybackRate(nativePlayer, rate);
+        AvpPlayerJni.get().setPlaybackRate(nativePlayer, rate);
     }
 
     /**
@@ -364,7 +365,7 @@ public class AvpPlayer {
      */
     public float getPlaybackRate() {
         checkNotReleased();
-        return nativeGetPlaybackRate(nativePlayer);
+        return AvpPlayerJni.get().getPlaybackRate(nativePlayer);
     }
 
     // --- Volume ---
@@ -377,7 +378,7 @@ public class AvpPlayer {
      */
     public void setVolume(float leftVolume, float rightVolume) {
         checkNotReleased();
-        nativeSetVolume(nativePlayer, leftVolume, rightVolume);
+        AvpPlayerJni.get().setVolume(nativePlayer, leftVolume, rightVolume);
     }
 
     // --- Track management ---
@@ -389,7 +390,7 @@ public class AvpPlayer {
      */
     public int getTrackCount() {
         checkNotReleased();
-        return nativeGetTrackCount(nativePlayer);
+        return AvpPlayerJni.get().getTrackCount(nativePlayer);
     }
 
     /**
@@ -401,7 +402,7 @@ public class AvpPlayer {
     @Nullable
     public TrackInfo getTrackInfo(int index) {
         checkNotReleased();
-        return nativeGetTrackInfo(nativePlayer, index);
+        return AvpPlayerJni.get().getTrackInfo(nativePlayer, index);
     }
 
     /**
@@ -412,7 +413,7 @@ public class AvpPlayer {
      */
     public void selectTrack(int index, boolean select) {
         checkNotReleased();
-        nativeSelectTrack(nativePlayer, index, select);
+        AvpPlayerJni.get().selectTrack(nativePlayer, index, select);
     }
 
     // --- Looping ---
@@ -542,43 +543,34 @@ public class AvpPlayer {
             throw new IllegalStateException("Player has been released");
         }
     }
-
-    // --- Native methods ---
-    private native long nativeInit();
-    private static native void nativeSetDataSource(long nativeAvpPlayerJni,
-                                                    String path);
-    private static native void nativeSetDataSourceFd(long nativeAvpPlayerJni,
-                                                      int fd, long offset,
-                                                      long length);
-    private static native void nativeSetVideoRenderer(long nativeAvpPlayerJni,
-                                                       boolean hasRenderer);
-    private static native void nativeSetSurface(long nativeAvpPlayerJni,
-                                                 Surface surface);
-    private static native void nativePrepare(long nativeAvpPlayerJni);
-    private static native void nativeStart(long nativeAvpPlayerJni);
-    private static native void nativePause(long nativeAvpPlayerJni);
-    private static native void nativeResume(long nativeAvpPlayerJni);
-    private static native void nativeStop(long nativeAvpPlayerJni);
-    private static native void nativeSeekTo(long nativeAvpPlayerJni,
-                                             int msec, int mode);
-    private static native void nativeReset(long nativeAvpPlayerJni);
-    private static native void nativeRelease(long nativeAvpPlayerJni);
-    private static native int nativeGetDuration(long nativeAvpPlayerJni);
-    private static native int nativeGetCurrentPosition(
-            long nativeAvpPlayerJni);
-    private static native boolean nativeIsPlaying(long nativeAvpPlayerJni);
-    private static native int nativeGetVideoWidth(long nativeAvpPlayerJni);
-    private static native int nativeGetVideoHeight(long nativeAvpPlayerJni);
-    private static native void nativeSetPlaybackRate(
-            long nativeAvpPlayerJni, float rate);
-    private static native float nativeGetPlaybackRate(
-            long nativeAvpPlayerJni);
-    private static native void nativeSetVolume(long nativeAvpPlayerJni,
-                                                float leftVolume,
-                                                float rightVolume);
-    private static native int nativeGetTrackCount(long nativeAvpPlayerJni);
-    private static native TrackInfo nativeGetTrackInfo(
-            long nativeAvpPlayerJni, int index);
-    private static native void nativeSelectTrack(long nativeAvpPlayerJni,
-                                                  int index, boolean select);
+    // --- Native methods via jni_zero proxy ---
+    @NativeMethods
+    interface Natives {
+        long init(AvpPlayer caller);
+        void setDataSource(long nativeAvpPlayerJni, @JniType("std::string") String path);
+        void setDataSourceFd(long nativeAvpPlayerJni,
+                             int fd, long offset, long length);
+        void setVideoRenderer(long nativeAvpPlayerJni, boolean hasRenderer);
+        void setSurface(long nativeAvpPlayerJni, Surface surface);
+        void prepare(long nativeAvpPlayerJni);
+        void start(long nativeAvpPlayerJni);
+        void pause(long nativeAvpPlayerJni);
+        void resume(long nativeAvpPlayerJni);
+        void stop(long nativeAvpPlayerJni);
+        void seekTo(long nativeAvpPlayerJni, int msec, int mode);
+        void reset(long nativeAvpPlayerJni);
+        void release(long nativeAvpPlayerJni);
+        int getDuration(long nativeAvpPlayerJni);
+        int getCurrentPosition(long nativeAvpPlayerJni);
+        boolean isPlaying(long nativeAvpPlayerJni);
+        int getVideoWidth(long nativeAvpPlayerJni);
+        int getVideoHeight(long nativeAvpPlayerJni);
+        void setPlaybackRate(long nativeAvpPlayerJni, float rate);
+        float getPlaybackRate(long nativeAvpPlayerJni);
+        void setVolume(long nativeAvpPlayerJni,
+                       float leftVolume, float rightVolume);
+        int getTrackCount(long nativeAvpPlayerJni);
+        TrackInfo getTrackInfo(long nativeAvpPlayerJni, int index);
+        void selectTrack(long nativeAvpPlayerJni, int index, boolean select);
+    }
 }

@@ -10,6 +10,7 @@
 
 #include <jni.h>
 #include <memory>
+#include <string>
 
 #include "api/player.h"
 #include "media/codec/android/android_native_window_render.h"
@@ -30,7 +31,7 @@ class AvpPlayerJni : public player::Player::Listener,
   ~AvpPlayerJni() override;
 
   // Player control methods (called from auto-generated JNI dispatch)
-  void SetDataSource(JNIEnv* env, const jni_zero::JavaParamRef<jstring>& path);
+  void SetDataSource(JNIEnv* env, const std::string& path);
   void SetDataSourceFd(JNIEnv* env, jint fd, jlong offset, jlong length);
   void SetVideoRenderer(JNIEnv* env, jboolean has_renderer);
   void SetSurface(JNIEnv* env, const jni_zero::JavaParamRef<jobject>& surface);

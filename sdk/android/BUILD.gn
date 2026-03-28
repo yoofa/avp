@@ -21,6 +21,7 @@ if (is_android) {
       "api/io/github/yoofa/avp/TrackInfo.java",
     ]
     deps = [
+      ":generated_avp_jni_java",
       "//base/android:ave_base_java",
       "//media/android:ave_media_java",
       "//third_party/androidx:androidx_annotation_annotation_java",
