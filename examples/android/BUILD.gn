@@ -3,17 +3,9 @@ import("//base/build/ave.gni")
 
 if (is_android) {
   import("//build/config/android/rules.gni")
-  import("//third_party/jni_zero/jni_zero.gni")
 
   group("android") {
     deps = [ ":AvpDemo" ]
-  }
-
-  # Generates the final merged GEN_JNI.java that the APK needs for JNI dispatch.
-  # This target scans all transitive Java deps of AvpDemo to find @NativeMethods
-  # interfaces and merges them into one GEN_JNI class.
-  generate_jni_registration("avpdemo_jni_registration") {
-    java_targets = [ ":AvpDemo" ]
   }
 
   ave_android_apk("AvpDemo") {
@@ -24,8 +16,10 @@ if (is_android) {
 
     deps = [ ":avpdemo_java" ]
 
-    # The merged GEN_JNI.java must be compiled into the APK for JNI dispatch.
-    srcjar_deps = [ ":avpdemo_jni_registration" ]
+    # The merged GEN_JNI.java (Java side) and the C++ registration code
+    # (Release-only, for JNI multiplexing) are both produced by libavp's
+    # jni_registration target, which is auto-created by shared_library_with_jni.
+    srcjar_deps = [ "//sdk/android:libavp__jni_registration" ]
 
     # Bundle the native player library
     shared_libraries = [ "//sdk/android:libavp" ]

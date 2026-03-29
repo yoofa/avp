@@ -58,10 +58,14 @@ if (is_android) {
     libs = [ "android" ]
   }
 
-  shared_library("libavp") {
+  # Use shared_library_with_jni so that Release builds (which enable JNI
+  # multiplexing) get the generated C++ registration code that defines
+  # kJniZeroHashWhole and kJniZeroHashPriority.
+  shared_library_with_jni("libavp") {
     output_name = "avp_android"
     sources = []
     deps = [
+      ":generated_avp_jni",
       "//base/android:ave_jni",
       "//core:avplayer_builder",
       "//media/android:ave_media_jni",
@@ -83,5 +87,12 @@ if (is_android) {
       rebase_path("$root_out_dir/obj/sdk/android/libavp_jni.a", root_build_dir),
       "-Wl,--no-whole-archive",
     ]
+
+    # Point to the APK so the registration scanner can find all @NativeMethods.
+    # This doesn't create a problematic build cycle: the jni_registration action
+    # has deps=[], so libavp -> libavp__jni_registration -> (nothing), while
+    # the jni_sources_list scanner (a separate generated_file target) references
+    # the APK for metadata only and doesn't feed back into libavp's build chain.
+    java_targets = [ "//examples/android:AvpDemo" ]
   }
 }
