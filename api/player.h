@@ -253,7 +253,23 @@ class Player {
   virtual status_t Stop() = 0;
 
   /**
-   * @brief Pauses playback.
+   * @brief Synchronous stop: blocks the calling thread until the player has
+   *        fully stopped (renders halted, decoders shut down). Must NOT be
+   *        called from the player's internal looper thread.
+   * @return The status of the operation.
+   */
+  virtual status_t StopSync() = 0;
+
+  /**
+   * @brief Prepares the player for destruction by stopping and joining the
+   *        internal looper thread from the caller's thread. Must be called
+   *        before the last shared_ptr to this player is released to prevent
+   *        a self-join deadlock when ~Player() is triggered from the looper.
+   *        Must NOT be called from the player's internal looper thread.
+   */
+  virtual void PrepareDestroy() = 0;
+
+  /**
    * @return The status of the operation.
    */
   virtual status_t Pause() = 0;

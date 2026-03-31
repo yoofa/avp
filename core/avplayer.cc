@@ -54,8 +54,22 @@ AvPlayer::AvPlayer(std::shared_ptr<ContentSourceFactory> content_source_factory,
 }
 
 AvPlayer::~AvPlayer() {
+  AVE_LOG(LS_INFO) << "~AvPlayer: begin destructor";
+  // Safety net: stop renders if StopSync() was not called.
+  if (audio_render_) {
+    audio_render_->Stop();
+  }
+  if (video_render_) {
+    video_render_->Stop();
+  }
+  // Stop the player looper. If PrepareDestroy() was already called from an
+  // external thread, the looper is already stopped (thread_ is null) and this
+  // is a no-op. If PrepareDestroy() was NOT called (abnormal teardown), this
+  // will attempt to join; if called from the looper thread itself, Looper::stop()
+  // will detach instead of join to avoid deadlock.
   player_looper_->unregisterHandler(id());
   player_looper_->stop();
+  AVE_LOG(LS_INFO) << "~AvPlayer: destructor complete";
 }
 
 status_t AvPlayer::SetListener(std::shared_ptr<Listener> listener) {
@@ -138,6 +152,25 @@ status_t AvPlayer::Stop() {
   auto msg = std::make_shared<Message>(kWhatStop, shared_from_this());
   msg->post();
   return ave::OK;
+}
+
+status_t AvPlayer::StopSync() {
+  AVE_LOG(LS_INFO) << "AvPlayer::StopSync: posting synchronous stop";
+  auto msg = std::make_shared<Message>(kWhatStop, shared_from_this());
+  std::shared_ptr<Message> response;
+  status_t err = msg->postAndWaitResponse(response);
+  AVE_LOG(LS_INFO) << "AvPlayer::StopSync: completed, err=" << err;
+  return err;
+}
+
+void AvPlayer::PrepareDestroy() {
+  // Stop and join the player looper thread from the caller's (external) thread.
+  // This ensures ~AvPlayer() runs on the caller's thread rather than on the
+  // looper thread itself, preventing a self-join deadlock in player_looper_->stop().
+  AVE_LOG(LS_INFO) << "AvPlayer::PrepareDestroy: stopping player looper";
+  player_looper_->unregisterHandler(id());
+  player_looper_->stop();  // blocks until looper thread fully exits
+  AVE_LOG(LS_INFO) << "AvPlayer::PrepareDestroy: looper stopped";
 }
 
 status_t AvPlayer::Pause() {
@@ -459,28 +492,50 @@ void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
 }
 
 void AvPlayer::OnStop() {
+  AVE_LOG(LS_INFO) << "OnStop: started_=" << started_;
   if (!started_) {
+    AVE_LOG(LS_INFO) << "OnStop: already stopped, nothing to do";
     return;
   }
   started_ = false;
   paused_ = false;
-  if (audio_decoder_) {
-    audio_decoder_->Shutdown();
-    audio_decoder_.reset();
-  }
-  if (video_decoder_) {
-    video_decoder_->Shutdown();
-    video_decoder_.reset();
-  }
+
+  // Stop renders FIRST so they reject any frames produced by decoders
+  // during their (potentially slow) shutdown sequence.
   if (audio_render_) {
+    AVE_LOG(LS_INFO) << "OnStop: stopping audio render";
     audio_render_->Stop();
   }
   if (video_render_) {
+    AVE_LOG(LS_INFO) << "OnStop: stopping video render";
     video_render_->Stop();
   }
+  AVE_LOG(LS_INFO) << "OnStop: renders stopped";
+
+  // Stop the source so it stops feeding new data.
   if (source_) {
+    AVE_LOG(LS_INFO) << "OnStop: stopping source";
     source_->Stop();
   }
+
+  // Shutdown decoders synchronously: ShutdownSync() blocks until OnShutdown()
+  // completes on the decoder's looper thread — meaning the codec has been
+  // stopped and decoder_ is reset — before audio_decoder_.reset() triggers
+  // ~AVPDecoder(). This prevents the race where both ~AVPDecoder() and
+  // OnShutdown() simultaneously call codec->Stop()/Release().
+  if (audio_decoder_) {
+    AVE_LOG(LS_INFO) << "OnStop: shutting down audio decoder (sync)";
+    audio_decoder_->ShutdownSync();
+    audio_decoder_.reset();
+    AVE_LOG(LS_INFO) << "OnStop: audio decoder destroyed";
+  }
+  if (video_decoder_) {
+    AVE_LOG(LS_INFO) << "OnStop: shutting down video decoder (sync)";
+    video_decoder_->ShutdownSync();
+    video_decoder_.reset();
+    AVE_LOG(LS_INFO) << "OnStop: video decoder destroyed";
+  }
+  AVE_LOG(LS_INFO) << "OnStop: complete";
 }
 
 void AvPlayer::OnPause() {
@@ -547,6 +602,27 @@ void AvPlayer::OnSeek(int64_t seek_to_us, SeekMode seek_mode) {
 }
 
 void AvPlayer::PerformReset() {
+  // If still playing, stop renders and decoders first so the reset is clean.
+  if (started_) {
+    if (audio_render_) {
+      audio_render_->Stop();
+    }
+    if (video_render_) {
+      video_render_->Stop();
+    }
+    if (audio_decoder_) {
+      audio_decoder_->Shutdown();
+      audio_decoder_.reset();
+    }
+    if (video_decoder_) {
+      video_decoder_->Shutdown();
+      video_decoder_.reset();
+    }
+    started_ = false;
+    paused_ = false;
+  }
+
+  resetting_ = false;
   source_.reset();
 }
 
@@ -1121,6 +1197,14 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
 
     case kWhatStop: {
       OnStop();
+      // If the caller used StopSync() (postAndWaitResponse), unblock it now
+      // that OnStop() has fully executed and renders are halted.
+      std::shared_ptr<media::ReplyToken> replyId;
+      if (message->senderAwaitsResponse(replyId)) {
+        auto response = std::make_shared<Message>();
+        response->postReply(replyId);
+        AVE_LOG(LS_VERBOSE) << "kWhatStop: replied to StopSync() caller";
+      }
       break;
     }
 

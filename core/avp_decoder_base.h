@@ -42,6 +42,10 @@ class AVPDecoderBase : public Handler {
   void Resume();
   void Flush();
   void Shutdown();
+  /// Synchronous shutdown: blocks until OnShutdown() has fully executed on
+  /// the decoder looper thread (codec stopped, buffers cleared). Safe to call
+  /// from any thread other than the decoder's own looper thread.
+  void ShutdownSync();
   virtual void Stop() {}
 
  protected:

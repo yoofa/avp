@@ -10,6 +10,8 @@
 #include <memory>
 
 #include "base/checks.h"
+#include "base/logging.h"
+#include "media/foundation/message.h"
 #include "message_def.h"
 
 namespace ave {
@@ -86,6 +88,14 @@ void AVPDecoderBase::Shutdown() {
   msg->post();
 }
 
+void AVPDecoderBase::ShutdownSync() {
+  AVE_LOG(LS_INFO) << "AVPDecoderBase::ShutdownSync: posting synchronous shutdown";
+  auto msg = std::make_shared<Message>(kWhatShutdown, shared_from_this());
+  std::shared_ptr<Message> response;
+  msg->postAndWaitResponse(response);
+  AVE_LOG(LS_INFO) << "AVPDecoderBase::ShutdownSync: done";
+}
+
 void AVPDecoderBase::ReportError(status_t err) {
   auto notify = notify_->dup();
   notify->setInt32(kWhat, kWhatDecoderError);
@@ -145,6 +155,12 @@ void AVPDecoderBase::onMessageReceived(const std::shared_ptr<Message>& msg) {
 
     case kWhatPause: {
       OnPause();
+      // Unblock Pause() caller (which uses postAndWaitResponse).
+      std::shared_ptr<media::ReplyToken> replyId;
+      if (msg->senderAwaitsResponse(replyId)) {
+        auto response = std::make_shared<Message>();
+        response->postReply(replyId);
+      }
       break;
     }
 
@@ -158,6 +174,12 @@ void AVPDecoderBase::onMessageReceived(const std::shared_ptr<Message>& msg) {
     }
     case kWhatShutdown: {
       OnShutdown();
+      // Unblock ShutdownSync() caller if this was a synchronous shutdown.
+      std::shared_ptr<media::ReplyToken> replyId;
+      if (msg->senderAwaitsResponse(replyId)) {
+        auto response = std::make_shared<Message>();
+        response->postReply(replyId);
+      }
       break;
     }
 

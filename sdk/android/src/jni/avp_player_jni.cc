@@ -179,14 +179,22 @@ void AvpPlayerJni::Reset(JNIEnv* env) {
 }
 
 void AvpPlayerJni::Release(JNIEnv* env) {
-  AVE_LOG(LS_INFO) << "AvpPlayerJni::Release";
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::Release: begin";
   if (player_) {
-    player_->Stop();
-    player_->Reset();
+    // 1. Synchronously stop: renders halted, decoders shut down.
+    player_->StopSync();
+    // 2. Join the player looper thread from THIS (JNI) thread. This prevents
+    //    ~AvPlayer() from running on the looper thread and self-joining.
+    player_->PrepareDestroy();
+    AVE_LOG(LS_INFO) << "AvpPlayerJni::Release: looper stopped, destroying player";
+    // 3. Now safe to reset: ~AvPlayer() runs here on JNI thread; looper is
+    //    already stopped so player_looper_->stop() in ~AvPlayer() is a no-op.
     player_.reset();
+    AVE_LOG(LS_INFO) << "AvpPlayerJni::Release: player destroyed";
   }
   self_as_listener_.reset();
   native_window_render_.reset();
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::Release: complete";
 }
 
 jint AvpPlayerJni::GetDuration(JNIEnv* env) {

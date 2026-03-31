@@ -72,7 +72,16 @@ AVE_EXPORT class AvPlayer : public Player,
   status_t Prepare() override;
   status_t Start()
       override;  // Starts source, instantiates decoders, starts renderers
-  status_t Stop() override;    // Stops and releases decoders and renderers
+  status_t Stop() override;  // Async stop; posts kWhatStop and returns immediately
+  /// Synchronous stop: blocks the calling thread until OnStop() has fully
+  /// executed (renders halted, decoders shut down). Must NOT be called from
+  /// the player looper thread.
+  status_t StopSync() override;
+  /// Prepare for destruction: stops and joins the player looper thread from
+  /// an external thread. Must be called before the last shared_ptr to this
+  /// player is released, to ensure ~AvPlayer() runs on the caller's thread
+  /// (not on the looper thread, which would cause a self-join deadlock).
+  void PrepareDestroy() override;
   status_t Pause() override;   // Pauses source, decoders, renderers
   status_t Resume() override;  // Resumes decoders and renderers
   status_t SeekTo(int msec, SeekMode mode) override;

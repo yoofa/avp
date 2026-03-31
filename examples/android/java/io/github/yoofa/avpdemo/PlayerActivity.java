@@ -243,6 +243,7 @@ public class PlayerActivity extends Activity {
         stopPositionUpdates();
         handler.removeCallbacksAndMessages(null);
         if (player != null) {
+            player.stop();
             player.release();
             player = null;
         }
@@ -251,10 +252,15 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        if (player != null && player.isPlaying()) {
-            player.pause();
-            stopPositionUpdates();
-            runOnUiThread(() -> updatePlayPauseButton(false));
+        if (player != null) {
+            if (isFinishing()) {
+                // Activity is being destroyed; release is handled by surfaceDestroyed/onDestroy.
+                stopPositionUpdates();
+            } else if (player.isPlaying()) {
+                player.pause();
+                stopPositionUpdates();
+                updatePlayPauseButton(false);
+            }
         }
     }
 
