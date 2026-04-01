@@ -33,6 +33,33 @@ void AVSyncControllerImpl::UpdateAnchor(int64_t media_pts_us,
                                         int64_t sys_time_us,
                                         int64_t max_media_time_us) {
   std::lock_guard<std::mutex> lock(mutex_);
+
+  // Guard against the master clock going backwards.  Audio writes happen in
+  // bursts (e.g. flushing an empty AAudio buffer at startup or after a stall).
+  // Each burst write calls UpdateAnchor with media_pts_us = write_pts -
+  // latency. Between bursts the clock free-runs forward, so by the time the
+  // next burst arrives its proposed media_pts_us may be lower than the current
+  // clock. Skip the anchor update in that case; only update max_media_time so
+  // the end-of-stream clamp stays accurate.
+  if (max_media_time_us_ != -1 && !paused_) {
+    const int64_t now_us = GetCurrentSystemTimeUs();
+    int64_t current_delta = now_us - anchor_sys_time_us_;
+    if (current_delta < 0) {
+      current_delta = 0;
+    }
+    const int64_t current_clock =
+        std::min(anchor_media_pts_us_ +
+                     static_cast<int64_t>(static_cast<float>(current_delta) *
+                                          playback_rate_),
+                 max_media_time_us_);
+    if (media_pts_us < current_clock) {
+      // New anchor would move the clock backwards — skip anchor update.
+      max_media_time_us_ =
+          std::max({media_pts_us, max_media_time_us, max_media_time_us_});
+      return;
+    }
+  }
+
   anchor_media_pts_us_ = media_pts_us;
   anchor_sys_time_us_ = sys_time_us;
   max_media_time_us_ =

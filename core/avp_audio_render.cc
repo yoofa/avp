@@ -501,18 +501,25 @@ void AVPAudioRender::UpdateSyncAnchor(
   int64_t frame_duration_us =
       audio_info->duration.IsFinite() ? audio_info->duration.us() : 0;
   int64_t current_sys_time_us = base::TimeMicros();
-
-  // Compensate for AAudio's internal buffer latency: the audio we just wrote
-  // will not be heard until buffer_latency_us from now.  Shifting the anchor
-  // forward by this amount keeps the video renderer in sync with actual audio
-  // playback rather than with the write position.
   int64_t buffer_latency_us =
       audio_track_ ? audio_track_->GetBufferDurationInUs() : 0;
-
   int64_t frame_end_pts_us = frame_pts_us + frame_duration_us;
 
-  GetAVSyncController()->UpdateAnchor(
-      frame_pts_us, current_sys_time_us + buffer_latency_us, frame_end_pts_us);
+  // Anchor the master clock to what is *currently being heard*, not what was
+  // just written.  The original formula (pts, now + latency) was intended to
+  // encode "at time now+latency the clock will be pts", but GetMasterClock
+  // clamps negative delta to 0, which returns pts immediately — completely
+  // defeating the latency compensation and making master_clock == write_pts.
+  //
+  // Using (pts - latency, now) means: "right now the heard position is
+  // pts - latency".  GetMasterClock then advances with real time from that
+  // base, so after `latency` seconds the clock correctly reaches `pts`.
+  // The monotonic-advancement guard in UpdateAnchor prevents rapid burst
+  // writes from jumping the clock backwards between bursts.
+  int64_t heard_pts_us = frame_pts_us - buffer_latency_us;
+
+  GetAVSyncController()->UpdateAnchor(heard_pts_us, current_sys_time_us,
+                                      frame_end_pts_us);
 
   AVE_LOG(LS_INFO) << "UpdateSyncAnchor PTS=" << frame_pts_us / 1000
                    << "ms sys=" << current_sys_time_us / 1000
