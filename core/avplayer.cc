@@ -136,6 +136,13 @@ void AvPlayer::SetSyncEnabled(bool enabled) {
   }
 }
 
+status_t AvPlayer::SetAudioDevice(std::shared_ptr<AudioDevice> audio_device) {
+  if (audio_device) {
+    audio_device_ = std::move(audio_device);
+  }
+  return ave::OK;
+}
+
 status_t AvPlayer::Prepare() {
   auto msg = std::make_shared<Message>(kWhatPrepare, shared_from_this());
   msg->post();

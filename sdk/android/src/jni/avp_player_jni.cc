@@ -18,6 +18,7 @@
 #include "jni_headers/sdk/android/generated_avp_jni/AvpPlayer_jni.h"
 #include "jni_headers/sdk/android/generated_avp_jni/TrackInfo_jni.h"
 #include "media/android/jni/video_frame_jni.h"
+#include "media/audio/android/java_audio_device.h"
 #include "media/foundation/media_frame.h"
 #include "media/foundation/media_meta.h"
 #include "third_party/jni_zero/jni_zero.h"
@@ -285,6 +286,29 @@ void AvpPlayerJni::SelectTrack(JNIEnv* env, jint index, jboolean select) {
   if (!player_)
     return;
   player_->SelectTrack(static_cast<size_t>(index), select);
+}
+
+void AvpPlayerJni::SetAudioSink(
+    JNIEnv* env,
+    const jni_zero::JavaParamRef<jobject>& audio_sink) {
+  AVE_LOG(LS_INFO) << "AvpPlayerJni::SetAudioSink";
+  if (!player_)
+    return;
+
+  if (audio_sink.obj()) {
+    j_audio_sink_ =
+        jni_zero::ScopedJavaGlobalRef<jobject>(env, audio_sink.obj());
+    java_audio_device_ =
+        std::make_shared<media::android::JavaAudioDevice>(j_audio_sink_);
+    java_audio_device_->Init();
+    player_->SetAudioDevice(java_audio_device_);
+    AVE_LOG(LS_INFO) << "AvpPlayerJni::SetAudioSink: JavaAudioDevice set";
+  } else {
+    // Clear; player will fall back to default audio device.
+    j_audio_sink_.Reset();
+    java_audio_device_.reset();
+    AVE_LOG(LS_INFO) << "AvpPlayerJni::SetAudioSink: cleared";
+  }
 }
 
 // --- Player::Listener callbacks ---

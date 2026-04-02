@@ -211,6 +211,21 @@ public class AvpPlayer {
         AvpPlayerJni.get().setSurface(nativePlayer, surface);
     }
 
+    // --- Audio output ---
+
+    /**
+     * Set a custom audio sink for audio output.
+     * Must be called before {@link #prepare()}.
+     *
+     * <p>If not set, a {@link DefaultAudioSink} is used automatically.
+     *
+     * @param audioSink The AudioSink implementation, or null to use default.
+     */
+    public void setAudioSink(@Nullable AudioSink audioSink) {
+        checkNotReleased();
+        AvpPlayerJni.get().setAudioSink(nativePlayer, audioSink);
+    }
+
     // --- Playback control ---
 
     /**
@@ -572,5 +587,6 @@ public class AvpPlayer {
         int getTrackCount(long nativeAvpPlayerJni);
         TrackInfo getTrackInfo(long nativeAvpPlayerJni, int index);
         void selectTrack(long nativeAvpPlayerJni, int index, boolean select);
+        void setAudioSink(long nativeAvpPlayerJni, AudioSink audioSink);
     }
 }

@@ -235,6 +235,15 @@ class Player {
   virtual void SetSyncEnabled(bool enabled) = 0;
 
   /**
+   * @brief Sets the audio device for the player.
+   *        Must be called before Prepare().
+   * @param audio_device The audio device to use.
+   * @return OK on success, or an error code.
+   */
+  virtual status_t SetAudioDevice(
+      std::shared_ptr<ave::media::AudioDevice> audio_device) = 0;
+
+  /**
    * @brief Prepares the player for playback.
    * @return The status of the preparation.
    */
