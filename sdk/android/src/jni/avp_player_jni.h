@@ -28,7 +28,7 @@ namespace jni {
 class AvpPlayerJni : public player::Player::Listener,
                      public media::VideoRender {
  public:
-  AvpPlayerJni(JNIEnv* env, jobject j_player);
+  AvpPlayerJni(JNIEnv* env, jobject j_player, jobject j_audio_device);
   ~AvpPlayerJni() override;
 
   // Player control methods (called from auto-generated JNI dispatch)
@@ -59,10 +59,6 @@ class AvpPlayerJni : public player::Player::Listener,
   // Volume
   void SetVolume(JNIEnv* env, jfloat left_volume, jfloat right_volume);
 
-  // Audio sink
-  void SetAudioSink(JNIEnv* env,
-                    const jni_zero::JavaParamRef<jobject>& audio_sink);
-
   // Track management
   jint GetTrackCount(JNIEnv* env);
   jni_zero::ScopedJavaLocalRef<jobject> GetTrackInfo(JNIEnv* env, jint index);
@@ -88,9 +84,9 @@ class AvpPlayerJni : public player::Player::Listener,
   std::shared_ptr<player::Player::Listener> self_as_listener_;
   // Surface-based rendering. Owned here; lifecycle managed via shared_ptr.
   std::shared_ptr<media::AndroidNativeWindowRender> native_window_render_;
-  // Java AudioSink reference for JavaAudioDevice.
-  jni_zero::ScopedJavaGlobalRef<jobject> j_audio_sink_;
-  // Java-backed audio device (created from AudioSink).
+  // Java AudioDevice reference — kept alive for the lifetime of the player.
+  jni_zero::ScopedJavaGlobalRef<jobject> j_audio_device_;
+  // Java-backed audio device (created from Java AudioDevice).
   std::shared_ptr<media::AudioDevice> java_audio_device_;
   bool has_video_renderer_ = false;
 };

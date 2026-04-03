@@ -16,9 +16,7 @@ if (is_android) {
   ave_android_library("avp_java") {
     visibility = [ "*" ]
     sources = [
-      "api/io/github/yoofa/avp/AudioSink.java",
       "api/io/github/yoofa/avp/AvpPlayer.java",
-      "api/io/github/yoofa/avp/DefaultAudioSink.java",
       "api/io/github/yoofa/avp/SeekMode.java",
       "api/io/github/yoofa/avp/TrackInfo.java",
     ]
@@ -33,7 +31,6 @@ if (is_android) {
 
   generate_jni("generated_avp_jni") {
     sources = [
-      "api/io/github/yoofa/avp/AudioSink.java",
       "api/io/github/yoofa/avp/AvpPlayer.java",
       "api/io/github/yoofa/avp/TrackInfo.java",
     ]

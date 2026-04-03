@@ -17,6 +17,8 @@ import org.jni_zero.NativeMethods;
 
 import io.github.yoofa.ContextUtils;
 import io.github.yoofa.Logging;
+import io.github.yoofa.media.AndroidJavaAudioDevice;
+import io.github.yoofa.media.AudioDevice;
 import io.github.yoofa.media.VideoFrame;
 import io.github.yoofa.media.VideoRenderer;
 
@@ -148,17 +150,29 @@ public class AvpPlayer {
     }
 
     /**
-     * Create a new AvpPlayer instance using default factories.
+     * Create a new AvpPlayer instance using default factories and the default
+     * {@link AndroidJavaAudioDevice} for audio output.
      *
      * @return A new AvpPlayer ready for use.
      * @throws RuntimeException if native player creation fails.
      */
     public static AvpPlayer create() {
-        return new AvpPlayer();
+        return new AvpPlayer(new AndroidJavaAudioDevice());
     }
 
-    private AvpPlayer() {
-        this.nativePlayer = AvpPlayerJni.get().init(this);
+    /**
+     * Create a new AvpPlayer instance with a custom {@link AudioDevice}.
+     *
+     * @param audioDevice The audio device to use for audio output.
+     * @return A new AvpPlayer ready for use.
+     * @throws RuntimeException if native player creation fails.
+     */
+    public static AvpPlayer create(AudioDevice audioDevice) {
+        return new AvpPlayer(audioDevice);
+    }
+
+    private AvpPlayer(AudioDevice audioDevice) {
+        this.nativePlayer = AvpPlayerJni.get().init(this, audioDevice);
         if (nativePlayer == 0) {
             throw new RuntimeException("Failed to create native player");
         }
@@ -209,21 +223,6 @@ public class AvpPlayer {
     public void setSurface(@Nullable Surface surface) {
         checkNotReleased();
         AvpPlayerJni.get().setSurface(nativePlayer, surface);
-    }
-
-    // --- Audio output ---
-
-    /**
-     * Set a custom audio sink for audio output.
-     * Must be called before {@link #prepare()}.
-     *
-     * <p>If not set, a {@link DefaultAudioSink} is used automatically.
-     *
-     * @param audioSink The AudioSink implementation, or null to use default.
-     */
-    public void setAudioSink(@Nullable AudioSink audioSink) {
-        checkNotReleased();
-        AvpPlayerJni.get().setAudioSink(nativePlayer, audioSink);
     }
 
     // --- Playback control ---
@@ -561,7 +560,7 @@ public class AvpPlayer {
     // --- Native methods via jni_zero proxy ---
     @NativeMethods
     interface Natives {
-        long init(AvpPlayer caller);
+        long init(AvpPlayer caller, AudioDevice audioDevice);
         void setDataSource(long nativeAvpPlayerJni, @JniType("std::string") String path);
         void setDataSourceFd(long nativeAvpPlayerJni,
                              int fd, long offset, long length);
@@ -587,6 +586,5 @@ public class AvpPlayer {
         int getTrackCount(long nativeAvpPlayerJni);
         TrackInfo getTrackInfo(long nativeAvpPlayerJni, int index);
         void selectTrack(long nativeAvpPlayerJni, int index, boolean select);
-        void setAudioSink(long nativeAvpPlayerJni, AudioSink audioSink);
     }
 }

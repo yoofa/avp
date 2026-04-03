@@ -46,10 +46,25 @@ int MediaTypeToTrackType(media::MediaType type) {
 
 // --- AvpPlayerJni implementation ---
 
-AvpPlayerJni::AvpPlayerJni(JNIEnv* env, jobject j_player)
+AvpPlayerJni::AvpPlayerJni(JNIEnv* env,
+                           jobject j_player,
+                           jobject j_audio_device)
     : j_player_(env, j_player) {
   AVE_LOG(LS_INFO) << "AvpPlayerJni::AvpPlayerJni created";
-  player_ = player::Player::Builder().build();
+
+  // Create JavaAudioDevice from the Java AudioDevice object.
+  player::Player::Builder builder;
+  if (j_audio_device) {
+    j_audio_device_ =
+        jni_zero::ScopedJavaGlobalRef<jobject>(env, j_audio_device);
+    java_audio_device_ =
+        std::make_shared<media::android::JavaAudioDevice>(j_audio_device_);
+    java_audio_device_->Init();
+    builder.setAudioDeviceFactory(java_audio_device_);
+    AVE_LOG(LS_INFO) << "AvpPlayerJni: using JavaAudioDevice";
+  }
+
+  player_ = builder.build();
   if (player_) {
     player_->Init();
     // Create a non-owning shared_ptr and store it as a member to keep
@@ -288,29 +303,6 @@ void AvpPlayerJni::SelectTrack(JNIEnv* env, jint index, jboolean select) {
   player_->SelectTrack(static_cast<size_t>(index), select);
 }
 
-void AvpPlayerJni::SetAudioSink(
-    JNIEnv* env,
-    const jni_zero::JavaParamRef<jobject>& audio_sink) {
-  AVE_LOG(LS_INFO) << "AvpPlayerJni::SetAudioSink";
-  if (!player_)
-    return;
-
-  if (audio_sink.obj()) {
-    j_audio_sink_ =
-        jni_zero::ScopedJavaGlobalRef<jobject>(env, audio_sink.obj());
-    java_audio_device_ =
-        std::make_shared<media::android::JavaAudioDevice>(j_audio_sink_);
-    java_audio_device_->Init();
-    player_->SetAudioDevice(java_audio_device_);
-    AVE_LOG(LS_INFO) << "AvpPlayerJni::SetAudioSink: JavaAudioDevice set";
-  } else {
-    // Clear; player will fall back to default audio device.
-    j_audio_sink_.Reset();
-    java_audio_device_.reset();
-    AVE_LOG(LS_INFO) << "AvpPlayerJni::SetAudioSink: cleared";
-  }
-}
-
 // --- Player::Listener callbacks ---
 
 void AvpPlayerJni::OnPrepared(status_t err) {
@@ -391,8 +383,9 @@ void AvpPlayerJni::OnFrame(const std::shared_ptr<media::MediaFrame>& frame) {
 // Called by jni_zero auto-generated JNI_AvpPlayer_Init dispatch
 static jlong JNI_AvpPlayer_Init(
     JNIEnv* env,
-    const jni_zero::JavaParamRef<jobject>& j_caller) {
-  auto* player = new AvpPlayerJni(env, j_caller.obj());
+    const jni_zero::JavaParamRef<jobject>& j_caller,
+    const jni_zero::JavaParamRef<jobject>& j_audio_device) {
+  auto* player = new AvpPlayerJni(env, j_caller.obj(), j_audio_device.obj());
   return reinterpret_cast<jlong>(player);
 }
 
