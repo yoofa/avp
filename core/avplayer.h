@@ -73,7 +73,8 @@ AVE_EXPORT class AvPlayer : public Player,
   status_t Prepare() override;
   status_t Start()
       override;  // Starts source, instantiates decoders, starts renderers
-  status_t Stop() override;  // Async stop; posts kWhatStop and returns immediately
+  status_t Stop()
+      override;  // Async stop; posts kWhatStop and returns immediately
   /// Synchronous stop: blocks the calling thread until OnStop() has fully
   /// executed (renders halted, decoders shut down). Must NOT be called from
   /// the player looper thread.

@@ -89,7 +89,8 @@ void AVPDecoderBase::Shutdown() {
 }
 
 void AVPDecoderBase::ShutdownSync() {
-  AVE_LOG(LS_INFO) << "AVPDecoderBase::ShutdownSync: posting synchronous shutdown";
+  AVE_LOG(LS_INFO)
+      << "AVPDecoderBase::ShutdownSync: posting synchronous shutdown";
   auto msg = std::make_shared<Message>(kWhatShutdown, shared_from_this());
   std::shared_ptr<Message> response;
   msg->postAndWaitResponse(response);

@@ -65,8 +65,8 @@ AvPlayer::~AvPlayer() {
   // Stop the player looper. If PrepareDestroy() was already called from an
   // external thread, the looper is already stopped (thread_ is null) and this
   // is a no-op. If PrepareDestroy() was NOT called (abnormal teardown), this
-  // will attempt to join; if called from the looper thread itself, Looper::stop()
-  // will detach instead of join to avoid deadlock.
+  // will attempt to join; if called from the looper thread itself,
+  // Looper::stop() will detach instead of join to avoid deadlock.
   player_looper_->unregisterHandler(id());
   player_looper_->stop();
   AVE_LOG(LS_INFO) << "~AvPlayer: destructor complete";
@@ -173,7 +173,8 @@ status_t AvPlayer::StopSync() {
 void AvPlayer::PrepareDestroy() {
   // Stop and join the player looper thread from the caller's (external) thread.
   // This ensures ~AvPlayer() runs on the caller's thread rather than on the
-  // looper thread itself, preventing a self-join deadlock in player_looper_->stop().
+  // looper thread itself, preventing a self-join deadlock in
+  // player_looper_->stop().
   AVE_LOG(LS_INFO) << "AvPlayer::PrepareDestroy: stopping player looper";
   player_looper_->unregisterHandler(id());
   player_looper_->stop();  // blocks until looper thread fully exits
