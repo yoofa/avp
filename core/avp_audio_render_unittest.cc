@@ -8,6 +8,7 @@
 #include "avp_audio_render.h"
 
 #include <memory>
+#include <vector>
 
 #include "base/logging.h"
 #include "base/time_utils.h"
@@ -54,7 +55,7 @@ class MockAudioTrack : public media::AudioTrack {
     return OK;
   }
 
-  int64_t GetBufferDurationInUs() const override { return 100000; }
+  int64_t GetBufferDurationInUs() const override { return buffer_duration_us_; }
 
   status_t Open(media::audio_config_t config,
                 AudioCallback cb,
@@ -70,6 +71,8 @@ class MockAudioTrack : public media::AudioTrack {
     if (!ready_)
       return -1;
 
+    const auto* bytes = static_cast<const uint8_t*>(buffer);
+    last_write_data_.assign(bytes, bytes + size);
     bytes_written_ += size;
     frames_written_ += size / frameSize();
     return size;
@@ -92,6 +95,16 @@ class MockAudioTrack : public media::AudioTrack {
   media::audio_config_t GetConfig() const { return config_; }
   size_t GetBytesWritten() const { return bytes_written_; }
   bool IsStarted() const { return started_; }
+  const std::vector<uint8_t>& GetLastWriteData() const {
+    return last_write_data_;
+  }
+  void SetPosition(uint32_t position) { position_ = position; }
+  void SetFramesWritten(uint32_t frames_written) {
+    frames_written_ = frames_written;
+  }
+  void SetBufferDurationInUs(int64_t buffer_duration_us) {
+    buffer_duration_us_ = buffer_duration_us;
+  }
 
  private:
   bool ready_;
@@ -103,6 +116,8 @@ class MockAudioTrack : public media::AudioTrack {
   uint32_t frames_written_ = 0;
   size_t bytes_written_ = 0;
   int64_t start_time_us_ = 0;
+  int64_t buffer_duration_us_ = 100000;
+  std::vector<uint8_t> last_write_data_;
 };
 
 // Mock AudioDevice for testing
@@ -114,7 +129,8 @@ class MockAudioDevice : public media::AudioDevice {
   status_t Init() override { return OK; }
 
   std::shared_ptr<media::AudioTrack> CreateAudioTrack() override {
-    return std::make_shared<MockAudioTrack>();
+    last_track_ = std::make_shared<MockAudioTrack>();
+    return last_track_;
   }
 
   std::shared_ptr<media::AudioRecord> CreateAudioRecord() override {
@@ -132,6 +148,11 @@ class MockAudioDevice : public media::AudioDevice {
 
   status_t SetAudioInputDevice(int device_id) override { return OK; }
   status_t SetAudioOutputDevice(int device_id) override { return OK; }
+
+  std::shared_ptr<MockAudioTrack> last_track() const { return last_track_; }
+
+ private:
+  std::shared_ptr<MockAudioTrack> last_track_;
 };
 
 // Mock AVSyncController for testing
@@ -181,7 +202,6 @@ std::shared_ptr<media::MediaFrame> CreateTestAudioFrame(
     int64_t pts_us,
     size_t data_size = 1024) {
   auto frame = media::MediaFrame::Create(data_size);
-  frame.SetMediaType(media::MediaType::AUDIO);
 
   auto* audio_info = frame.audio_info();
   if (audio_info) {
@@ -201,6 +221,26 @@ std::shared_ptr<media::MediaFrame> CreateTestAudioFrame(
   }
 
   return std::make_shared<media::MediaFrame>(frame);
+}
+
+std::shared_ptr<media::MediaFrame> CreateTestAACFrame(
+    int64_t pts_us,
+    std::vector<uint8_t> data) {
+  auto frame =
+      media::MediaFrame::CreateShared(data.size(), media::MediaType::AUDIO);
+  auto* audio_info = frame->audio_info();
+  if (audio_info) {
+    audio_info->codec_id = media::CodecId::AVE_CODEC_ID_AAC;
+    audio_info->sample_rate_hz = 44100;
+    audio_info->channel_layout = media::CHANNEL_LAYOUT_STEREO;
+    audio_info->bits_per_sample = 16;
+    audio_info->pts = base::Timestamp::Micros(pts_us);
+    audio_info->duration = base::TimeDelta::Micros(23220);
+  }
+
+  std::memcpy(frame->data(), data.data(), data.size());
+  frame->setRange(0, data.size());
+  return frame;
 }
 
 }  // namespace
@@ -340,6 +380,72 @@ TEST_F(AVPAudioRenderTest, FormatChangeDetection) {
 
   // Both frames should be processed
   EXPECT_GT(mock_avsync_controller_->GetUpdateCount(), 0);
+}
+
+TEST_F(AVPAudioRenderTest, WritesRawAacOffloadFrameUnchanged) {
+  media::audio_config_t config = media::DefaultAudioConfig;
+  config.sample_rate = 44100;
+  config.channel_layout = media::CHANNEL_LAYOUT_STEREO;
+  config.format = media::AUDIO_FORMAT_AAC_LC;
+  config.offload_info.format = media::AUDIO_FORMAT_AAC_LC;
+  ASSERT_EQ(audio_render_->OpenAudioSink(config), OK);
+  audio_render_->Start();
+
+  auto track = mock_audio_device_->last_track();
+  ASSERT_NE(track, nullptr);
+
+  const std::vector<uint8_t> payload = {0x11, 0x22, 0x33, 0x44};
+  audio_render_->RenderFrame(CreateTestAACFrame(1000, payload));
+  mock_task_runner_factory_->runner()->AdvanceTimeUs(1000);
+  mock_task_runner_factory_->runner()->RunDueTasks();
+
+  const auto& written = track->GetLastWriteData();
+  EXPECT_EQ(written, payload);
+}
+
+TEST_F(AVPAudioRenderTest, DoesNotDoubleWrapAdtsAacOffload) {
+  media::audio_config_t config = media::DefaultAudioConfig;
+  config.sample_rate = 44100;
+  config.channel_layout = media::CHANNEL_LAYOUT_STEREO;
+  config.format = media::AUDIO_FORMAT_AAC_LC;
+  config.offload_info.format = media::AUDIO_FORMAT_AAC_LC;
+  ASSERT_EQ(audio_render_->OpenAudioSink(config), OK);
+  audio_render_->Start();
+
+  auto track = mock_audio_device_->last_track();
+  ASSERT_NE(track, nullptr);
+
+  const std::vector<uint8_t> adts_frame = {0xFF, 0xF1, 0x50, 0x80, 0x01, 0x7F,
+                                           0xFC, 0x11, 0x22, 0x33, 0x44};
+  audio_render_->RenderFrame(CreateTestAACFrame(1000, adts_frame));
+  mock_task_runner_factory_->runner()->AdvanceTimeUs(1000);
+  mock_task_runner_factory_->runner()->RunDueTasks();
+
+  EXPECT_EQ(track->GetLastWriteData(), adts_frame);
+}
+
+TEST_F(AVPAudioRenderTest, CompressedAnchorUsesQueuedFramesLatency) {
+  media::audio_config_t config = media::DefaultAudioConfig;
+  config.sample_rate = 44100;
+  config.channel_layout = media::CHANNEL_LAYOUT_STEREO;
+  config.format = media::AUDIO_FORMAT_AAC_LC;
+  config.offload_info.format = media::AUDIO_FORMAT_AAC_LC;
+  ASSERT_EQ(audio_render_->OpenAudioSink(config), OK);
+  audio_render_->Start();
+
+  auto track = mock_audio_device_->last_track();
+  ASSERT_NE(track, nullptr);
+
+  track->SetBufferDurationInUs(793000);
+  track->SetPosition(44100);
+  track->SetFramesWritten(44100 * 3 - 1);
+
+  audio_render_->RenderFrame(
+      CreateTestAACFrame(3'000'000, {0x11, 0x22, 0x33, 0x44}));
+  mock_task_runner_factory_->runner()->AdvanceTimeUs(1000);
+  mock_task_runner_factory_->runner()->RunDueTasks();
+
+  EXPECT_EQ(mock_avsync_controller_->GetAnchorMediaPts(), 1'023'220);
 }
 
 }  // namespace player

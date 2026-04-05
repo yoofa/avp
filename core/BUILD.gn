@@ -47,6 +47,7 @@ ave_library("avplayer") {
     "//base:logging",
     "//base:utils",
     "//base/system:ave_export",
+    "//media/audio:audio",
     "//media/codec:codec",
     "//media/video:video_render",
   ]
@@ -128,7 +129,12 @@ ave_library("avp_decoder") {
     "avp_tunnel_decoder.cc",
     "avp_tunnel_decoder.h",
   ]
-  deps = [ "//base:logging" ]
+  deps = [
+    "//base:buffer",
+    "//base:logging",
+    "//media/audio:audio",
+    "//media/foundation:aac_util",
+  ]
 
   deps += [
     "//media/foundation:media_frame",
@@ -152,6 +158,16 @@ ave_library("avp_audio_render_unittest") {
   deps = [
     ":avp_audio_render",
     "//base/test:mock_task_runner_factory",
+    "//test:test_support",
+  ]
+}
+
+ave_library("avp_passthrough_decoder_unittest") {
+  testonly = true
+  sources = [ "avp_passthrough_decoder_unittest.cc" ]
+  deps = [
+    ":avp_decoder",
+    "//base:buffer",
     "//test:test_support",
   ]
 }
@@ -181,11 +197,19 @@ executable("player_unittests") {
   testonly = true
   deps = [
     ":avp_audio_render_unittest",
-
-    #":avp_decoder_unittest",
     ":avp_render_unittest",
     ":avp_video_render_unittest",
     ":avsync_controller_unittest",
+    "//test:test_main",
+    "//test:test_support",
+  ]
+}
+
+executable("aac_offload_unittests") {
+  testonly = true
+  deps = [
+    ":avp_audio_render_unittest",
+    ":avp_passthrough_decoder_unittest",
     "//test:test_main",
     "//test:test_support",
   ]

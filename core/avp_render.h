@@ -96,6 +96,12 @@ class AVPRender {
   int64_t GetCurrentTimeStamp() const EXCLUDES(mutex_);
 
   /**
+   * @brief Returns the number of frames currently in the render queue.
+   * Used by producers (e.g. passthrough decoder) for back-pressure.
+   */
+  size_t QueueSize() const EXCLUDES(mutex_);
+
+  /**
    * @brief Starts the renderer.
    */
   virtual void Start() EXCLUDES(mutex_);

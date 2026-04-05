@@ -15,6 +15,9 @@
 #include "media/foundation/media_errors.h"
 #include "media/foundation/media_meta.h"
 
+#include "media/audio/audio_format.h"
+#include "media/codec/codec_id.h"
+
 #include "content_source/generic_source.h"
 
 #include "message_def.h"
@@ -141,6 +144,16 @@ status_t AvPlayer::SetAudioDevice(std::shared_ptr<AudioDevice> audio_device) {
     audio_device_ = std::move(audio_device);
   }
   return ave::OK;
+}
+
+void AvPlayer::SetAudioPassthroughPolicy(AudioPassthroughPolicy policy) {
+  passthrough_policy_ = policy;
+  AVE_LOG(LS_INFO) << "SetAudioPassthroughPolicy: " << static_cast<int>(policy);
+}
+
+void AvPlayer::SetAudioOnly(bool audio_only) {
+  audio_only_ = audio_only;
+  AVE_LOG(LS_INFO) << "SetAudioOnly: " << audio_only_;
 }
 
 status_t AvPlayer::Prepare() {
@@ -356,6 +369,18 @@ status_t AvPlayer::InstantiateDecoder(
                    << ", sample_rate=" << format->sample_rate()
                    << ", bitrate=" << format->bitrate();
 
+  // Determine decoder type — check if passthrough should be used for audio.
+  auto decoder_type = AVPDecoderFactory::DECODER_NORMAL;
+  if (audio && passthrough_policy_ != AudioPassthroughPolicy::ALWAYS_PCM) {
+    bool prefer_passthrough = ShouldUsePassthrough(format);
+    decoder_type = AVPDecoderFactory::DetermineDecoderType(
+        format, prefer_passthrough, false);
+    AVE_LOG(LS_INFO) << "InstantiateDecoder: passthrough_policy="
+                     << static_cast<int>(passthrough_policy_)
+                     << ", prefer=" << prefer_passthrough
+                     << ", decoder_type=" << decoder_type;
+  }
+
   if (audio) {
     auto notify =
         std::make_shared<Message>(kWhatAudioNotify, shared_from_this());
@@ -363,7 +388,8 @@ status_t AvPlayer::InstantiateDecoder(
                                                      sync_controller_.get(),
                                                      audio_device_, true);
     decoder = AVPDecoderFactory::CreateDecoder(codec_factory_, notify, source_,
-                                               audio_render_, format);
+                                               audio_render_, format, nullptr,
+                                               decoder_type);
   } else {
     auto notify =
         std::make_shared<Message>(kWhatVideoNotify, shared_from_this());
@@ -406,6 +432,74 @@ status_t AvPlayer::InstantiateDecoder(
   return ave::OK;
 }
 
+namespace {
+
+// Map codec_id to audio_format_t for passthrough capability checks.
+media::audio_format_t CodecIdToPassthroughFormat(media::CodecId codec_id) {
+  using media::CodecId;
+  switch (codec_id) {
+    case CodecId::AVE_CODEC_ID_AAC:
+      return media::AUDIO_FORMAT_AAC_LC;
+    case CodecId::AVE_CODEC_ID_AC3:
+      return media::AUDIO_FORMAT_AC3;
+    case CodecId::AVE_CODEC_ID_EAC3:
+      return media::AUDIO_FORMAT_E_AC3;
+    case CodecId::AVE_CODEC_ID_DTS:
+      return media::AUDIO_FORMAT_DTS;
+    case CodecId::AVE_CODEC_ID_TRUEHD:
+      return media::AUDIO_FORMAT_DOLBY_TRUEHD;
+    default:
+      return media::AUDIO_FORMAT_INVALID;
+  }
+}
+
+}  // namespace
+
+bool AvPlayer::ShouldUsePassthrough(
+    const std::shared_ptr<MediaMeta>& format) const {
+  if (!format) {
+    return false;
+  }
+
+  auto codec_id = format->codec();
+  auto audio_format = CodecIdToPassthroughFormat(codec_id);
+  if (audio_format == media::AUDIO_FORMAT_INVALID) {
+    AVE_LOG(LS_INFO) << "ShouldUsePassthrough: codec "
+                     << static_cast<int>(codec_id)
+                     << " not a passthrough-capable format";
+    return false;
+  }
+
+  // PREFER_PASSTHROUGH: always try if codec supports it
+  if (passthrough_policy_ == AudioPassthroughPolicy::PREFER_PASSTHROUGH) {
+    // Check device capability if audio device is available
+    if (audio_device_ && !audio_device_->IsFormatSupported(audio_format)) {
+      AVE_LOG(LS_INFO) << "ShouldUsePassthrough: device does not support "
+                       << "format=" << static_cast<uint32_t>(audio_format);
+      return false;
+    }
+    AVE_LOG(LS_INFO) << "ShouldUsePassthrough: PREFER_PASSTHROUGH, using "
+                     << "passthrough for format="
+                     << static_cast<uint32_t>(audio_format);
+    return true;
+  }
+
+  // AUTO: use passthrough only if device confirms support
+  if (passthrough_policy_ == AudioPassthroughPolicy::AUTO) {
+    if (!audio_device_) {
+      AVE_LOG(LS_INFO) << "ShouldUsePassthrough: AUTO but no audio device";
+      return false;
+    }
+    bool supported = audio_device_->IsFormatSupported(audio_format);
+    AVE_LOG(LS_INFO) << "ShouldUsePassthrough: AUTO, device support="
+                     << supported
+                     << " for format=" << static_cast<uint32_t>(audio_format);
+    return supported;
+  }
+
+  return false;
+}
+
 ///////////////////////////////////////////
 
 void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
@@ -436,10 +530,12 @@ void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
   // Instantiate decoders immediately based on current track info (NuPlayer
   // style)
   bool has_audio = (source_->GetTrackInfo(MediaType::AUDIO) != nullptr);
-  bool has_video = (source_->GetTrackInfo(MediaType::VIDEO) != nullptr);
+  bool has_video =
+      !audio_only_ && (source_->GetTrackInfo(MediaType::VIDEO) != nullptr);
 
   AVE_LOG(LS_INFO) << "OnStart: has_audio=" << has_audio
                    << ", has_video=" << has_video
+                   << ", audio_only=" << audio_only_
                    << ", video_render_sink=" << video_render_sink_.get()
                    << ", audio_device=" << audio_device_.get();
 
@@ -1133,6 +1229,9 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
     case kWhatSetVideoRender: {
       std::shared_ptr<VideoRender> video_render;
       message->findObject(kVideoRender, video_render);
+      if (audio_only_) {
+        video_render = nullptr;
+      }
       AVE_LOG(LS_INFO) << "kWhatSetVideoRender (" << video_render_sink_.get()
                        << ", "
                        << ((started_ && source_ != nullptr &&
@@ -1232,7 +1331,8 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
                        << ", has video: " << (video_decoder_ != nullptr);
 
       bool rescan = false;
-      if (video_render_sink_ != nullptr && video_decoder_ == nullptr) {
+      if (!audio_only_ && video_render_sink_ != nullptr &&
+          video_decoder_ == nullptr) {
         if (InstantiateDecoder(false, video_decoder_) == WOULD_BLOCK) {
           rescan = true;
         }

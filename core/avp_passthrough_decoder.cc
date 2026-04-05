@@ -9,6 +9,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 #include "base/logging.h"
 #include "media/audio/audio.h"
@@ -31,6 +32,11 @@ const size_t kMaxCachedBytes = 200000;
 // Optimal buffer size for power consumption
 const size_t kAggregateBufferSizeBytes = 24 * 1024;
 
+// Maximum number of frames to keep in the render queue for passthrough audio.
+// This provides back-pressure so the decoder doesn't flood the queue faster
+// than real-time, which would cause queue overflow, oldest-frame drops, and
+// a broken passthrough pacing anchor in the audio renderer.
+const size_t kMaxPassthroughQueueFrames = 10;
 media::audio_config_t ConvertTrackInfoToAudioConfig(
     std::shared_ptr<MediaMeta> meta) {
   auto audio_info = &(meta->track_info()->audio());
@@ -111,6 +117,7 @@ AVPPassthroughDecoder::AVPPassthroughDecoder(
       cached_bytes_(0),
       pending_audio_access_unit_(nullptr),
       pending_audio_err_(OK),
+      audio_config_(media::DefaultAudioConfig),
       buffer_generation_(0) {
   AVE_LOG(LS_VERBOSE) << "AVPPassthroughDecoder created";
 }
@@ -129,7 +136,9 @@ void AVPPassthroughDecoder::OnConfigure(
   ++buffer_generation_;
 
   auto audio_render = std::static_pointer_cast<AVPAudioRender>(avp_render_);
-  audio_render->OpenAudioSink(ConvertTrackInfoToAudioConfig(format));
+  codec_private_data_ = format ? format->private_data() : nullptr;
+  audio_config_ = ConvertTrackInfoToAudioConfig(format);
+  audio_render->OpenAudioSink(audio_config_);
 
   // Request input buffers to start the decoding process
   OnRequestInputBuffers();
@@ -192,7 +201,16 @@ bool AVPPassthroughDecoder::IsDoneFetching() const {
                       << ", reached_eos=" << reached_eos_
                       << ", paused=" << paused_;
 
-  return cached_bytes_ >= kMaxCachedBytes || reached_eos_ || paused_;
+  if (cached_bytes_ >= kMaxCachedBytes || reached_eos_ || paused_) {
+    return true;
+  }
+  // Back-pressure: stop fetching when the render queue is near full.
+  // This prevents queue overflow that would cause oldest audio frames to be
+  // dropped, breaking the passthrough pacing anchor in the audio renderer.
+  if (avp_render_ && avp_render_->QueueSize() >= kMaxPassthroughQueueFrames) {
+    return true;
+  }
+  return false;
 }
 
 bool AVPPassthroughDecoder::DoRequestInputBuffers() {
@@ -328,18 +346,30 @@ status_t AVPPassthroughDecoder::FetchInputData(
   return OK;
 }
 
+std::shared_ptr<MediaFrame> AVPPassthroughDecoder::PreparePacketForOffload(
+    const std::shared_ptr<MediaFrame>& packet,
+    const media::audio_config_t& audio_config,
+    const std::shared_ptr<base::Buffer>& codec_private_data) {
+  (void)audio_config;
+  (void)codec_private_data;
+  return packet;
+}
+
 void AVPPassthroughDecoder::OnInputBufferFilled(
     const std::shared_ptr<MediaFrame>& packet) {
-  total_bytes_ += packet->size();
+  auto prepared_packet =
+      PreparePacketForOffload(packet, audio_config_, codec_private_data_);
+
+  total_bytes_ += prepared_packet->size();
   AVE_LOG(LS_VERBOSE) << "OnInputBufferFilled: totalBytes=" << total_bytes_;
   if (reached_eos_) {
     return;
   }
 
-  cached_bytes_ += packet->size();
+  cached_bytes_ += prepared_packet->size();
 
   avp_render_->RenderFrame(
-      packet, [this, size = packet->size()](bool rendered) {
+      prepared_packet, [this, size = prepared_packet->size()](bool rendered) {
         auto msg =
             std::make_shared<Message>(kWhatBufferConsumed, shared_from_this());
         msg->setInt32("generation", buffer_generation_);
@@ -369,6 +399,8 @@ void AVPPassthroughDecoder::DoFlush(bool notifyComplete) {
     // TODO: Fix MediaFrame interface
     // aggregate_buffer_->setRange(0, 0);
   }
+  pending_audio_access_unit_ = nullptr;
+  pending_audio_err_ = OK;
 
   if (avp_render_) {
     avp_render_->Flush();

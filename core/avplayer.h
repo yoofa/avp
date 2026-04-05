@@ -68,6 +68,8 @@ AVE_EXPORT class AvPlayer : public Player,
   status_t SetVideoRender(std::shared_ptr<VideoRender> video_render) override;
   status_t SetAudioDevice(std::shared_ptr<AudioDevice> audio_device) override;
   void SetSyncEnabled(bool enabled) override;
+  void SetAudioPassthroughPolicy(AudioPassthroughPolicy policy) override;
+  void SetAudioOnly(bool audio_only) override;
 
   // High-level control similar to ExoPlayer/NuPlayer
   status_t Prepare() override;
@@ -269,6 +271,7 @@ AVE_EXPORT class AvPlayer : public Player,
   void PostScanSources();
   status_t InstantiateDecoder(bool audio,
                               std::shared_ptr<AVPDecoderBase>& decoder);
+  bool ShouldUsePassthrough(const std::shared_ptr<MediaMeta>& format) const;
   // New methods for improved state management
   void ProcessDeferredActions();
   void PerformSeek(int64_t seek_time_us, SeekMode seek_mode);
@@ -310,6 +313,9 @@ AVE_EXPORT class AvPlayer : public Player,
   bool paused_;
   bool paused_for_buffering_;
   bool sync_enabled_ = true;
+  AudioPassthroughPolicy passthrough_policy_ =
+      AudioPassthroughPolicy::ALWAYS_PCM;
+  bool audio_only_ = false;
   bool paused_by_client_;
   bool source_started_;
   bool scan_sources_pending_;

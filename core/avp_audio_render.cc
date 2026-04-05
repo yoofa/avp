@@ -104,6 +104,11 @@ void AVPAudioRender::Start() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
+    // Reset passthrough pacing state on every fresh start so the new session
+    // measures ahead-ness relative to its own start time.
+    passthrough_start_time_us_ = 0;
+    passthrough_start_pts_us_ = 0;
+
     if (audio_sink_ready_ && audio_track_) {
       status_t result = audio_track_->Start();
       if (result == OK) {
@@ -157,6 +162,11 @@ void AVPAudioRender::Resume() {
 void AVPAudioRender::Flush() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
+
+    // Reset passthrough pacing so the next burst of frames after a seek/flush
+    // is measured from the new position, not the old one.
+    passthrough_start_time_us_ = 0;
+    passthrough_start_pts_us_ = 0;
 
     if (audio_track_) {
       audio_track_->Flush();
@@ -227,6 +237,8 @@ uint64_t AVPAudioRender::RenderFrameInternal(
       AVE_LOG(LS_ERROR) << "Failed to recreate audio track after format change";
       return 0;
     }
+    // Start the newly created track — we are already inside the render loop.
+    audio_track_->Start();
   }
 
   // Track whether we consumed the incoming frame in this call. Used to
@@ -244,21 +256,25 @@ uint64_t AVPAudioRender::RenderFrameInternal(
                      << "remaining=" << cached_frame_->size();
   }
 
+  auto frame_to_write = cached_frame_;
+  auto* written_audio_info =
+      frame_to_write ? frame_to_write->audio_info() : audio_info;
+  const size_t requested_size = frame_to_write ? frame_to_write->size() : 0;
+  const bool is_compressed = (current_audio_config_.format & 0xFF000000u) != 0;
+
   // Write audio data to track.  Single-shot write with a short timeout so
   // the caller's mutex is not held for a long time.  Partial writes are
   // handled via cached_frame_ and a 0-delay re-schedule.
-  ssize_t bytes_written = WriteAudioData(cached_frame_);
+  ssize_t bytes_written = WriteAudioData(frame_to_write);
   if (bytes_written > 0) {
     total_bytes_written_ += bytes_written;
+    const bool full_frame_written =
+        static_cast<size_t>(bytes_written) >= requested_size;
 
-    // Update sync anchor on first write of this frame (full size means
-    // this is the beginning of the frame, not a partial retry)
-    if (master_stream_ &&
-        (cached_frame_->size() == cached_frame_->capacity())) {
-      UpdateSyncAnchor(cached_frame_);
-    }
-
-    if (static_cast<size_t>(bytes_written) >= cached_frame_->size()) {
+    if (full_frame_written) {
+      if (master_stream_) {
+        UpdateSyncAnchor(frame_to_write);
+      }
       cached_frame_.reset();
     } else {
       auto new_offset =
@@ -292,10 +308,49 @@ uint64_t AVPAudioRender::RenderFrameInternal(
   AVE_LOG(LS_INFO) << "RenderFrameInternal[AUDIO]: wrote " << bytes_written
                    << " bytes, total=" << total_bytes_written_
                    << ", cached=" << (cached_frame_ ? "partial" : "done");
-  if (audio_info->pts.IsFinite()) {
-    last_audio_pts_us_ = audio_info->pts.us();
+  if (!is_compressed && written_audio_info &&
+      written_audio_info->pts.IsFinite()) {
+    last_audio_pts_us_ = written_audio_info->pts.us();
   }
-  // Blocking write provides natural pacing; no extra delay needed.
+
+  // Passthrough pacing: for compressed audio formats, AudioTrack.write()
+  // accepts data into a large hardware FIFO without blocking, so all frames
+  // can be fed at CPU speed.  This causes the sync anchor PTS to race far
+  // ahead of real time (e.g. 2500 ms of audio written in 6 ms wall time),
+  // making every video frame appear "late" and be dropped — freezing video.
+  //
+  // Mitigation: after each passthrough write, check how far ahead of real
+  // time we are and return a scheduling delay so the render task is woken
+  // only when the next frame is due.  We allow kMaxAheadUs (200 ms) of
+  // look-ahead to keep the hardware FIFO topped up without runaway.
+  if (is_compressed && !cached_frame_ && written_audio_info &&
+      written_audio_info->pts.IsFinite()) {
+    int64_t frame_pts_us = written_audio_info->pts.us();
+    int64_t frame_duration_us = written_audio_info->duration.IsFinite()
+                                    ? written_audio_info->duration.us()
+                                    : 0;
+    int64_t frame_end_pts_us = frame_pts_us + frame_duration_us;
+    int64_t now_us = base::TimeMicros();
+
+    if (passthrough_start_time_us_ == 0) {
+      passthrough_start_time_us_ = now_us;
+      passthrough_start_pts_us_ = frame_end_pts_us;
+    }
+
+    // How far ahead of "expected real-time" are we?
+    int64_t expected_pts_us =
+        passthrough_start_pts_us_ + (now_us - passthrough_start_time_us_);
+    int64_t ahead_us = frame_end_pts_us - expected_pts_us;
+
+    constexpr int64_t kMaxAheadUs = 200000;  // 200 ms look-ahead budget
+    if (ahead_us > kMaxAheadUs) {
+      int64_t delay_us = ahead_us - kMaxAheadUs;
+      AVE_LOG(LS_VERBOSE) << "Passthrough pacing: ahead=" << ahead_us / 1000
+                          << "ms, delaying " << delay_us / 1000 << "ms";
+      return static_cast<uint64_t>(delay_us);
+    }
+  }
+
   return 0;
 }
 
@@ -356,6 +411,15 @@ bool AVPAudioRender::HasAudioFormatChanged(
 
   auto* audio_info = frame->audio_info();
   if (!audio_info) {
+    return false;
+  }
+
+  // Passthrough (compressed) audio frames may not carry per-sample audio
+  // parameters — their sample_rate_hz and channel_layout remain at default
+  // uninitialized values.  Skip format-change detection when the frame lacks
+  // valid metadata to avoid falsely destroying a working audio track.
+  if (audio_info->sample_rate_hz <= 0 ||
+      audio_info->channel_layout == media::CHANNEL_LAYOUT_NONE) {
     return false;
   }
 
@@ -503,7 +567,23 @@ void AVPAudioRender::UpdateSyncAnchor(
   int64_t current_sys_time_us = base::TimeMicros();
   int64_t buffer_latency_us =
       audio_track_ ? audio_track_->GetBufferDurationInUs() : 0;
+  const bool is_compressed = (current_audio_config_.format & 0xFF000000u) != 0;
   int64_t frame_end_pts_us = frame_pts_us + frame_duration_us;
+  uint32_t played_frames = 0;
+  uint32_t frames_written = 0;
+  const bool have_position = is_compressed && audio_track_ &&
+                             audio_track_->GetPosition(&played_frames) == OK;
+  const bool have_written =
+      is_compressed && audio_track_ &&
+      audio_track_->GetFramesWritten(&frames_written) == OK;
+
+  if (have_position && have_written && frames_written > played_frames &&
+      current_audio_config_.sample_rate > 0) {
+    const int64_t queued_frames =
+        static_cast<int64_t>(frames_written) - played_frames;
+    buffer_latency_us =
+        queued_frames * 1000000LL / current_audio_config_.sample_rate;
+  }
 
   // Anchor the master clock to what is *currently being heard*, not what was
   // just written.  The original formula (pts, now + latency) was intended to
@@ -516,10 +596,37 @@ void AVPAudioRender::UpdateSyncAnchor(
   // base, so after `latency` seconds the clock correctly reaches `pts`.
   // The monotonic-advancement guard in UpdateAnchor prevents rapid burst
   // writes from jumping the clock backwards between bursts.
-  int64_t heard_pts_us = frame_pts_us - buffer_latency_us;
+  int64_t heard_pts_us = frame_end_pts_us - buffer_latency_us;
 
   GetAVSyncController()->UpdateAnchor(heard_pts_us, current_sys_time_us,
                                       frame_end_pts_us);
+
+  if (is_compressed && audio_track_ &&
+      (last_position_log_time_us_ == 0 ||
+       current_sys_time_us - last_position_log_time_us_ >= 500000)) {
+    if (have_position || have_written) {
+      if (have_position && played_frames < last_played_frames_) {
+        AVE_LOG(LS_WARNING)
+            << "Offload position: played_frames="
+            << (have_position ? static_cast<int64_t>(played_frames) : -1)
+            << " frames_written="
+            << (have_written ? static_cast<int64_t>(frames_written) : -1)
+            << " buffer_latency_ms=" << buffer_latency_us / 1000;
+      } else {
+        AVE_LOG(LS_INFO) << "Offload position: played_frames="
+                         << (have_position ? static_cast<int64_t>(played_frames)
+                                           : -1)
+                         << " frames_written="
+                         << (have_written ? static_cast<int64_t>(frames_written)
+                                          : -1)
+                         << " buffer_latency_ms=" << buffer_latency_us / 1000;
+      }
+      if (have_position) {
+        last_played_frames_ = played_frames;
+      }
+      last_position_log_time_us_ = current_sys_time_us;
+    }
+  }
 
   AVE_LOG(LS_INFO) << "UpdateSyncAnchor PTS=" << frame_pts_us / 1000
                    << "ms sys=" << current_sys_time_us / 1000

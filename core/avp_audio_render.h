@@ -12,7 +12,6 @@
 #include <mutex>
 
 #include "avp_render.h"
-
 #include "media/audio/audio_device.h"
 #include "media/audio/audio_track.h"
 #include "media/foundation/media_frame.h"
@@ -193,6 +192,13 @@ class AVPAudioRender : public AVPRender {
   // Statistics
   int64_t total_bytes_written_ GUARDED_BY(mutex_);
   int64_t last_audio_pts_us_ GUARDED_BY(mutex_);
+  int64_t last_position_log_time_us_ GUARDED_BY(mutex_){0};
+  uint32_t last_played_frames_ GUARDED_BY(mutex_){0};
+
+  // Passthrough write-pacing: prevent the sync clock from racing ahead when
+  // compressed frames are accepted by the HAL faster than real-time.
+  int64_t passthrough_start_time_us_ GUARDED_BY(mutex_){0};
+  int64_t passthrough_start_pts_us_ GUARDED_BY(mutex_){0};
 };
 
 }  // namespace player

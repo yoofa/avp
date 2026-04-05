@@ -38,6 +38,12 @@ void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame,
     AVE_LOG(LS_WARNING) << "RenderFrame: renderer not running, dropping "
                         << (frame ? static_cast<int>(frame->stream_type()) : -1)
                         << " frame";
+    // Must fire the callback even for dropped frames so that the caller
+    // (e.g. video decoder) releases its codec output buffer.  Without this
+    // the codec exhausts all output slots and stalls permanently.
+    if (render_event) {
+      render_event->OnRenderEvent(false);
+    }
     return;
   }
 
@@ -48,7 +54,20 @@ void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame,
 
   // Check queue size to prevent memory overflow
   if (frame_queue_.size() >= kMaxQueueSize) {
+    if (frame->stream_type() == media::MediaType::AUDIO) {
+      // For audio: reject the incoming frame (preserve playback order).
+      // Fire the render_event so the producer's byte-accounting stays correct.
+      AVE_LOG(LS_WARNING)
+          << "Audio frame queue full, dropping incoming frame (back-pressure)";
+      if (render_event) {
+        render_event->OnRenderEvent(false);
+      }
+      return;
+    }
+    // For video: drop oldest to show the most recent frame when behind.
+    // Release the oldest frame's codec buffer via its callback.
     AVE_LOG(LS_WARNING) << "Frame queue full, dropping oldest frame";
+    ReleaseFrame(frame_queue_.front(), false);
     frame_queue_.pop();
   }
 
@@ -77,6 +96,11 @@ int64_t AVPRender::GetCurrentTimeStamp() const {
     return avsync_controller_->GetMasterClock();
   }
   return 0;
+}
+
+size_t AVPRender::QueueSize() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return frame_queue_.size();
 }
 
 void AVPRender::Start() {

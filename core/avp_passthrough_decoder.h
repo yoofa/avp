@@ -12,6 +12,8 @@
 #include <mutex>
 #include <queue>
 
+#include "base/buffer.h"
+#include "media/audio/audio.h"
 #include "media/foundation/media_frame.h"
 
 #include "avp_decoder_base.h"
@@ -35,6 +37,11 @@ class AVPPassthroughDecoder : public AVPDecoderBase {
                         const std::shared_ptr<ContentSource>& source,
                         const std::shared_ptr<AVPRender>& render);
   ~AVPPassthroughDecoder() override;
+
+  static std::shared_ptr<MediaFrame> PreparePacketForOffload(
+      const std::shared_ptr<MediaFrame>& packet,
+      const media::audio_config_t& audio_config,
+      const std::shared_ptr<base::Buffer>& codec_private_data);
 
  protected:
   // AVPDecoderBase implementation
@@ -77,6 +84,8 @@ class AVPPassthroughDecoder : public AVPDecoderBase {
   std::shared_ptr<MediaFrame> aggregate_buffer_;
   std::shared_ptr<MediaFrame> pending_audio_access_unit_;
   status_t pending_audio_err_;
+  media::audio_config_t audio_config_;
+  std::shared_ptr<base::Buffer> codec_private_data_;
 
   // For buffer generation tracking
   int32_t buffer_generation_;

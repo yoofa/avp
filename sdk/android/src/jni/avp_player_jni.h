@@ -63,6 +63,8 @@ class AvpPlayerJni : public player::Player::Listener,
   jint GetTrackCount(JNIEnv* env);
   jni_zero::ScopedJavaLocalRef<jobject> GetTrackInfo(JNIEnv* env, jint index);
   void SelectTrack(JNIEnv* env, jint index, jboolean select);
+  void SetAudioPassthroughPolicy(JNIEnv* env, jint policy);
+  void SetAudioOnly(JNIEnv* env, jboolean audio_only);
 
   // Player::Listener
   void OnPrepared(status_t err) override;

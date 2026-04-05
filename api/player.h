@@ -27,6 +27,19 @@ namespace ave {
 namespace player {
 
 /**
+ * @brief Policy for audio passthrough (compressed audio direct output).
+ *
+ * ALWAYS_PCM:          Always decode to PCM (default, current behavior).
+ * PREFER_PASSTHROUGH:  Try passthrough if device supports it, fall back to PCM.
+ * AUTO:                Let the player decide based on device capabilities.
+ */
+enum class AudioPassthroughPolicy : uint8_t {
+  ALWAYS_PCM = 0,
+  PREFER_PASSTHROUGH = 1,
+  AUTO = 2,
+};
+
+/**
  * @brief The Player class represents a media player.
  */
 class Player {
@@ -242,6 +255,24 @@ class Player {
    */
   virtual status_t SetAudioDevice(
       std::shared_ptr<ave::media::AudioDevice> audio_device) = 0;
+
+  /**
+   * @brief Sets the audio passthrough policy.
+   *        Controls whether compressed audio is sent directly to the output
+   *        device (passthrough/offload) or always decoded to PCM.
+   *        Must be called before Prepare().
+   * @param policy The passthrough policy.
+   */
+  virtual void SetAudioPassthroughPolicy(AudioPassthroughPolicy policy) = 0;
+
+  /**
+   * @brief Enables or disables audio-only playback mode.
+   *        When enabled, the player skips creating and driving the video path
+   *        even if the source contains video tracks.
+   *        Must be called before Prepare().
+   * @param audio_only True to play audio only, false for normal A/V playback.
+   */
+  virtual void SetAudioOnly(bool audio_only) = 0;
 
   /**
    * @brief Prepares the player for playback.

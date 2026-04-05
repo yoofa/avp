@@ -304,6 +304,19 @@ void AvpPlayerJni::SelectTrack(JNIEnv* env, jint index, jboolean select) {
   player_->SelectTrack(static_cast<size_t>(index), select);
 }
 
+void AvpPlayerJni::SetAudioPassthroughPolicy(JNIEnv* env, jint policy) {
+  if (!player_)
+    return;
+  player_->SetAudioPassthroughPolicy(
+      static_cast<player::AudioPassthroughPolicy>(policy));
+}
+
+void AvpPlayerJni::SetAudioOnly(JNIEnv* env, jboolean audio_only) {
+  if (!player_)
+    return;
+  player_->SetAudioOnly(audio_only);
+}
+
 // --- Player::Listener callbacks ---
 
 void AvpPlayerJni::OnPrepared(status_t err) {
