@@ -91,13 +91,49 @@ class Player {
     }
 
     /**
-     * @brief Sets the audio device factory for the player.
-     * @param audio_device_factory The audio device factory to set.
+     * @brief Sets the audio device for the player.
+     * @param audio_device The audio device to use.
      * @return A reference to the Builder object.
      */
-    Builder& setAudioDeviceFactory(
+    Builder& setAudioDevice(
         std::shared_ptr<ave::media::AudioDevice> audio_device) {
       audio_device_ = std::move(audio_device);
+      return *this;
+    }
+
+    Builder& setAudioDeviceFactory(
+        std::shared_ptr<ave::media::AudioDevice> audio_device) {
+      return setAudioDevice(std::move(audio_device));
+    }
+
+    /**
+     * @brief Sets whether A/V synchronization is enabled.
+     * @param enabled True to enable sync-based pacing, false to render
+     *        immediately.
+     * @return A reference to the Builder object.
+     */
+    Builder& setSyncEnabled(bool enabled) {
+      sync_enabled_ = enabled;
+      return *this;
+    }
+
+    /**
+     * @brief Sets the audio passthrough policy.
+     * @param policy The passthrough policy to use for the player lifetime.
+     * @return A reference to the Builder object.
+     */
+    Builder& setAudioPassthroughPolicy(AudioPassthroughPolicy policy) {
+      passthrough_policy_ = policy;
+      return *this;
+    }
+
+    /**
+     * @brief Sets whether the player should run in audio-only mode.
+     * @param audio_only True to skip the video path, false for normal A/V.
+     * @return A reference to the Builder object.
+     */
+    Builder& setAudioOnly(bool audio_only) {
+      audio_only_ = audio_only;
       return *this;
     }
 
@@ -112,6 +148,10 @@ class Player {
     std::shared_ptr<DemuxerFactory> demuxer_factory_;
     std::shared_ptr<ave::media::CodecFactory> codec_factory_;
     std::shared_ptr<ave::media::AudioDevice> audio_device_;
+    bool sync_enabled_ = true;
+    AudioPassthroughPolicy passthrough_policy_ =
+        AudioPassthroughPolicy::ALWAYS_PCM;
+    bool audio_only_ = false;
   };
 
   /**
@@ -238,41 +278,6 @@ class Player {
    */
   virtual status_t SetVideoRender(
       std::shared_ptr<ave::media::VideoRender> video_render) = 0;
-
-  /**
-   * @brief Enables or disables A/V synchronization.
-   *        When disabled, frames are rendered immediately without clock-based
-   *        pacing (useful for file output or testing).
-   * @param enabled True to enable A/V sync (default), false to disable.
-   */
-  virtual void SetSyncEnabled(bool enabled) = 0;
-
-  /**
-   * @brief Sets the audio device for the player.
-   *        Must be called before Prepare().
-   * @param audio_device The audio device to use.
-   * @return OK on success, or an error code.
-   */
-  virtual status_t SetAudioDevice(
-      std::shared_ptr<ave::media::AudioDevice> audio_device) = 0;
-
-  /**
-   * @brief Sets the audio passthrough policy.
-   *        Controls whether compressed audio is sent directly to the output
-   *        device (passthrough/offload) or always decoded to PCM.
-   *        Must be called before Prepare().
-   * @param policy The passthrough policy.
-   */
-  virtual void SetAudioPassthroughPolicy(AudioPassthroughPolicy policy) = 0;
-
-  /**
-   * @brief Enables or disables audio-only playback mode.
-   *        When enabled, the player skips creating and driving the video path
-   *        even if the source contains video tracks.
-   *        Must be called before Prepare().
-   * @param audio_only True to play audio only, false for normal A/V playback.
-   */
-  virtual void SetAudioOnly(bool audio_only) = 0;
 
   /**
    * @brief Prepares the player for playback.

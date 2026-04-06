@@ -53,7 +53,10 @@ AVE_EXPORT class AvPlayer : public Player,
       std::shared_ptr<ContentSourceFactory> content_source_factory,
       std::shared_ptr<DemuxerFactory> demuxer_factory,
       std::shared_ptr<CodecFactory> codec_factory,
-      std::shared_ptr<AudioDevice> audio_device);
+      std::shared_ptr<AudioDevice> audio_device,
+      bool sync_enabled,
+      AudioPassthroughPolicy passthrough_policy,
+      bool audio_only);
 
   ~AvPlayer() override;
 
@@ -66,10 +69,6 @@ AVE_EXPORT class AvPlayer : public Player,
   status_t SetDataSource(std::shared_ptr<ave::DataSource> data_source) override;
   status_t SetDataSource(std::shared_ptr<ContentSource> source) override;
   status_t SetVideoRender(std::shared_ptr<VideoRender> video_render) override;
-  status_t SetAudioDevice(std::shared_ptr<AudioDevice> audio_device) override;
-  void SetSyncEnabled(bool enabled) override;
-  void SetAudioPassthroughPolicy(AudioPassthroughPolicy policy) override;
-  void SetAudioOnly(bool audio_only) override;
 
   // High-level control similar to ExoPlayer/NuPlayer
   status_t Prepare() override;

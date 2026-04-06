@@ -48,7 +48,10 @@ int MediaTypeToTrackType(media::MediaType type) {
 
 AvpPlayerJni::AvpPlayerJni(JNIEnv* env,
                            jobject j_player,
-                           jobject j_audio_device)
+                           jobject j_audio_device,
+                           jboolean sync_enabled,
+                           jint audio_passthrough_policy,
+                           jboolean audio_only)
     : j_player_(env, j_player) {
   AVE_LOG(LS_INFO) << "AvpPlayerJni::AvpPlayerJni created";
 
@@ -60,9 +63,13 @@ AvpPlayerJni::AvpPlayerJni(JNIEnv* env,
     java_audio_device_ =
         std::make_shared<media::android::JavaAudioDevice>(j_audio_device_);
     java_audio_device_->Init();
-    builder.setAudioDeviceFactory(java_audio_device_);
+    builder.setAudioDevice(java_audio_device_);
     AVE_LOG(LS_INFO) << "AvpPlayerJni: using JavaAudioDevice";
   }
+  builder.setSyncEnabled(sync_enabled)
+      .setAudioPassthroughPolicy(
+          static_cast<player::AudioPassthroughPolicy>(audio_passthrough_policy))
+      .setAudioOnly(audio_only);
 
   player_ = builder.build();
   if (player_) {
@@ -304,19 +311,6 @@ void AvpPlayerJni::SelectTrack(JNIEnv* env, jint index, jboolean select) {
   player_->SelectTrack(static_cast<size_t>(index), select);
 }
 
-void AvpPlayerJni::SetAudioPassthroughPolicy(JNIEnv* env, jint policy) {
-  if (!player_)
-    return;
-  player_->SetAudioPassthroughPolicy(
-      static_cast<player::AudioPassthroughPolicy>(policy));
-}
-
-void AvpPlayerJni::SetAudioOnly(JNIEnv* env, jboolean audio_only) {
-  if (!player_)
-    return;
-  player_->SetAudioOnly(audio_only);
-}
-
 // --- Player::Listener callbacks ---
 
 void AvpPlayerJni::OnPrepared(status_t err) {
@@ -398,8 +392,13 @@ void AvpPlayerJni::OnFrame(const std::shared_ptr<media::MediaFrame>& frame) {
 static jlong JNI_AvpPlayer_Init(
     JNIEnv* env,
     const jni_zero::JavaParamRef<jobject>& j_caller,
-    const jni_zero::JavaParamRef<jobject>& j_audio_device) {
-  auto* player = new AvpPlayerJni(env, j_caller.obj(), j_audio_device.obj());
+    const jni_zero::JavaParamRef<jobject>& j_audio_device,
+    jboolean sync_enabled,
+    jint audio_passthrough_policy,
+    jboolean audio_only) {
+  auto* player =
+      new AvpPlayerJni(env, j_caller.obj(), j_audio_device.obj(), sync_enabled,
+                       audio_passthrough_policy, audio_only);
   return reinterpret_cast<jlong>(player);
 }
 

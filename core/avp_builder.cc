@@ -44,7 +44,8 @@ std::shared_ptr<Player> Player::Builder::build() {
   // Create AvPlayer instance and cast it to Player
   auto player = std::make_shared<AvPlayer>(
       std::move(content_source_factory_), std::move(demuxer_factory_),
-      std::move(codec_factory_), std::move(audio_device_));
+      std::move(codec_factory_), std::move(audio_device_), sync_enabled_,
+      passthrough_policy_, audio_only_);
   return std::static_pointer_cast<Player>(player);
 }
 

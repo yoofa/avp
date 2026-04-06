@@ -105,9 +105,11 @@ public class PlayerActivity extends Activity {
 
   private void initPlayer(String filePath, SurfaceHolder holder) {
     try {
-      player = AvpPlayer.create();
-      player.setAudioPassthroughPolicy(AvpPlayer.PASSTHROUGH_PREFER_PASSTHROUGH);
-      player.setAudioOnly(audioOnly);
+      player =
+          new AvpPlayer.Builder()
+              .setAudioPassthroughPolicy(AvpPlayer.PASSTHROUGH_PREFER_PASSTHROUGH)
+              .setAudioOnly(audioOnly)
+              .build();
       player.setDataSource(filePath);
       if (!audioOnly && holder != null) {
         player.setSurface(holder.getSurface());

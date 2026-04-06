@@ -28,7 +28,12 @@ namespace jni {
 class AvpPlayerJni : public player::Player::Listener,
                      public media::VideoRender {
  public:
-  AvpPlayerJni(JNIEnv* env, jobject j_player, jobject j_audio_device);
+  AvpPlayerJni(JNIEnv* env,
+               jobject j_player,
+               jobject j_audio_device,
+               jboolean sync_enabled,
+               jint audio_passthrough_policy,
+               jboolean audio_only);
   ~AvpPlayerJni() override;
 
   // Player control methods (called from auto-generated JNI dispatch)
@@ -63,8 +68,6 @@ class AvpPlayerJni : public player::Player::Listener,
   jint GetTrackCount(JNIEnv* env);
   jni_zero::ScopedJavaLocalRef<jobject> GetTrackInfo(JNIEnv* env, jint index);
   void SelectTrack(JNIEnv* env, jint index, jboolean select);
-  void SetAudioPassthroughPolicy(JNIEnv* env, jint policy);
-  void SetAudioOnly(JNIEnv* env, jboolean audio_only);
 
   // Player::Listener
   void OnPrepared(status_t err) override;

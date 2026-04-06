@@ -8,14 +8,11 @@ package io.github.yoofa.avp;
 
 import android.util.Log;
 import android.view.Surface;
-
 import androidx.annotation.Nullable;
-
 import io.github.yoofa.media.AndroidJavaAudioDevice;
 import io.github.yoofa.media.AudioDevice;
 import io.github.yoofa.media.VideoFrame;
 import io.github.yoofa.media.VideoRenderer;
-
 import org.jni_zero.CalledByNative;
 import org.jni_zero.JniType;
 import org.jni_zero.NativeMethods;
@@ -26,7 +23,7 @@ import org.jni_zero.NativeMethods;
  * <p>Usage:
  *
  * <pre>
- *   AvpPlayer player = AvpPlayer.create();
+ *   AvpPlayer player = new AvpPlayer.Builder().build();
  *   player.setDataSource("/path/to/file.mp4");
  *   player.setOnPreparedListener(mp -> mp.start());
  *   player.prepare();
@@ -142,7 +139,7 @@ public class AvpPlayer {
    * @throws RuntimeException if native player creation fails.
    */
   public static AvpPlayer create() {
-    return new AvpPlayer(new AndroidJavaAudioDevice());
+    return new Builder().setAudioDevice(new AndroidJavaAudioDevice()).build();
   }
 
   /**
@@ -153,11 +150,22 @@ public class AvpPlayer {
    * @throws RuntimeException if native player creation fails.
    */
   public static AvpPlayer create(AudioDevice audioDevice) {
-    return new AvpPlayer(audioDevice);
+    return new Builder().setAudioDevice(audioDevice).build();
   }
 
-  private AvpPlayer(AudioDevice audioDevice) {
-    this.nativePlayer = AvpPlayerJni.get().init(this, audioDevice);
+  private AvpPlayer(Builder builder) {
+    AudioDevice audioDevice = builder.audioDevice;
+    if (audioDevice == null) {
+      audioDevice = new AndroidJavaAudioDevice();
+    }
+    this.nativePlayer =
+        AvpPlayerJni.get()
+            .init(
+                this,
+                audioDevice,
+                builder.syncEnabled,
+                builder.audioPassthroughPolicy,
+                builder.audioOnly);
     if (nativePlayer == 0) {
       throw new RuntimeException("Failed to create native player");
     }
@@ -413,28 +421,36 @@ public class AvpPlayer {
   public static final int PASSTHROUGH_PREFER_PASSTHROUGH = 1;
   public static final int PASSTHROUGH_AUTO = 2;
 
-  /**
-   * Set the audio passthrough policy. Controls whether compressed audio (AAC, AC3, DTS, etc.) is
-   * sent directly to the audio output device or always decoded to PCM. Must be called before {@link
-   * #prepare()}.
-   *
-   * @param policy One of {@link #PASSTHROUGH_ALWAYS_PCM}, {@link #PASSTHROUGH_PREFER_PASSTHROUGH},
-   *     {@link #PASSTHROUGH_AUTO}.
-   */
-  public void setAudioPassthroughPolicy(int policy) {
-    checkNotReleased();
-    AvpPlayerJni.get().setAudioPassthroughPolicy(nativePlayer, policy);
-  }
+  /** Builder for player instances and init-only configuration. */
+  public static final class Builder {
+    private @Nullable AudioDevice audioDevice;
+    private boolean syncEnabled = true;
+    private int audioPassthroughPolicy;
+    private boolean audioOnly;
 
-  /**
-   * Enables audio-only playback mode. When enabled, the native player skips the video decode/render
-   * path even if the source contains video tracks.
-   *
-   * @param audioOnly true to play audio only, false for normal A/V playback.
-   */
-  public void setAudioOnly(boolean audioOnly) {
-    checkNotReleased();
-    AvpPlayerJni.get().setAudioOnly(nativePlayer, audioOnly);
+    public Builder setAudioDevice(@Nullable AudioDevice audioDevice) {
+      this.audioDevice = audioDevice;
+      return this;
+    }
+
+    public Builder setSyncEnabled(boolean syncEnabled) {
+      this.syncEnabled = syncEnabled;
+      return this;
+    }
+
+    public Builder setAudioPassthroughPolicy(int audioPassthroughPolicy) {
+      this.audioPassthroughPolicy = audioPassthroughPolicy;
+      return this;
+    }
+
+    public Builder setAudioOnly(boolean audioOnly) {
+      this.audioOnly = audioOnly;
+      return this;
+    }
+
+    public AvpPlayer build() {
+      return new AvpPlayer(this);
+    }
   }
 
   /**
@@ -566,7 +582,12 @@ public class AvpPlayer {
   // --- Native methods via jni_zero proxy ---
   @NativeMethods
   interface Natives {
-    long init(AvpPlayer caller, AudioDevice audioDevice);
+    long init(
+        AvpPlayer caller,
+        AudioDevice audioDevice,
+        boolean syncEnabled,
+        int audioPassthroughPolicy,
+        boolean audioOnly);
 
     void setDataSource(long nativeAvpPlayerJni, @JniType("std::string") String path);
 
@@ -613,9 +634,5 @@ public class AvpPlayer {
     TrackInfo getTrackInfo(long nativeAvpPlayerJni, int index);
 
     void selectTrack(long nativeAvpPlayerJni, int index, boolean select);
-
-    void setAudioPassthroughPolicy(long nativeAvpPlayerJni, int policy);
-
-    void setAudioOnly(long nativeAvpPlayerJni, boolean audioOnly);
   }
 }

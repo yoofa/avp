@@ -28,7 +28,10 @@ namespace player {
 AvPlayer::AvPlayer(std::shared_ptr<ContentSourceFactory> content_source_factory,
                    std::shared_ptr<DemuxerFactory> demuxer_factory,
                    std::shared_ptr<CodecFactory> codec_factory,
-                   std::shared_ptr<AudioDevice> audio_device)
+                   std::shared_ptr<AudioDevice> audio_device,
+                   bool sync_enabled,
+                   AudioPassthroughPolicy passthrough_policy,
+                   bool audio_only)
     : task_runner_factory_(ave::base::CreateDefaultTaskRunnerFactory()),
       content_source_factory_(std::move(content_source_factory)),
       demuxer_factory_(std::move(demuxer_factory)),
@@ -52,6 +55,9 @@ AvPlayer::AvPlayer(std::shared_ptr<ContentSourceFactory> content_source_factory,
       poll_duration_generation_(0),
       flushing_audio_(NONE),
       flushing_video_(NONE) {
+  sync_enabled_ = sync_enabled;
+  passthrough_policy_ = passthrough_policy;
+  audio_only_ = audio_only;
   player_looper_->setName("AvPlayer");
   ClearFlushComplete();
 }
@@ -128,32 +134,6 @@ status_t AvPlayer::SetVideoRender(std::shared_ptr<VideoRender> video_render) {
   msg->setObject(kVideoRender, std::move(video_render));
   msg->post();
   return ave::OK;
-}
-
-void AvPlayer::SetSyncEnabled(bool enabled) {
-  // video_render_ may not be created yet (created during Prepare/Start).
-  // Store the flag and apply it when the render is created.
-  sync_enabled_ = enabled;
-  if (video_render_) {
-    video_render_->SetSyncEnabled(enabled);
-  }
-}
-
-status_t AvPlayer::SetAudioDevice(std::shared_ptr<AudioDevice> audio_device) {
-  if (audio_device) {
-    audio_device_ = std::move(audio_device);
-  }
-  return ave::OK;
-}
-
-void AvPlayer::SetAudioPassthroughPolicy(AudioPassthroughPolicy policy) {
-  passthrough_policy_ = policy;
-  AVE_LOG(LS_INFO) << "SetAudioPassthroughPolicy: " << static_cast<int>(policy);
-}
-
-void AvPlayer::SetAudioOnly(bool audio_only) {
-  audio_only_ = audio_only;
-  AVE_LOG(LS_INFO) << "SetAudioOnly: " << audio_only_;
 }
 
 status_t AvPlayer::Prepare() {
