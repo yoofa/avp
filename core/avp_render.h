@@ -161,6 +161,10 @@ class AVPRender {
     return avsync_controller_;
   }
 
+  bool IsRunningLocked() const REQUIRES(mutex_) { return running_; }
+
+  bool IsPausedLocked() const REQUIRES(mutex_) { return paused_; }
+
   /**
    * @brief Checks if the renderer is running.
    * @return True if running, false otherwise.

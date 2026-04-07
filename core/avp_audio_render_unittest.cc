@@ -319,6 +319,20 @@ TEST_F(AVPAudioRenderTest, StartStopAudioTrack) {
   // Similarly, we can test that Stop() doesn't crash
 }
 
+TEST_F(AVPAudioRenderTest, OpenAudioSinkStartsTrackWhenRendererAlreadyRunning) {
+  media::audio_config_t config = media::DefaultAudioConfig;
+  config.sample_rate = 44100;
+  config.channel_layout = media::CHANNEL_LAYOUT_STEREO;
+  config.format = media::AUDIO_FORMAT_AAC_LC;
+
+  audio_render_->Start();
+
+  ASSERT_EQ(audio_render_->OpenAudioSink(config), OK);
+  auto track = mock_audio_device_->last_track();
+  ASSERT_NE(track, nullptr);
+  EXPECT_TRUE(track->IsStarted());
+}
+
 TEST_F(AVPAudioRenderTest, RenderAudioFrame) {
   media::audio_config_t config = media::DefaultAudioConfig;
   audio_render_->OpenAudioSink(config);

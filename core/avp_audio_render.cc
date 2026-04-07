@@ -56,6 +56,19 @@ status_t AVPAudioRender::OpenAudioSink(const media::audio_config_t& config) {
   status_t result = CreateAudioTrack();
   if (result == OK) {
     audio_sink_ready_ = true;
+    if (IsRunningLocked() && !IsPausedLocked() && audio_track_) {
+      status_t start_result = audio_track_->Start();
+      if (start_result == OK) {
+        AVE_LOG(LS_INFO) << "Audio sink opened while renderer already running, "
+                            "started track";
+      } else {
+        AVE_LOG(LS_ERROR)
+            << "Audio sink opened but failed to start track, error: "
+            << start_result;
+        audio_sink_ready_ = false;
+        return start_result;
+      }
+    }
     AVE_LOG(LS_INFO) << "Audio sink opened successfully";
   } else {
     AVE_LOG(LS_ERROR) << "Failed to open audio sink, error: " << result;
