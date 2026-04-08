@@ -121,6 +121,11 @@ void AVPAudioRender::Start() {
     // measures ahead-ness relative to its own start time.
     passthrough_start_time_us_ = 0;
     passthrough_start_pts_us_ = 0;
+    passthrough_media_start_pts_us_ = 0;
+    passthrough_media_start_pts_valid_ = false;
+    passthrough_position_started_ = false;
+    last_position_log_time_us_ = 0;
+    last_played_frames_ = 0;
 
     if (audio_sink_ready_ && audio_track_) {
       status_t result = audio_track_->Start();
@@ -180,6 +185,11 @@ void AVPAudioRender::Flush() {
     // is measured from the new position, not the old one.
     passthrough_start_time_us_ = 0;
     passthrough_start_pts_us_ = 0;
+    passthrough_media_start_pts_us_ = 0;
+    passthrough_media_start_pts_valid_ = false;
+    passthrough_position_started_ = false;
+    last_position_log_time_us_ = 0;
+    last_played_frames_ = 0;
 
     if (audio_track_) {
       audio_track_->Flush();
@@ -589,6 +599,71 @@ void AVPAudioRender::UpdateSyncAnchor(
   const bool have_written =
       is_compressed && audio_track_ &&
       audio_track_->GetFramesWritten(&frames_written) == OK;
+
+  if (is_compressed && !passthrough_media_start_pts_valid_) {
+    passthrough_media_start_pts_us_ = frame_pts_us;
+    passthrough_media_start_pts_valid_ = true;
+  }
+
+  if (is_compressed && have_position && current_audio_config_.sample_rate > 0) {
+    if (played_frames == 0 && !passthrough_position_started_) {
+      if (last_position_log_time_us_ == 0 ||
+          current_sys_time_us - last_position_log_time_us_ >= 500000) {
+        AVE_LOG(LS_INFO) << "Offload position: waiting for playout start"
+                         << " frames_written="
+                         << (have_written ? static_cast<int64_t>(frames_written)
+                                          : -1)
+                         << " start_pts_ms="
+                         << (passthrough_media_start_pts_valid_
+                                 ? passthrough_media_start_pts_us_ / 1000
+                                 : -1)
+                         << " played_frames=0";
+        last_position_log_time_us_ = current_sys_time_us;
+      }
+      return;
+    }
+
+    passthrough_position_started_ = true;
+    const int64_t played_duration_us = static_cast<int64_t>(played_frames) *
+                                       1000000LL /
+                                       current_audio_config_.sample_rate;
+    int64_t heard_pts_us =
+        passthrough_media_start_pts_valid_
+            ? passthrough_media_start_pts_us_ + played_duration_us
+            : frame_pts_us + played_duration_us;
+    if (heard_pts_us > frame_end_pts_us) {
+      heard_pts_us = frame_end_pts_us;
+    }
+
+    GetAVSyncController()->UpdateAnchor(heard_pts_us, current_sys_time_us,
+                                        frame_end_pts_us);
+
+    if (last_position_log_time_us_ == 0 ||
+        current_sys_time_us - last_position_log_time_us_ >= 500000) {
+      if (played_frames < last_played_frames_) {
+        AVE_LOG(LS_WARNING)
+            << "Offload position: played_frames="
+            << static_cast<int64_t>(played_frames) << " frames_written="
+            << (have_written ? static_cast<int64_t>(frames_written) : -1)
+            << " media_pts_ms=" << heard_pts_us / 1000;
+      } else {
+        AVE_LOG(LS_INFO) << "Offload position: played_frames="
+                         << static_cast<int64_t>(played_frames)
+                         << " frames_written="
+                         << (have_written ? static_cast<int64_t>(frames_written)
+                                          : -1)
+                         << " media_pts_ms=" << heard_pts_us / 1000;
+      }
+      last_position_log_time_us_ = current_sys_time_us;
+    }
+    last_played_frames_ = played_frames;
+
+    AVE_LOG(LS_INFO) << "UpdateSyncAnchor PTS=" << frame_pts_us / 1000
+                     << "ms sys=" << current_sys_time_us / 1000
+                     << "ms heard_pts=" << heard_pts_us / 1000
+                     << "ms played_frames=" << played_frames;
+    return;
+  }
 
   if (have_position && have_written && frames_written > played_frames &&
       current_audio_config_.sample_rate > 0) {

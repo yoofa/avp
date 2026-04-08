@@ -199,6 +199,9 @@ class AVPAudioRender : public AVPRender {
   // compressed frames are accepted by the HAL faster than real-time.
   int64_t passthrough_start_time_us_ GUARDED_BY(mutex_){0};
   int64_t passthrough_start_pts_us_ GUARDED_BY(mutex_){0};
+  int64_t passthrough_media_start_pts_us_ GUARDED_BY(mutex_){0};
+  bool passthrough_media_start_pts_valid_ GUARDED_BY(mutex_){false};
+  bool passthrough_position_started_ GUARDED_BY(mutex_){false};
 };
 
 }  // namespace player
