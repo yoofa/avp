@@ -1,0 +1,24 @@
+import("//avp.gni")
+
+source_set("mpeg2_demuxers") {
+  sources = [
+    "mpeg2_common.cc",
+    "mpeg2_common.h",
+    "mpeg2_ps_demuxer.cc",
+    "mpeg2_ps_demuxer.h",
+    "mpeg2_ts_demuxer.cc",
+    "mpeg2_ts_demuxer.h",
+  ]
+
+  deps = [
+    "../../api:player_interface",
+    "//base:logging",
+    "//media/foundation:bit_reader",
+    "//media/foundation:media_buffer",
+    "//media/foundation:media_frame",
+    "//media/foundation:media_meta",
+    "//media/foundation:media_mimes",
+    "//media/foundation:media_source",
+    "//media/modules/mpeg2ts:mpeg2ts",
+  ]
+}

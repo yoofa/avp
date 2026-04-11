@@ -285,6 +285,28 @@ uint64_t AVPAudioRender::RenderFrameInternal(
   const size_t requested_size = frame_to_write ? frame_to_write->size() : 0;
   const bool is_compressed = (current_audio_config_.format & 0xFF000000u) != 0;
 
+  if (!is_compressed && frame_to_write) {
+    static int s_pcm_debug_frames = 0;
+    if (s_pcm_debug_frames < 8) {
+      const uint8_t* pcm = frame_to_write->data();
+      const size_t inspect_bytes =
+          requested_size < 256 ? requested_size : static_cast<size_t>(256);
+      int nonzero_bytes = 0;
+      int sample_sum = 0;
+      for (size_t i = 0; i < inspect_bytes; ++i) {
+        const int value = static_cast<int>(static_cast<int8_t>(pcm[i]));
+        sample_sum += value >= 0 ? value : -value;
+        if (pcm[i] != 0) {
+          ++nonzero_bytes;
+        }
+      }
+      AVE_LOG(LS_INFO) << "RenderFrameInternal[AUDIO]: pcm probe bytes="
+                       << inspect_bytes << " nonzero=" << nonzero_bytes
+                       << " abs_sum=" << sample_sum;
+      ++s_pcm_debug_frames;
+    }
+  }
+
   // Write audio data to track.  Single-shot write with a short timeout so
   // the caller's mutex is not held for a long time.  Partial writes are
   // handled via cached_frame_ and a 0-delay re-schedule.
@@ -336,17 +358,11 @@ uint64_t AVPAudioRender::RenderFrameInternal(
     last_audio_pts_us_ = written_audio_info->pts.us();
   }
 
-  // Passthrough pacing: for compressed audio formats, AudioTrack.write()
-  // accepts data into a large hardware FIFO without blocking, so all frames
-  // can be fed at CPU speed.  This causes the sync anchor PTS to race far
-  // ahead of real time (e.g. 2500 ms of audio written in 6 ms wall time),
-  // making every video frame appear "late" and be dropped — freezing video.
-  //
-  // Mitigation: after each passthrough write, check how far ahead of real
-  // time we are and return a scheduling delay so the render task is woken
-  // only when the next frame is due.  We allow kMaxAheadUs (200 ms) of
-  // look-ahead to keep the hardware FIFO topped up without runaway.
-  if (is_compressed && !cached_frame_ && written_audio_info &&
+  // Audio pacing: some devices accept both compressed and PCM writes much
+  // faster than real playout. If we keep feeding at CPU speed, the master
+  // clock runs far ahead of the actual presentation timeline and video starts
+  // dropping aggressively to catch up.
+  if (!cached_frame_ && written_audio_info &&
       written_audio_info->pts.IsFinite()) {
     int64_t frame_pts_us = written_audio_info->pts.us();
     int64_t frame_duration_us = written_audio_info->duration.IsFinite()
@@ -365,10 +381,10 @@ uint64_t AVPAudioRender::RenderFrameInternal(
         passthrough_start_pts_us_ + (now_us - passthrough_start_time_us_);
     int64_t ahead_us = frame_end_pts_us - expected_pts_us;
 
-    constexpr int64_t kMaxAheadUs = 200000;  // 200 ms look-ahead budget
+    constexpr int64_t kMaxAheadUs = 80000;  // ~2 audio callbacks at 48 kHz PCM
     if (ahead_us > kMaxAheadUs) {
       int64_t delay_us = ahead_us - kMaxAheadUs;
-      AVE_LOG(LS_VERBOSE) << "Passthrough pacing: ahead=" << ahead_us / 1000
+      AVE_LOG(LS_VERBOSE) << "Audio pacing: ahead=" << ahead_us / 1000
                           << "ms, delaying " << delay_us / 1000 << "ms";
       return static_cast<uint64_t>(delay_us);
     }
@@ -658,10 +674,6 @@ void AVPAudioRender::UpdateSyncAnchor(
     }
     last_played_frames_ = played_frames;
 
-    AVE_LOG(LS_INFO) << "UpdateSyncAnchor PTS=" << frame_pts_us / 1000
-                     << "ms sys=" << current_sys_time_us / 1000
-                     << "ms heard_pts=" << heard_pts_us / 1000
-                     << "ms played_frames=" << played_frames;
     return;
   }
 
@@ -716,9 +728,6 @@ void AVPAudioRender::UpdateSyncAnchor(
     }
   }
 
-  AVE_LOG(LS_INFO) << "UpdateSyncAnchor PTS=" << frame_pts_us / 1000
-                   << "ms sys=" << current_sys_time_us / 1000
-                   << "ms buf_latency=" << buffer_latency_us / 1000 << "ms";
 }
 
 bool AVPAudioRender::SupportsPlaybackRateChange() const {

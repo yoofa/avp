@@ -390,6 +390,8 @@ status_t GenericSource::InitFromDataSource() {
   demuxer_->GetFormat(source_format);
 
   size_t num_tracks = demuxer_->GetTrackCount();
+  AVE_LOG(LS_INFO) << "GenericSource::InitFromDataSource track_count="
+                   << num_tracks;
   if (num_tracks == 0) {
     AVE_LOG(LS_ERROR) << "InitFromDataSource, source has no track!";
     lock_.lock();
@@ -418,6 +420,12 @@ status_t GenericSource::InitFromDataSource() {
       AVE_LOG(LS_ERROR) << "no metadata for track " << i;
       return ave::UNKNOWN_ERROR;
     }
+    AVE_LOG(LS_INFO) << "GenericSource track[" << i
+                     << "] mime=" << format->mime() << " stream_type="
+                     << static_cast<int>(format->stream_type())
+                     << " width=" << format->width()
+                     << " height=" << format->height()
+                     << " sample_rate=" << format->sample_rate();
     sources_.push_back(source);
 
     Track* track = nullptr;

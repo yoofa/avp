@@ -37,6 +37,7 @@ ave_library("internal_demuxer_factory") {
   deps = [
     "../api:player_interface",
     "isobmff",
+    "mpeg2:mpeg2_demuxers",
     "//base:logging",
     "//base:utils",
     "//media/audio:audio_channel_layout",

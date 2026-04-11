@@ -233,6 +233,9 @@ status_t FFmpegDemuxer::Init() {
   int ret = OK;
   ret = avformat_open_input(&av_format_context_, nullptr, nullptr, nullptr);
   AVE_LOG(LS_VERBOSE) << "avformat_open_input ret=" << ret;
+  if (ret < 0 || av_format_context_ == nullptr) {
+    return ret < 0 ? ret : media::ERROR_MALFORMED;
+  }
 
   // Limit probing so avformat_find_stream_info doesn't try to decode frames
   // to detect stream parameters.  Container formats like MP4/MKV embed all

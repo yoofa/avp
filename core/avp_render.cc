@@ -13,6 +13,10 @@
 namespace ave {
 namespace player {
 
+namespace {
+constexpr int64_t kVideoDropThresholdUs = 100000;
+}
+
 AVPRender::AVPRender(base::TaskRunnerFactory* task_runner_factory,
                      IAVSyncController* avsync_controller)
     : task_runner_(std::make_unique<base::TaskRunner>(
@@ -241,9 +245,6 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
     // For audio, render immediately and schedule next based on returned delay
 
     next_render_delay_us = RenderFrameInternal(frame, consumed);
-    AVE_LOG(LS_INFO) << "OnRenderTask[AUDIO]: consumed=" << consumed
-                     << ", next_delay=" << next_render_delay_us
-                     << ", queue_size=" << frame_queue_.size();
     if (consumed) {
       ReleaseFrame(entry, true);
       frame_queue_.pop();
@@ -253,17 +254,16 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
     // For video/subtitle, use original logic with drop frame behavior
     // Calculate delay within mutex lock
     int64_t late_us = sync_enabled_ ? CalculateRenderLateUs(frame) : 0;
-
-    if (sync_enabled_ && late_us > 40000 && frames_rendered_count_ > 0) {
+    if (sync_enabled_ && late_us > kVideoDropThresholdUs &&
+        frames_rendered_count_ > 0) {
       // too late, drop the frame (only after at least one frame was rendered)
-      AVE_LOG(LS_INFO) << "Dropping frame, late: " << late_us << "us";
       ReleaseFrame(entry, false);
       frame_queue_.pop();
     } else if (late_us > -5000 || frames_rendered_count_ == 0) {
       // Render if: not too early, OR this is the very first frame ever
       // (first frame may arrive "late" due to codec startup latency while
       // the audio clock has already advanced; always display first frame)
-      if (frames_rendered_count_ == 0 && late_us > 40000) {
+      if (frames_rendered_count_ == 0 && late_us > kVideoDropThresholdUs) {
         AVE_LOG(LS_WARNING)
             << "First frame is " << late_us
             << "us late (codec startup latency), rendering anyway";
