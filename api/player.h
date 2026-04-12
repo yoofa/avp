@@ -24,6 +24,12 @@
 #include "api/player_interface.h"
 
 namespace ave {
+namespace net {
+class HTTPProvider;
+}  // namespace net
+}  // namespace ave
+
+namespace ave {
 namespace player {
 
 /**
@@ -137,6 +143,12 @@ class Player {
       return *this;
     }
 
+    Builder& setHttpProvider(
+        std::shared_ptr<ave::net::HTTPProvider> http_provider) {
+      http_provider_ = std::move(http_provider);
+      return *this;
+    }
+
     /**
      * @brief Builds and returns a shared pointer to a Player object.
      * @return A shared pointer to a Player object.
@@ -148,6 +160,7 @@ class Player {
     std::shared_ptr<DemuxerFactory> demuxer_factory_;
     std::shared_ptr<ave::media::CodecFactory> codec_factory_;
     std::shared_ptr<ave::media::AudioDevice> audio_device_;
+    std::shared_ptr<ave::net::HTTPProvider> http_provider_;
     bool sync_enabled_ = true;
     AudioPassthroughPolicy passthrough_policy_ =
         AudioPassthroughPolicy::ALWAYS_PCM;

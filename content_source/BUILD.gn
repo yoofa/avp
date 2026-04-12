@@ -13,3 +13,23 @@ ave_library("generic_content_source") {
     "//media/foundation:media_source",
   ]
 }
+
+ave_library("http_live_content_source") {
+  sources = [
+    "http_live/http_live_source.cc",
+    "http_live/http_live_source.h",
+    "http_live/playlist_parser.cc",
+    "http_live/playlist_parser.h",
+  ]
+  deps = [
+    "../core:packet_source",
+    "//api:api_content_source",
+    "//base:logging",
+    "//base:timeutils",
+    "//base/data_source:data_source_base",
+    "//base/net:http_api",
+    "//media/foundation:media_meta",
+    "//media/foundation:media_mimes",
+    "//media/modules/mpeg2ts:mpeg2ts",
+  ]
+}

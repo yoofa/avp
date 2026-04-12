@@ -11,6 +11,12 @@
 #include "api/content_source/content_source_factory.h"
 
 namespace ave {
+namespace net {
+class HTTPProvider;
+}  // namespace net
+}  // namespace ave
+
+namespace ave {
 namespace player {
 
 class DemuxerFactory;
@@ -20,8 +26,10 @@ class DemuxerFactory;
 class DefaultContentSourceFactory : public ContentSourceFactory {
  public:
   explicit DefaultContentSourceFactory(
-      std::shared_ptr<DemuxerFactory> demuxer_factory)
-      : demuxer_factory_(std::move(demuxer_factory)) {}
+      std::shared_ptr<DemuxerFactory> demuxer_factory,
+      std::shared_ptr<net::HTTPProvider> http_provider = nullptr)
+      : demuxer_factory_(std::move(demuxer_factory)),
+        http_provider_(std::move(http_provider)) {}
   ~DefaultContentSourceFactory() override = default;
 
   std::shared_ptr<ContentSource> CreateContentSource(
@@ -37,6 +45,7 @@ class DefaultContentSourceFactory : public ContentSourceFactory {
 
  private:
   std::shared_ptr<DemuxerFactory> demuxer_factory_;
+  std::shared_ptr<net::HTTPProvider> http_provider_;
 };
 
 }  // namespace player

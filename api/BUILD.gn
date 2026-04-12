@@ -23,7 +23,10 @@ ave_library("default_content_source_factory") {
   deps = [
     ":api_content_source",
     ":api_demuxer",
+    "//base/data_source:http_source",
+    "//base/net:http_api",
     "//content_source:generic_content_source",
+    "//content_source:http_live_content_source",
   ]
 }
 

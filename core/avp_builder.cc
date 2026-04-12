@@ -37,8 +37,8 @@ std::shared_ptr<Player> Player::Builder::build() {
   }
 
   if (content_source_factory_ == nullptr) {
-    content_source_factory_ =
-        std::make_shared<DefaultContentSourceFactory>(demuxer_factory_);
+    content_source_factory_ = std::make_shared<DefaultContentSourceFactory>(
+        demuxer_factory_, http_provider_);
   }
 
   // Create AvPlayer instance and cast it to Player

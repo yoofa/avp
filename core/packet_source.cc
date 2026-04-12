@@ -25,7 +25,12 @@ status_t PacketSource::Stop() {
   return ave::OK;
 }
 
-void PacketSource::Clear() {}
+void PacketSource::Clear() {
+  std::lock_guard<std::mutex> l(lock_);
+  std::queue<std::shared_ptr<MediaFrame>> empty;
+  packets_.swap(empty);
+  condition_.notify_all();
+}
 
 void PacketSource::SetFormat(std::shared_ptr<MediaMeta> format) {
   std::lock_guard<std::mutex> l(lock_);
