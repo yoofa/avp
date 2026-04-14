@@ -54,6 +54,21 @@
             android:checked="true"
             android:textSize="12sp" />
 
+        <TextView
+            android:id="@+id/btnOpenUrl"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:gravity="center"
+            android:text="URL"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?android:attr/selectableItemBackground" />
+
     </LinearLayout>
 
     <!-- File list -->

@@ -14,8 +14,10 @@
 #include "base/checks.h"
 #include "base/logging.h"
 #include "media/codec/codec_id.h"
+#include "media/foundation/aac_utils.h"
 #include "media/foundation/media_errors.h"
 #include "media/foundation/media_meta.h"
+#include "media/foundation/media_mimes.h"
 
 #include "message_def.h"
 
@@ -215,8 +217,26 @@ void AVPDecoder::FillCodecBuffer(std::shared_ptr<CodecBuffer>& buffer) {
   auto packet = input_packet_queue_.front();
   input_packet_queue_.pop_front();
 
-  buffer->SetRange(0, packet->size());
-  memcpy(buffer->data(), packet->data(), packet->size());
+  const uint8_t* packet_data = packet->data();
+  size_t packet_size = packet->size();
+
+  if (is_audio_ && packet &&
+      packet->mime() == media::MEDIA_MIMETYPE_AUDIO_AAC && packet_size >= 7) {
+    media::ADTSHeader adts_header{};
+    if (media::ParseADTSHeader(packet_data, packet_size, &adts_header) == OK) {
+      const size_t adts_header_size = adts_header.protection_absent ? 7 : 9;
+      if (packet_size > adts_header_size) {
+        packet_data += adts_header_size;
+        packet_size -= adts_header_size;
+        AVE_LOG(LS_INFO)
+            << "FillCodecBuffer: stripped ADTS header, payload_size="
+            << packet_size;
+      }
+    }
+  }
+
+  buffer->SetRange(0, packet_size);
+  memcpy(buffer->data(), packet_data, packet_size);
 
   // Pass the PTS from input packet so the codec can stamp output frames
   auto meta = media::MediaMeta::CreatePtr(

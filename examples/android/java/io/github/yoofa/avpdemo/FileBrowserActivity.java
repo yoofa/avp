@@ -25,7 +25,6 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -45,6 +44,7 @@ public class FileBrowserActivity extends Activity {
 
     // Views
     private TextView btnBack;
+    private TextView btnOpenUrl;
     private HorizontalScrollView breadcrumbScroll;
     private LinearLayout breadcrumbContainer;
     private CheckBox cbMediaOnly;
@@ -81,6 +81,7 @@ public class FileBrowserActivity extends Activity {
         setContentView(R.layout.activity_file_browser);
 
         btnBack = findViewById(R.id.btnBack);
+        btnOpenUrl = findViewById(R.id.btnOpenUrl);
         breadcrumbScroll = findViewById(R.id.breadcrumbScroll);
         breadcrumbContainer = findViewById(R.id.breadcrumbContainer);
         cbMediaOnly = findViewById(R.id.cbMediaOnly);
@@ -89,6 +90,7 @@ public class FileBrowserActivity extends Activity {
         tvStatus = findViewById(R.id.tvStatus);
 
         btnBack.setOnClickListener(v -> onBackPressed());
+        btnOpenUrl.setOnClickListener(v -> startActivity(new Intent(this, MainActivity.class)));
 
         cbMediaOnly.setChecked(showMediaOnly);
         cbMediaOnly.setOnCheckedChangeListener((btn, checked) -> {

@@ -31,6 +31,7 @@ class AvpPlayerJni : public player::Player::Listener,
   AvpPlayerJni(JNIEnv* env,
                jobject j_player,
                jobject j_audio_device,
+               jobject j_http_provider,
                jboolean sync_enabled,
                jint audio_passthrough_policy,
                jboolean audio_only);

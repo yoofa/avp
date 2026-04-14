@@ -21,6 +21,7 @@
 #include "media/audio/android/java_audio_device.h"
 #include "media/foundation/media_frame.h"
 #include "media/foundation/media_meta.h"
+#include "sdk/android/src/jni/java_http_provider_jni.h"
 #include "third_party/jni_zero/jni_zero.h"
 
 namespace ave {
@@ -49,6 +50,7 @@ int MediaTypeToTrackType(media::MediaType type) {
 AvpPlayerJni::AvpPlayerJni(JNIEnv* env,
                            jobject j_player,
                            jobject j_audio_device,
+                           jobject j_http_provider,
                            jboolean sync_enabled,
                            jint audio_passthrough_policy,
                            jboolean audio_only)
@@ -65,6 +67,11 @@ AvpPlayerJni::AvpPlayerJni(JNIEnv* env,
     java_audio_device_->Init();
     builder.setAudioDevice(java_audio_device_);
     AVE_LOG(LS_INFO) << "AvpPlayerJni: using JavaAudioDevice";
+  }
+  if (j_http_provider) {
+    builder.setHttpProvider(
+        std::make_shared<JavaHttpProvider>(env, j_http_provider));
+    AVE_LOG(LS_INFO) << "AvpPlayerJni: using JavaHttpProvider";
   }
   builder.setSyncEnabled(sync_enabled)
       .setAudioPassthroughPolicy(
@@ -393,12 +400,13 @@ static jlong JNI_AvpPlayer_Init(
     JNIEnv* env,
     const jni_zero::JavaParamRef<jobject>& j_caller,
     const jni_zero::JavaParamRef<jobject>& j_audio_device,
+    const jni_zero::JavaParamRef<jobject>& j_http_provider,
     jboolean sync_enabled,
     jint audio_passthrough_policy,
     jboolean audio_only) {
-  auto* player =
-      new AvpPlayerJni(env, j_caller.obj(), j_audio_device.obj(), sync_enabled,
-                       audio_passthrough_policy, audio_only);
+  auto* player = new AvpPlayerJni(env, j_caller.obj(), j_audio_device.obj(),
+                                  j_http_provider.obj(), sync_enabled,
+                                  audio_passthrough_policy, audio_only);
   return reinterpret_cast<jlong>(player);
 }
 

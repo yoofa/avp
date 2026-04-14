@@ -8,6 +8,17 @@ if (is_android) {
     deps = [ ":AvpDemo" ]
   }
 
+  java_prebuilt("okhttp_java") {
+    jar_path = "third_party/okhttp/okhttp-4.12.0.jar"
+    output_name = "com_squareup_okhttp3_okhttp"
+    supports_android = true
+    enable_bytecode_checks = false
+    deps = [
+      "//third_party/android_deps:com_squareup_okio_okio_jvm_java",
+      "//third_party/kotlin_stdlib:kotlin_stdlib_java",
+    ]
+  }
+
   ave_android_apk("AvpDemo") {
     apk_name = "AvpDemo"
     android_manifest = "AndroidManifest.xml"
@@ -31,6 +42,7 @@ if (is_android) {
       "java/io/github/yoofa/avpdemo/FileItem.java",
       "java/io/github/yoofa/avpdemo/MainActivity.java",
       "java/io/github/yoofa/avpdemo/MimeTypeUtils.java",
+      "java/io/github/yoofa/avpdemo/OkHttpHttpProvider.java",
       "java/io/github/yoofa/avpdemo/PlayerActivity.java",
       "java/io/github/yoofa/avpdemo/StorageUtils.java",
     ]
@@ -39,6 +51,7 @@ if (is_android) {
 
     deps = [
       ":avpdemo_resources",
+      ":okhttp_java",
       "//sdk/android:avp_java",
     ]
   }

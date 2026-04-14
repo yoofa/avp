@@ -516,6 +516,8 @@ status_t HttpLiveSource::FeedMoreESData() {
 
   status_t err = LoadNextSegmentLocked();
   if (err == media::ERROR_END_OF_STREAM) {
+    AVE_LOG(LS_INFO) << "HttpLiveSource reached EOS at sequence="
+                     << next_segment_sequence_;
     end_of_stream_ = true;
   }
   return err;
@@ -569,6 +571,8 @@ status_t HttpLiveSource::RefreshPlaylistLocked(bool initial) {
     if (!variant) {
       return BAD_VALUE;
     }
+    AVE_LOG(LS_INFO) << "HttpLiveSource selected variant: uri=" << variant->uri
+                     << " bandwidth=" << variant->bandwidth_bps;
     media_playlist_url_ = variant->uri;
     std::string media_text;
     err = FetchTextLocked(media_playlist_url_, media_text);
@@ -648,6 +652,10 @@ status_t HttpLiveSource::LoadNextSegmentLocked() {
   }
 
   const auto& segment = playlist_.segments[index];
+  AVE_LOG(LS_INFO) << "HttpLiveSource loading segment: sequence="
+                   << segment.sequence << " uri=" << segment.uri
+                   << " start_us=" << next_segment_start_time_us_
+                   << " duration_us=" << segment.duration_us;
   status_t err = LoadSegmentLocked(segment, next_segment_start_time_us_);
   if (err != OK) {
     return err;
@@ -762,6 +770,7 @@ status_t HttpLiveSource::QueueTsPacketsLocked(
     return UNKNOWN_ERROR;
   }
 
+  size_t packet_count = 0;
   for (;;) {
     std::shared_ptr<media::MediaFrame> packet;
     status_t err = source->DequeueAccessUnit(packet);
@@ -769,6 +778,10 @@ status_t HttpLiveSource::QueueTsPacketsLocked(
       continue;
     }
     if (err == media::ERROR_END_OF_STREAM) {
+      AVE_LOG(LS_INFO) << "HttpLiveSource queued " << packet_count
+                       << " packets for "
+                       << (media_type == MediaType::AUDIO ? "audio" : "video")
+                       << " at segment_start_us=" << segment_start_time_us;
       return OK;
     }
     if (err != OK) {
@@ -781,6 +794,7 @@ status_t HttpLiveSource::QueueTsPacketsLocked(
 
     OffsetFrameTimestamp(packet, segment_start_time_us);
     track->packet_source->QueueAccessunit(packet);
+    ++packet_count;
   }
 }
 

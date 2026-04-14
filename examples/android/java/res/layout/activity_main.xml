@@ -22,6 +22,7 @@
         android:layout_height="wrap_content"
         android:inputType="text"
         android:singleLine="true"
+        android:text="https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
         android:background="@android:drawable/edit_text"
         android:padding="8dp"
         android:layout_marginBottom="16dp" />

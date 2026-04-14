@@ -17,6 +17,8 @@ if (is_android) {
     visibility = [ "*" ]
     sources = [
       "api/io/github/yoofa/avp/AvpPlayer.java",
+      "api/io/github/yoofa/avp/HttpConnection.java",
+      "api/io/github/yoofa/avp/HttpProvider.java",
       "api/io/github/yoofa/avp/SeekMode.java",
       "api/io/github/yoofa/avp/TrackInfo.java",
     ]
@@ -43,6 +45,8 @@ if (is_android) {
     sources = [
       "src/jni/avp_player_jni.cc",
       "src/jni/avp_player_jni.h",
+      "src/jni/java_http_provider_jni.cc",
+      "src/jni/java_http_provider_jni.h",
       "src/jni/jni_onload.cc",
     ]
     deps = [
@@ -50,6 +54,7 @@ if (is_android) {
       "//api:player_interface",
       "//base:logging",
       "//base/android:ave_jni",
+      "//base/net:http_api",
       "//media/android:ave_media_jni",
       "//media/audio:java_audio_device",
       "//media/codec/android:android_ndk_media_codec",
