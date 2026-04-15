@@ -609,12 +609,8 @@ void AVPAudioRender::UpdateSyncAnchor(
   const bool is_compressed = (current_audio_config_.format & 0xFF000000u) != 0;
   int64_t frame_end_pts_us = frame_pts_us + frame_duration_us;
   uint32_t played_frames = 0;
-  uint32_t frames_written = 0;
   const bool have_position = is_compressed && audio_track_ &&
                              audio_track_->GetPosition(&played_frames) == OK;
-  const bool have_written =
-      is_compressed && audio_track_ &&
-      audio_track_->GetFramesWritten(&frames_written) == OK;
 
   if (is_compressed && !passthrough_media_start_pts_valid_) {
     passthrough_media_start_pts_us_ = frame_pts_us;
@@ -626,9 +622,6 @@ void AVPAudioRender::UpdateSyncAnchor(
       if (last_position_log_time_us_ == 0 ||
           current_sys_time_us - last_position_log_time_us_ >= 500000) {
         AVE_LOG(LS_INFO) << "Offload position: waiting for playout start"
-                         << " frames_written="
-                         << (have_written ? static_cast<int64_t>(frames_written)
-                                          : -1)
                          << " start_pts_ms="
                          << (passthrough_media_start_pts_valid_
                                  ? passthrough_media_start_pts_us_ / 1000
@@ -657,17 +650,12 @@ void AVPAudioRender::UpdateSyncAnchor(
     if (last_position_log_time_us_ == 0 ||
         current_sys_time_us - last_position_log_time_us_ >= 500000) {
       if (played_frames < last_played_frames_) {
-        AVE_LOG(LS_WARNING)
-            << "Offload position: played_frames="
-            << static_cast<int64_t>(played_frames) << " frames_written="
-            << (have_written ? static_cast<int64_t>(frames_written) : -1)
-            << " media_pts_ms=" << heard_pts_us / 1000;
+        AVE_LOG(LS_WARNING) << "Offload position: played_frames="
+                            << static_cast<int64_t>(played_frames)
+                            << " media_pts_ms=" << heard_pts_us / 1000;
       } else {
         AVE_LOG(LS_INFO) << "Offload position: played_frames="
                          << static_cast<int64_t>(played_frames)
-                         << " frames_written="
-                         << (have_written ? static_cast<int64_t>(frames_written)
-                                          : -1)
                          << " media_pts_ms=" << heard_pts_us / 1000;
       }
       last_position_log_time_us_ = current_sys_time_us;
@@ -675,14 +663,6 @@ void AVPAudioRender::UpdateSyncAnchor(
     last_played_frames_ = played_frames;
 
     return;
-  }
-
-  if (have_position && have_written && frames_written > played_frames &&
-      current_audio_config_.sample_rate > 0) {
-    const int64_t queued_frames =
-        static_cast<int64_t>(frames_written) - played_frames;
-    buffer_latency_us =
-        queued_frames * 1000000LL / current_audio_config_.sample_rate;
   }
 
   // Anchor the master clock to what is *currently being heard*, not what was
@@ -704,21 +684,16 @@ void AVPAudioRender::UpdateSyncAnchor(
   if (is_compressed && audio_track_ &&
       (last_position_log_time_us_ == 0 ||
        current_sys_time_us - last_position_log_time_us_ >= 500000)) {
-    if (have_position || have_written) {
+    if (have_position || buffer_latency_us > 0) {
       if (have_position && played_frames < last_played_frames_) {
         AVE_LOG(LS_WARNING)
             << "Offload position: played_frames="
             << (have_position ? static_cast<int64_t>(played_frames) : -1)
-            << " frames_written="
-            << (have_written ? static_cast<int64_t>(frames_written) : -1)
             << " buffer_latency_ms=" << buffer_latency_us / 1000;
       } else {
         AVE_LOG(LS_INFO) << "Offload position: played_frames="
                          << (have_position ? static_cast<int64_t>(played_frames)
                                            : -1)
-                         << " frames_written="
-                         << (have_written ? static_cast<int64_t>(frames_written)
-                                          : -1)
                          << " buffer_latency_ms=" << buffer_latency_us / 1000;
       }
       if (have_position) {

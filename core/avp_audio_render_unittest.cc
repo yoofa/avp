@@ -351,6 +351,26 @@ TEST_F(AVPAudioRenderTest, RenderAudioFrame) {
   EXPECT_GT(mock_avsync_controller_->GetUpdateCount(), 0);
 }
 
+TEST_F(AVPAudioRenderTest, PcmAnchorUsesReportedBufferDuration) {
+  media::audio_config_t config = media::DefaultAudioConfig;
+  config.sample_rate = 44100;
+  config.channel_layout = media::CHANNEL_LAYOUT_STEREO;
+  config.format = media::AUDIO_FORMAT_PCM_16_BIT;
+  ASSERT_EQ(audio_render_->OpenAudioSink(config), OK);
+  audio_render_->Start();
+
+  auto track = mock_audio_device_->last_track();
+  ASSERT_NE(track, nullptr);
+  track->SetBufferDurationInUs(100000);
+  track->SetPosition(0);
+
+  audio_render_->RenderFrame(CreateTestAudioFrame(1'000'000));
+  mock_task_runner_factory_->runner()->AdvanceTimeUs(1000);
+  mock_task_runner_factory_->runner()->RunDueTasks();
+
+  EXPECT_EQ(mock_avsync_controller_->GetAnchorMediaPts(), 923'220);
+}
+
 TEST_F(AVPAudioRenderTest, NonMasterStream) {
   // Create a non-master stream renderer
   auto non_master_render = std::make_unique<AVPAudioRender>(
