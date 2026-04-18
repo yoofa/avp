@@ -29,8 +29,10 @@ namespace {
 // Maximum size of cached data before we stop fetching
 const size_t kMaxCachedBytes = 200000;
 
-// Optimal buffer size for power consumption
-const size_t kAggregateBufferSizeBytes = 24 * 1024;
+// Aggregate small AAC access units into modest chunks so offload startup does
+// not rely on hundreds of tiny writes.
+const size_t kAggregateBufferSizeBytes = 4 * 1024;
+const int64_t kAggregateBufferDurationUs = 200000;
 
 // Maximum number of frames to keep in the render queue for passthrough audio.
 // This provides back-pressure so the decoder doesn't flood the queue faster
@@ -231,63 +233,92 @@ bool AVPPassthroughDecoder::DoRequestInputBuffers() {
     OnInputBufferFilled(packet);
   }
 
-  return (err == WOULD_BLOCK) && (source_->FeedMoreESData() == OK);
+  // GenericSource (local files) does not implement FeedMoreESData — it
+  // refills its internal queue asynchronously via PostReadBuffer.  Always
+  // retry when WOULD_BLOCK so the decoder polls until data arrives.
+  if (err == WOULD_BLOCK) {
+    source_->FeedMoreESData();  // hint for live/HLS sources; may be a no-op
+    return true;
+  }
+  return false;
 }
 
 std::shared_ptr<MediaFrame> AVPPassthroughDecoder::AggregateBuffer(
     const std::shared_ptr<MediaFrame>& packet) {
-  std::shared_ptr<MediaFrame> aggregate;
-
   if (packet == nullptr) {
-    aggregate = aggregate_buffer_;
+    auto aggregate = aggregate_buffer_;
     aggregate_buffer_ = nullptr;
     return aggregate;
   }
 
-  auto small_size = packet->size();
+  const size_t packet_size = packet->size();
+  auto* packet_audio_info = packet->audio_info();
+  if (packet_size == 0 || packet_audio_info == nullptr) {
+    return packet;
+  }
+
+  if (packet_size >= kAggregateBufferSizeBytes) {
+    if (!aggregate_buffer_ || aggregate_buffer_->size() == 0) {
+      return packet;
+    }
+    pending_audio_err_ = OK;
+    pending_audio_access_unit_ = packet;
+    auto aggregate = aggregate_buffer_;
+    aggregate_buffer_ = nullptr;
+    return aggregate;
+  }
+
   if (aggregate_buffer_ == nullptr) {
-    if (small_size < (kAggregateBufferSizeBytes / 3)) {
-      return nullptr;
-    }
-    aggregate_buffer_ = MediaFrame::CreateShared(kAggregateBufferSizeBytes);
+    aggregate_buffer_ =
+        MediaFrame::CreateShared(kAggregateBufferSizeBytes, MediaType::AUDIO);
+    aggregate_buffer_->setRange(0, 0);
+    auto* aggregate_audio_info = aggregate_buffer_->audio_info();
+    AVE_CHECK(aggregate_audio_info != nullptr);
+    *aggregate_audio_info = *packet_audio_info;
+    aggregate_audio_info->duration = base::TimeDelta::Zero();
+    aggregate_audio_info->samples_per_channel = 0;
   }
 
-  if (aggregate_buffer_ != nullptr) {
-    auto small_timestamp = packet->meta()->pts();
-    auto big_timestamp = aggregate_buffer_->meta()->pts();
+  size_t aggregate_size = aggregate_buffer_->size();
+  if (aggregate_size + packet_size > aggregate_buffer_->capacity()) {
+    pending_audio_err_ = OK;
+    pending_audio_access_unit_ = packet;
+    auto aggregate = aggregate_buffer_;
+    aggregate_buffer_ = nullptr;
+    return aggregate;
+  }
 
-    auto big_size = aggregate_buffer_->size();
-    auto room_left = aggregate_buffer_->size() - big_size;
+  memcpy(aggregate_buffer_->base() + aggregate_size, packet->data(),
+         packet_size);
+  aggregate_size += packet_size;
+  aggregate_buffer_->setRange(0, aggregate_size);
 
-    // Should we save this small buffer for the next big buffer?
-    // If the first small buffer did not have a timestamp then save
-    // any buffer that does have a timestamp until the next big buffer.
-    if ((small_size > room_left) ||
-        (big_timestamp.IsInfinite() && (big_size > 0) &&
-         small_timestamp.IsFinite())) {
-      pending_audio_err_ = OK;
-      pending_audio_access_unit_ = packet;
-      aggregate = aggregate_buffer_;
-      aggregate_buffer_ = nullptr;
+  auto* aggregate_audio_info = aggregate_buffer_->audio_info();
+  AVE_CHECK(aggregate_audio_info != nullptr);
+  if (packet_audio_info->duration.IsFinite()) {
+    if (!aggregate_audio_info->duration.IsFinite()) {
+      aggregate_audio_info->duration = packet_audio_info->duration;
     } else {
-      // Grab time from first small buffer if available.
-      if ((big_size == 0) && small_timestamp.IsFinite()) {
-        aggregate_buffer_->meta()->SetPts(small_timestamp);
-      }
-      // Append small buffer to the bigger buffer.
-      memcpy(const_cast<uint8_t*>(aggregate_buffer_->data() + big_size),
-             packet->data(), small_size);
-      big_size += small_size;
-      aggregate_buffer_->setRange(aggregate_buffer_->offset(), big_size);
-
-      AVE_LOG(LS_VERBOSE) << "feedDecoderInputData() smallSize = " << small_size
-                          << ", bigSize = " << big_size
-                          << ", capacity = " << aggregate_buffer_->size();
+      aggregate_audio_info->duration += packet_audio_info->duration;
     }
-
-  } else {
-    aggregate = packet;
   }
+  if (packet_audio_info->samples_per_channel > 0) {
+    if (aggregate_audio_info->samples_per_channel < 0) {
+      aggregate_audio_info->samples_per_channel = 0;
+    }
+    aggregate_audio_info->samples_per_channel +=
+        packet_audio_info->samples_per_channel;
+  }
+
+  if (aggregate_size < kAggregateBufferSizeBytes &&
+      (!aggregate_audio_info->duration.IsFinite() ||
+       aggregate_audio_info->duration.us() < kAggregateBufferDurationUs) &&
+      !packet_audio_info->eos) {
+    return nullptr;
+  }
+
+  auto aggregate = aggregate_buffer_;
+  aggregate_buffer_ = nullptr;
   return aggregate;
 }
 
@@ -359,6 +390,12 @@ void AVPPassthroughDecoder::OnInputBufferFilled(
     const std::shared_ptr<MediaFrame>& packet) {
   auto prepared_packet =
       PreparePacketForOffload(packet, audio_config_, codec_private_data_);
+  if (audio_config_.format == media::AUDIO_FORMAT_AAC_LC) {
+    prepared_packet = AggregateBuffer(prepared_packet);
+    if (!prepared_packet) {
+      return;
+    }
+  }
 
   total_bytes_ += prepared_packet->size();
   AVE_LOG(LS_VERBOSE) << "OnInputBufferFilled: totalBytes=" << total_bytes_;

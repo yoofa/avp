@@ -17,6 +17,10 @@
 namespace ave {
 namespace player {
 
+namespace {
+constexpr int64_t kCompressedStartPrerollUs = 250000;
+}
+
 AVPAudioRender::AVPAudioRender(base::TaskRunnerFactory* task_runner_factory,
                                IAVSyncController* avsync_controller,
                                std::shared_ptr<media::AudioDevice> audio_device,
@@ -56,17 +60,19 @@ status_t AVPAudioRender::OpenAudioSink(const media::audio_config_t& config) {
   status_t result = CreateAudioTrack();
   if (result == OK) {
     audio_sink_ready_ = true;
+    audio_track_started_ = false;
     if (IsRunningLocked() && !IsPausedLocked() && audio_track_) {
-      status_t start_result = audio_track_->Start();
-      if (start_result == OK) {
-        AVE_LOG(LS_INFO) << "Audio sink opened while renderer already running, "
-                            "started track";
+      if (IsCompressedOutputLocked()) {
+        AVE_LOG(LS_INFO)
+            << "Audio sink opened while renderer already running, deferring "
+               "compressed track start until preroll";
       } else {
-        AVE_LOG(LS_ERROR)
-            << "Audio sink opened but failed to start track, error: "
-            << start_result;
-        audio_sink_ready_ = false;
-        return start_result;
+        status_t start_result =
+            StartAudioTrackLocked("audio sink opened while renderer running");
+        if (start_result != OK) {
+          audio_sink_ready_ = false;
+          return start_result;
+        }
       }
     }
     AVE_LOG(LS_INFO) << "Audio sink opened successfully";
@@ -117,22 +123,26 @@ void AVPAudioRender::Start() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    // Reset passthrough pacing state on every fresh start so the new session
+    // Reset audio pacing state on every fresh start so the new session
     // measures ahead-ness relative to its own start time.
-    passthrough_start_time_us_ = 0;
-    passthrough_start_pts_us_ = 0;
+    audio_pacing_start_time_us_ = 0;
+    audio_pacing_start_pts_us_ = 0;
     passthrough_media_start_pts_us_ = 0;
+    passthrough_last_written_end_pts_us_ = 0;
     passthrough_media_start_pts_valid_ = false;
     passthrough_position_started_ = false;
+    ++passthrough_position_poll_generation_;
+    passthrough_position_poll_pending_ = false;
+    audio_track_started_ = false;
     last_position_log_time_us_ = 0;
     last_played_frames_ = 0;
 
     if (audio_sink_ready_ && audio_track_) {
-      status_t result = audio_track_->Start();
-      if (result == OK) {
-        AVE_LOG(LS_INFO) << "Audio track started";
+      if (IsCompressedOutputLocked()) {
+        AVE_LOG(LS_INFO)
+            << "Deferring compressed track start until preroll is queued";
       } else {
-        AVE_LOG(LS_ERROR) << "Failed to start audio track, error: " << result;
+        StartAudioTrackLocked("renderer start");
       }
     }
   }
@@ -145,8 +155,13 @@ void AVPAudioRender::Stop() {
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (audio_track_) {
-      audio_track_->Stop();
-      AVE_LOG(LS_INFO) << "Audio track stopped";
+      ++passthrough_position_poll_generation_;
+      passthrough_position_poll_pending_ = false;
+      if (audio_track_started_) {
+        audio_track_->Stop();
+        AVE_LOG(LS_INFO) << "Audio track stopped";
+      }
+      audio_track_started_ = false;
     }
   }
   AVPRender::Stop();
@@ -157,6 +172,8 @@ void AVPAudioRender::Pause() {
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (audio_track_) {
+      ++passthrough_position_poll_generation_;
+      passthrough_position_poll_pending_ = false;
       audio_track_->Pause();
       AVE_LOG(LS_INFO) << "Audio track paused";
     }
@@ -169,9 +186,22 @@ void AVPAudioRender::Resume() {
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (audio_track_) {
-      // Note: AudioTrack might not have Resume method, we may need to restart
-      // This depends on the specific AudioTrack implementation
-      AVE_LOG(LS_INFO) << "Audio track resumed";
+      if (audio_track_started_) {
+        status_t result = audio_track_->Start();
+        if (result == OK) {
+          AVE_LOG(LS_INFO) << "Audio track resumed";
+          if (IsCompressedOutputLocked()) {
+            MaybeScheduleCompressedPositionPollLocked();
+          }
+        } else {
+          AVE_LOG(LS_ERROR)
+              << "Failed to resume audio track, error: " << result;
+        }
+      } else if (IsCompressedOutputLocked()) {
+        AVE_LOG(LS_INFO)
+            << "Resume requested before compressed track start; waiting for "
+               "preroll";
+      }
     }
   }
   AVPRender::Resume();
@@ -181,13 +211,17 @@ void AVPAudioRender::Flush() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    // Reset passthrough pacing so the next burst of frames after a seek/flush
-    // is measured from the new position, not the old one.
-    passthrough_start_time_us_ = 0;
-    passthrough_start_pts_us_ = 0;
+    // Reset audio pacing so the next burst of frames after a seek/flush is
+    // measured from the new position, not the old one.
+    audio_pacing_start_time_us_ = 0;
+    audio_pacing_start_pts_us_ = 0;
     passthrough_media_start_pts_us_ = 0;
+    passthrough_last_written_end_pts_us_ = 0;
     passthrough_media_start_pts_valid_ = false;
     passthrough_position_started_ = false;
+    ++passthrough_position_poll_generation_;
+    passthrough_position_poll_pending_ = false;
+    audio_track_started_ = false;
     last_position_log_time_us_ = 0;
     last_played_frames_ = 0;
 
@@ -231,13 +265,16 @@ uint64_t AVPAudioRender::RenderFrameInternal(
       AVE_LOG(LS_ERROR) << "Failed to create audio track from first frame";
       return 0;
     }
-    // Renderer is already running (we are inside RenderFrameInternal),
-    // so start the track immediately.
-    AVE_LOG(LS_INFO)
-        << "RenderFrameInternal[AUDIO]: starting track after lazy init";
-    audio_track_->Start();
     format_initialized_ = true;
     audio_sink_ready_ = true;
+    audio_track_started_ = false;
+    if (IsCompressedOutputLocked()) {
+      AVE_LOG(LS_INFO)
+          << "RenderFrameInternal[AUDIO]: deferring compressed track start "
+             "after lazy init";
+    } else {
+      StartAudioTrackLocked("lazy init");
+    }
   }
 
   if (!audio_sink_ready_ || !audio_track_) {
@@ -260,8 +297,14 @@ uint64_t AVPAudioRender::RenderFrameInternal(
       AVE_LOG(LS_ERROR) << "Failed to recreate audio track after format change";
       return 0;
     }
-    // Start the newly created track — we are already inside the render loop.
-    audio_track_->Start();
+    audio_track_started_ = false;
+    if (IsCompressedOutputLocked()) {
+      AVE_LOG(LS_INFO)
+          << "RenderFrameInternal[AUDIO]: deferring compressed track start "
+             "after format change";
+    } else {
+      StartAudioTrackLocked("format change");
+    }
   }
 
   // Track whether we consumed the incoming frame in this call. Used to
@@ -316,6 +359,27 @@ uint64_t AVPAudioRender::RenderFrameInternal(
     const bool full_frame_written =
         static_cast<size_t>(bytes_written) >= requested_size;
 
+    if (is_compressed && full_frame_written && written_audio_info &&
+        written_audio_info->pts.IsFinite()) {
+      const int64_t written_duration_us =
+          written_audio_info->duration.IsFinite()
+              ? written_audio_info->duration.us()
+              : 0;
+      const int64_t written_end_pts_us =
+          written_audio_info->pts.us() + written_duration_us;
+      if (written_end_pts_us > passthrough_last_written_end_pts_us_) {
+        passthrough_last_written_end_pts_us_ = written_end_pts_us;
+      }
+    }
+
+    if (is_compressed) {
+      MaybeStartCompressedTrackLocked(frame_to_write, bytes_written,
+                                      requested_size);
+      if (audio_track_started_) {
+        MaybeScheduleCompressedPositionPollLocked();
+      }
+    }
+
     if (full_frame_written) {
       if (master_stream_) {
         UpdateSyncAnchor(frame_to_write);
@@ -358,11 +422,10 @@ uint64_t AVPAudioRender::RenderFrameInternal(
     last_audio_pts_us_ = written_audio_info->pts.us();
   }
 
-  // Audio pacing: some devices accept both compressed and PCM writes much
-  // faster than real playout. If we keep feeding at CPU speed, the master
-  // clock runs far ahead of the actual presentation timeline and video starts
-  // dropping aggressively to catch up.
-  if (!cached_frame_ && written_audio_info &&
+  // PCM pacing: some sinks accept PCM writes much faster than real playout.
+  // Compressed/offload audio uses played-frame position for the audio clock,
+  // so pre-roll should drain into the HAL as fast as the sink accepts it.
+  if (!is_compressed && !cached_frame_ && written_audio_info &&
       written_audio_info->pts.IsFinite()) {
     int64_t frame_pts_us = written_audio_info->pts.us();
     int64_t frame_duration_us = written_audio_info->duration.IsFinite()
@@ -371,14 +434,14 @@ uint64_t AVPAudioRender::RenderFrameInternal(
     int64_t frame_end_pts_us = frame_pts_us + frame_duration_us;
     int64_t now_us = base::TimeMicros();
 
-    if (passthrough_start_time_us_ == 0) {
-      passthrough_start_time_us_ = now_us;
-      passthrough_start_pts_us_ = frame_end_pts_us;
+    if (audio_pacing_start_time_us_ == 0) {
+      audio_pacing_start_time_us_ = now_us;
+      audio_pacing_start_pts_us_ = frame_end_pts_us;
     }
 
     // How far ahead of "expected real-time" are we?
     int64_t expected_pts_us =
-        passthrough_start_pts_us_ + (now_us - passthrough_start_time_us_);
+        audio_pacing_start_pts_us_ + (now_us - audio_pacing_start_time_us_);
     int64_t ahead_us = frame_end_pts_us - expected_pts_us;
 
     constexpr int64_t kMaxAheadUs = 80000;  // ~2 audio callbacks at 48 kHz PCM
@@ -391,6 +454,100 @@ uint64_t AVPAudioRender::RenderFrameInternal(
   }
 
   return 0;
+}
+
+bool AVPAudioRender::IsCompressedOutputLocked() const {
+  return (current_audio_config_.format & 0xFF000000u) != 0;
+}
+
+status_t AVPAudioRender::StartAudioTrackLocked(const char* reason) {
+  if (!audio_track_) {
+    AVE_LOG(LS_ERROR) << "StartAudioTrackLocked: no audio track";
+    return INVALID_OPERATION;
+  }
+  if (audio_track_started_) {
+    return OK;
+  }
+  status_t result = audio_track_->Start();
+  if (result == OK) {
+    audio_track_started_ = true;
+    AVE_LOG(LS_INFO) << "Audio track started: " << reason;
+    if (IsCompressedOutputLocked()) {
+      MaybeScheduleCompressedPositionPollLocked();
+    }
+  } else {
+    AVE_LOG(LS_ERROR) << "Failed to start audio track (" << reason
+                      << "), error: " << result;
+  }
+  return result;
+}
+
+void AVPAudioRender::MaybeStartCompressedTrackLocked(
+    const std::shared_ptr<media::MediaFrame>& frame,
+    ssize_t bytes_written,
+    size_t requested_size) {
+  if (!IsCompressedOutputLocked() || audio_track_started_ || !audio_track_ ||
+      bytes_written <= 0 || !frame) {
+    return;
+  }
+
+  auto* audio_info = frame->audio_info();
+  if (!audio_info || !audio_info->pts.IsFinite()) {
+    return;
+  }
+
+  if (!passthrough_media_start_pts_valid_) {
+    passthrough_media_start_pts_us_ = audio_info->pts.us();
+    passthrough_media_start_pts_valid_ = true;
+  }
+
+  const int64_t frame_duration_us =
+      audio_info->duration.IsFinite() ? audio_info->duration.us() : 0;
+  int64_t preroll_us = audio_info->pts.us() + frame_duration_us -
+                       passthrough_media_start_pts_us_;
+  if (preroll_us < 0) {
+    preroll_us = 0;
+  }
+
+  const bool sink_backpressured =
+      static_cast<size_t>(bytes_written) < requested_size;
+  if (!sink_backpressured && preroll_us < kCompressedStartPrerollUs) {
+    return;
+  }
+
+  AVE_LOG(LS_INFO) << "Starting compressed track after preroll_ms="
+                   << preroll_us / 1000
+                   << " backpressured=" << sink_backpressured;
+  StartAudioTrackLocked("compressed preroll");
+}
+
+void AVPAudioRender::MaybeScheduleCompressedPositionPollLocked(
+    uint32_t delay_us) {
+  if (!task_runner_ || !master_stream_ || !audio_track_ ||
+      !audio_track_started_ || !IsCompressedOutputLocked() ||
+      !IsRunningLocked() || IsPausedLocked() ||
+      passthrough_position_poll_pending_) {
+    return;
+  }
+
+  passthrough_position_poll_pending_ = true;
+  const int32_t generation = passthrough_position_poll_generation_;
+  task_runner_->PostDelayedTask(
+      [this, generation]() { OnCompressedPositionPoll(generation); }, delay_us);
+}
+
+void AVPAudioRender::OnCompressedPositionPoll(int32_t generation) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  passthrough_position_poll_pending_ = false;
+
+  if (generation != passthrough_position_poll_generation_ || !master_stream_ ||
+      !audio_track_ || !audio_track_started_ || !IsCompressedOutputLocked() ||
+      !IsRunningLocked() || IsPausedLocked()) {
+    return;
+  }
+
+  UpdateCompressedSyncAnchorLocked(passthrough_last_written_end_pts_us_);
+  MaybeScheduleCompressedPositionPollLocked(10000);
 }
 
 status_t AVPAudioRender::CreateAudioTrack() {
@@ -436,6 +593,8 @@ status_t AVPAudioRender::CreateAudioTrack() {
 
 void AVPAudioRender::DestroyAudioTrack() {
   if (audio_track_) {
+    ++passthrough_position_poll_generation_;
+    passthrough_position_poll_pending_ = false;
     audio_track_->Close();
     audio_track_.reset();
     AVE_LOG(LS_INFO) << "Audio track destroyed";
@@ -565,6 +724,7 @@ ssize_t AVPAudioRender::WriteAudioData(
 
   const uint8_t* data = frame->data();
   size_t size = frame->size();
+  auto* audio_info = frame->audio_info();
 
   if (!data || size == 0) {
     AVE_LOG(LS_WARNING) << "Invalid audio data";
@@ -573,10 +733,23 @@ ssize_t AVPAudioRender::WriteAudioData(
 
   // Use blocking write with 2ms timeout so we make progress without
   // holding the mutex for an extended period.
-  ssize_t bytes_written = audio_track_->Write(data, size, true);
+  uint32_t frame_count = 0;
+  if (audio_info && IsCompressedOutputLocked()) {
+    if (audio_info->samples_per_channel > 0) {
+      frame_count = static_cast<uint32_t>(audio_info->samples_per_channel);
+    } else if (audio_info->duration.IsFinite() &&
+               current_audio_config_.sample_rate > 0) {
+      const int64_t scaled =
+          audio_info->duration.us() * current_audio_config_.sample_rate;
+      frame_count = static_cast<uint32_t>((scaled + 500000LL) / 1000000LL);
+    }
+  }
+
+  ssize_t bytes_written = audio_track_->Write(data, size, true, frame_count);
 
   AVE_LOG(LS_INFO) << "WriteAudioData: requested=" << size
-                   << " written=" << bytes_written;
+                   << " written=" << bytes_written
+                   << " frame_count=" << static_cast<int64_t>(frame_count);
 
   if (bytes_written < 0) {
     AVE_LOG(LS_WARNING) << "Audio track write failed: " << bytes_written;
@@ -603,67 +776,22 @@ void AVPAudioRender::UpdateSyncAnchor(
   int64_t frame_pts_us = audio_info->pts.us();
   int64_t frame_duration_us =
       audio_info->duration.IsFinite() ? audio_info->duration.us() : 0;
-  int64_t current_sys_time_us = base::TimeMicros();
-  int64_t buffer_latency_us =
-      audio_track_ ? audio_track_->GetBufferDurationInUs() : 0;
   const bool is_compressed = (current_audio_config_.format & 0xFF000000u) != 0;
   int64_t frame_end_pts_us = frame_pts_us + frame_duration_us;
-  uint32_t played_frames = 0;
-  const bool have_position = is_compressed && audio_track_ &&
-                             audio_track_->GetPosition(&played_frames) == OK;
 
   if (is_compressed && !passthrough_media_start_pts_valid_) {
     passthrough_media_start_pts_us_ = frame_pts_us;
     passthrough_media_start_pts_valid_ = true;
   }
 
-  if (is_compressed && have_position && current_audio_config_.sample_rate > 0) {
-    if (played_frames == 0 && !passthrough_position_started_) {
-      if (last_position_log_time_us_ == 0 ||
-          current_sys_time_us - last_position_log_time_us_ >= 500000) {
-        AVE_LOG(LS_INFO) << "Offload position: waiting for playout start"
-                         << " start_pts_ms="
-                         << (passthrough_media_start_pts_valid_
-                                 ? passthrough_media_start_pts_us_ / 1000
-                                 : -1)
-                         << " played_frames=0";
-        last_position_log_time_us_ = current_sys_time_us;
-      }
-      return;
-    }
-
-    passthrough_position_started_ = true;
-    const int64_t played_duration_us = static_cast<int64_t>(played_frames) *
-                                       1000000LL /
-                                       current_audio_config_.sample_rate;
-    int64_t heard_pts_us =
-        passthrough_media_start_pts_valid_
-            ? passthrough_media_start_pts_us_ + played_duration_us
-            : frame_pts_us + played_duration_us;
-    if (heard_pts_us > frame_end_pts_us) {
-      heard_pts_us = frame_end_pts_us;
-    }
-
-    GetAVSyncController()->UpdateAnchor(heard_pts_us, current_sys_time_us,
-                                        frame_end_pts_us);
-
-    if (last_position_log_time_us_ == 0 ||
-        current_sys_time_us - last_position_log_time_us_ >= 500000) {
-      if (played_frames < last_played_frames_) {
-        AVE_LOG(LS_WARNING) << "Offload position: played_frames="
-                            << static_cast<int64_t>(played_frames)
-                            << " media_pts_ms=" << heard_pts_us / 1000;
-      } else {
-        AVE_LOG(LS_INFO) << "Offload position: played_frames="
-                         << static_cast<int64_t>(played_frames)
-                         << " media_pts_ms=" << heard_pts_us / 1000;
-      }
-      last_position_log_time_us_ = current_sys_time_us;
-    }
-    last_played_frames_ = played_frames;
-
+  if (is_compressed) {
+    UpdateCompressedSyncAnchorLocked(frame_end_pts_us);
     return;
   }
+
+  int64_t current_sys_time_us = base::TimeMicros();
+  int64_t buffer_latency_us =
+      audio_track_ ? audio_track_->GetBufferDurationInUs() : 0;
 
   // Anchor the master clock to what is *currently being heard*, not what was
   // just written.  The original formula (pts, now + latency) was intended to
@@ -680,29 +808,71 @@ void AVPAudioRender::UpdateSyncAnchor(
 
   GetAVSyncController()->UpdateAnchor(heard_pts_us, current_sys_time_us,
                                       frame_end_pts_us);
+}
 
-  if (is_compressed && audio_track_ &&
-      (last_position_log_time_us_ == 0 ||
-       current_sys_time_us - last_position_log_time_us_ >= 500000)) {
-    if (have_position || buffer_latency_us > 0) {
-      if (have_position && played_frames < last_played_frames_) {
-        AVE_LOG(LS_WARNING)
-            << "Offload position: played_frames="
-            << (have_position ? static_cast<int64_t>(played_frames) : -1)
-            << " buffer_latency_ms=" << buffer_latency_us / 1000;
-      } else {
-        AVE_LOG(LS_INFO) << "Offload position: played_frames="
-                         << (have_position ? static_cast<int64_t>(played_frames)
-                                           : -1)
-                         << " buffer_latency_ms=" << buffer_latency_us / 1000;
-      }
-      if (have_position) {
-        last_played_frames_ = played_frames;
-      }
-      last_position_log_time_us_ = current_sys_time_us;
-    }
+void AVPAudioRender::UpdateCompressedSyncAnchorLocked(
+    int64_t frame_end_pts_us) {
+  if (!GetAVSyncController() || !audio_track_ ||
+      current_audio_config_.sample_rate <= 0) {
+    return;
   }
 
+  if (frame_end_pts_us > passthrough_last_written_end_pts_us_) {
+    passthrough_last_written_end_pts_us_ = frame_end_pts_us;
+  } else {
+    frame_end_pts_us = passthrough_last_written_end_pts_us_;
+  }
+
+  uint32_t played_frames = 0;
+  const bool have_position = audio_track_->GetPosition(&played_frames) == OK;
+  const int64_t current_sys_time_us = base::TimeMicros();
+  if (played_frames == 0 && !passthrough_position_started_) {
+    if (last_position_log_time_us_ == 0 ||
+        current_sys_time_us - last_position_log_time_us_ >= 500000) {
+      AVE_LOG(LS_INFO) << "Offload position: waiting for playout start"
+                       << " start_pts_ms="
+                       << (passthrough_media_start_pts_valid_
+                               ? passthrough_media_start_pts_us_ / 1000
+                               : -1)
+                       << " played_frames=0";
+      last_position_log_time_us_ = current_sys_time_us;
+    }
+    return;
+  }
+
+  if (!have_position) {
+    return;
+  }
+
+  passthrough_position_started_ = true;
+  const int64_t played_duration_us = static_cast<int64_t>(played_frames) *
+                                     1000000LL /
+                                     current_audio_config_.sample_rate;
+  int64_t heard_pts_us =
+      passthrough_media_start_pts_valid_
+          ? passthrough_media_start_pts_us_ + played_duration_us
+          : played_duration_us;
+  if (frame_end_pts_us > 0 && heard_pts_us > frame_end_pts_us) {
+    heard_pts_us = frame_end_pts_us;
+  }
+
+  GetAVSyncController()->UpdateAnchor(heard_pts_us, current_sys_time_us,
+                                      frame_end_pts_us);
+
+  if (last_position_log_time_us_ == 0 ||
+      current_sys_time_us - last_position_log_time_us_ >= 500000) {
+    if (played_frames < last_played_frames_) {
+      AVE_LOG(LS_WARNING) << "Offload position: played_frames="
+                          << static_cast<int64_t>(played_frames)
+                          << " media_pts_ms=" << heard_pts_us / 1000;
+    } else {
+      AVE_LOG(LS_INFO) << "Offload position: played_frames="
+                       << static_cast<int64_t>(played_frames)
+                       << " media_pts_ms=" << heard_pts_us / 1000;
+    }
+    last_position_log_time_us_ = current_sys_time_us;
+  }
+  last_played_frames_ = played_frames;
 }
 
 bool AVPAudioRender::SupportsPlaybackRateChange() const {

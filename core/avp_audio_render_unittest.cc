@@ -319,7 +319,8 @@ TEST_F(AVPAudioRenderTest, StartStopAudioTrack) {
   // Similarly, we can test that Stop() doesn't crash
 }
 
-TEST_F(AVPAudioRenderTest, OpenAudioSinkStartsTrackWhenRendererAlreadyRunning) {
+TEST_F(AVPAudioRenderTest,
+       OpenCompressedAudioSinkDefersTrackStartWhenRendererAlreadyRunning) {
   media::audio_config_t config = media::DefaultAudioConfig;
   config.sample_rate = 44100;
   config.channel_layout = media::CHANNEL_LAYOUT_STEREO;
@@ -330,7 +331,7 @@ TEST_F(AVPAudioRenderTest, OpenAudioSinkStartsTrackWhenRendererAlreadyRunning) {
   ASSERT_EQ(audio_render_->OpenAudioSink(config), OK);
   auto track = mock_audio_device_->last_track();
   ASSERT_NE(track, nullptr);
-  EXPECT_TRUE(track->IsStarted());
+  EXPECT_FALSE(track->IsStarted());
 }
 
 TEST_F(AVPAudioRenderTest, RenderAudioFrame) {
@@ -524,6 +525,56 @@ TEST_F(AVPAudioRenderTest, CompressedAnchorUsesPlayedFramesMediaPosition) {
   mock_task_runner_factory_->runner()->RunDueTasks();
 
   EXPECT_EQ(mock_avsync_controller_->GetAnchorMediaPts(), 1'023'219);
+}
+
+TEST_F(AVPAudioRenderTest, CompressedFramesAreNotRealTimePaced) {
+  media::audio_config_t config = media::DefaultAudioConfig;
+  config.sample_rate = 44100;
+  config.channel_layout = media::CHANNEL_LAYOUT_STEREO;
+  config.format = media::AUDIO_FORMAT_AAC_LC;
+  config.offload_info.format = media::AUDIO_FORMAT_AAC_LC;
+  ASSERT_EQ(audio_render_->OpenAudioSink(config), OK);
+  audio_render_->Start();
+
+  auto track = mock_audio_device_->last_track();
+  ASSERT_NE(track, nullptr);
+  track->SetPosition(0);
+
+  const std::vector<uint8_t> payload = {0x11, 0x22, 0x33, 0x44};
+  for (int i = 0; i < 10; ++i) {
+    audio_render_->RenderFrame(CreateTestAACFrame(i * 23'220, payload));
+  }
+
+  for (int i = 0; i < 20; ++i) {
+    mock_task_runner_factory_->runner()->RunDueTasks();
+  }
+
+  EXPECT_EQ(track->GetBytesWritten(), payload.size() * 10);
+}
+
+TEST_F(AVPAudioRenderTest, CompressedTrackStartsAfterPrerollQueued) {
+  media::audio_config_t config = media::DefaultAudioConfig;
+  config.sample_rate = 44100;
+  config.channel_layout = media::CHANNEL_LAYOUT_STEREO;
+  config.format = media::AUDIO_FORMAT_AAC_LC;
+  config.offload_info.format = media::AUDIO_FORMAT_AAC_LC;
+  ASSERT_EQ(audio_render_->OpenAudioSink(config), OK);
+  audio_render_->Start();
+
+  auto track = mock_audio_device_->last_track();
+  ASSERT_NE(track, nullptr);
+  EXPECT_FALSE(track->IsStarted());
+
+  const std::vector<uint8_t> payload = {0x11, 0x22, 0x33, 0x44};
+  for (int i = 0; i < 12; ++i) {
+    audio_render_->RenderFrame(CreateTestAACFrame(i * 23'220, payload));
+  }
+
+  for (int i = 0; i < 24; ++i) {
+    mock_task_runner_factory_->runner()->RunDueTasks();
+  }
+
+  EXPECT_TRUE(track->IsStarted());
 }
 
 }  // namespace player

@@ -167,6 +167,18 @@ class AVPAudioRender : public AVPRender {
    */
   void ApplyPlaybackRate() REQUIRES(mutex_);
 
+  bool IsCompressedOutputLocked() const REQUIRES(mutex_);
+  status_t StartAudioTrackLocked(const char* reason) REQUIRES(mutex_);
+  void MaybeStartCompressedTrackLocked(
+      const std::shared_ptr<media::MediaFrame>& frame,
+      ssize_t bytes_written,
+      size_t requested_size) REQUIRES(mutex_);
+  void UpdateCompressedSyncAnchorLocked(int64_t frame_end_pts_us)
+      REQUIRES(mutex_);
+  void MaybeScheduleCompressedPositionPollLocked(uint32_t delay_us = 10000)
+      REQUIRES(mutex_);
+  void OnCompressedPositionPoll(int32_t generation);
+
   /**
    * @brief Calculates the delay for the next audio frame based on real playback
    * latency.
@@ -188,6 +200,7 @@ class AVPAudioRender : public AVPRender {
   // Audio track capabilities
   bool supports_playback_rate_ GUARDED_BY(mutex_);
   bool supports_timestamp_ GUARDED_BY(mutex_);
+  bool audio_track_started_ GUARDED_BY(mutex_){false};
 
   // Statistics
   int64_t total_bytes_written_ GUARDED_BY(mutex_);
@@ -195,13 +208,17 @@ class AVPAudioRender : public AVPRender {
   int64_t last_position_log_time_us_ GUARDED_BY(mutex_){0};
   uint32_t last_played_frames_ GUARDED_BY(mutex_){0};
 
-  // Passthrough write-pacing: prevent the sync clock from racing ahead when
-  // compressed frames are accepted by the HAL faster than real-time.
-  int64_t passthrough_start_time_us_ GUARDED_BY(mutex_){0};
-  int64_t passthrough_start_pts_us_ GUARDED_BY(mutex_){0};
+  // PCM write-pacing: prevent PCM sinks that accept data too quickly from
+  // racing the clock ahead of real playout. Compressed/offload tracks are
+  // anchored from played-frame position instead of write pace.
+  int64_t audio_pacing_start_time_us_ GUARDED_BY(mutex_){0};
+  int64_t audio_pacing_start_pts_us_ GUARDED_BY(mutex_){0};
   int64_t passthrough_media_start_pts_us_ GUARDED_BY(mutex_){0};
+  int64_t passthrough_last_written_end_pts_us_ GUARDED_BY(mutex_){0};
   bool passthrough_media_start_pts_valid_ GUARDED_BY(mutex_){false};
   bool passthrough_position_started_ GUARDED_BY(mutex_){false};
+  int32_t passthrough_position_poll_generation_ GUARDED_BY(mutex_){0};
+  bool passthrough_position_poll_pending_ GUARDED_BY(mutex_){false};
 };
 
 }  // namespace player
