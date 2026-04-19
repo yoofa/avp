@@ -184,6 +184,10 @@ status_t Mp4Demuxer::ParseBoxes(off64_t offset, off64_t end_offset, int depth) {
         }
         break;
 
+      case FOURCC_moof:
+        AVE_LOG(LS_INFO) << "Mp4Demuxer: fragmented MP4 not handled internally";
+        return ERROR_UNSUPPORTED;
+
       case FOURCC_mdat:
       case FOURCC_free:
       case FOURCC_skip:

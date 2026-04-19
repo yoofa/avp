@@ -22,6 +22,7 @@ constexpr uint32_t FourCC(char a, char b, char c, char d) {
 // File-level boxes
 constexpr uint32_t FOURCC_ftyp = FourCC('f', 't', 'y', 'p');
 constexpr uint32_t FOURCC_moov = FourCC('m', 'o', 'o', 'v');
+constexpr uint32_t FOURCC_moof = FourCC('m', 'o', 'o', 'f');
 constexpr uint32_t FOURCC_mdat = FourCC('m', 'd', 'a', 't');
 constexpr uint32_t FOURCC_free = FourCC('f', 'r', 'e', 'e');
 constexpr uint32_t FOURCC_skip = FourCC('s', 'k', 'i', 'p');
@@ -30,6 +31,7 @@ constexpr uint32_t FOURCC_uuid = FourCC('u', 'u', 'i', 'd');
 
 // Movie-level boxes (under moov)
 constexpr uint32_t FOURCC_mvhd = FourCC('m', 'v', 'h', 'd');
+constexpr uint32_t FOURCC_mvex = FourCC('m', 'v', 'e', 'x');
 constexpr uint32_t FOURCC_trak = FourCC('t', 'r', 'a', 'k');
 constexpr uint32_t FOURCC_udta = FourCC('u', 'd', 't', 'a');
 constexpr uint32_t FOURCC_meta = FourCC('m', 'e', 't', 'a');
@@ -39,6 +41,7 @@ constexpr uint32_t FOURCC_tkhd = FourCC('t', 'k', 'h', 'd');
 constexpr uint32_t FOURCC_mdia = FourCC('m', 'd', 'i', 'a');
 constexpr uint32_t FOURCC_edts = FourCC('e', 'd', 't', 's');
 constexpr uint32_t FOURCC_elst = FourCC('e', 'l', 's', 't');
+constexpr uint32_t FOURCC_traf = FourCC('t', 'r', 'a', 'f');
 
 // Media-level boxes (under mdia)
 constexpr uint32_t FOURCC_mdhd = FourCC('m', 'd', 'h', 'd');

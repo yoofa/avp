@@ -110,7 +110,7 @@ public class PlayerActivity extends Activity {
         try {
             player =
                     new AvpPlayer.Builder()
-                            .setHttpProvider(new OkHttpHttpProvider())
+                            .setHttpProvider(new OkHttpHttpProvider(this))
                             .setAudioPassthroughPolicy(AvpPlayer.PASSTHROUGH_PREFER_PASSTHROUGH)
                             .setAudioOnly(audioOnly)
                             .build();

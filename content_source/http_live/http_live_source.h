@@ -15,9 +15,11 @@
 #include <vector>
 
 #include "api/content_source/content_source.h"
+#include "api/demuxer/demuxer_factory.h"
 #include "base/net/http/http_provider.h"
 #include "core/packet_source.h"
 #include "media/foundation/media_meta.h"
+#include "media/foundation/media_source.h"
 
 #include "content_source/http_live/playlist_parser.h"
 
@@ -28,14 +30,15 @@ namespace mpeg2ts {
 class PacketSource;
 }  // namespace mpeg2ts
 }  // namespace media
-}
+}  // namespace ave
 
 namespace ave {
 namespace player {
 
 class HttpLiveSource : public ContentSource {
  public:
-  explicit HttpLiveSource(std::shared_ptr<net::HTTPProvider> http_provider);
+  explicit HttpLiveSource(std::shared_ptr<DemuxerFactory> demuxer_factory,
+                          std::shared_ptr<net::HTTPProvider> http_provider);
   ~HttpLiveSource() override;
 
   status_t SetDataSource(
@@ -48,14 +51,16 @@ class HttpLiveSource : public ContentSource {
   void Stop() override;
   void Pause() override;
   void Resume() override;
-  status_t DequeueAccessUnit(MediaType track_type,
-                             std::shared_ptr<media::MediaFrame>& access_unit)
-      override;
+  status_t DequeueAccessUnit(
+      MediaType track_type,
+      std::shared_ptr<media::MediaFrame>& access_unit) override;
   std::shared_ptr<media::MediaMeta> GetFormat() override;
   status_t GetDuration(int64_t* duration_us) override;
   size_t GetTrackCount() const override;
-  std::shared_ptr<media::MediaMeta> GetTrackInfo(size_t track_index) const override;
-  std::shared_ptr<media::MediaMeta> GetTrackInfo(MediaType track_type) const override;
+  std::shared_ptr<media::MediaMeta> GetTrackInfo(
+      size_t track_index) const override;
+  std::shared_ptr<media::MediaMeta> GetTrackInfo(
+      MediaType track_type) const override;
   status_t SelectTrack(size_t track_index, bool select) override;
   status_t SeekTo(int64_t seek_time_us, SeekMode mode) override;
   bool IsStreaming() const override;
@@ -69,42 +74,75 @@ class HttpLiveSource : public ContentSource {
     std::shared_ptr<PacketSource> packet_source;
   };
 
+  struct StreamState {
+    std::string playlist_url;
+    http_live::Playlist playlist;
+    std::vector<uint8_t> init_segment_bytes;
+    std::string init_segment_cache_key;
+    int32_t next_segment_sequence = 0;
+    int64_t next_segment_start_time_us = 0;
+    int64_t next_playlist_refresh_time_us = 0;
+
+    bool active() const { return !playlist_url.empty(); }
+    bool is_live() const { return active() && playlist.is_live; }
+  };
+
   status_t PrepareLocked();
   status_t RefreshPlaylistLocked(bool initial);
+  status_t RefreshStreamPlaylistLocked(StreamState& stream, bool initial);
   status_t LoadNextSegmentLocked();
-  status_t LoadSegmentLocked(const http_live::MediaPlaylistSegment& segment,
+  status_t LoadNextSegmentLocked(StreamState& stream);
+  status_t LoadSegmentLocked(StreamState& stream,
+                             const http_live::MediaPlaylistSegment& segment,
                              int64_t segment_start_time_us);
-  status_t LoadTsSegmentLocked(const std::shared_ptr<ave::DataSource>& data_source,
-                               int64_t segment_start_time_us);
+  status_t LoadTsSegmentLocked(
+      const std::shared_ptr<ave::DataSource>& data_source,
+      int64_t segment_start_time_us);
+  status_t LoadFragmentedSegmentLocked(
+      StreamState& stream,
+      const http_live::MediaPlaylistSegment& segment,
+      int64_t segment_start_time_us);
+  status_t LoadDemuxedSegmentLocked(
+      const std::shared_ptr<ave::DataSource>& data_source,
+      int64_t segment_start_time_us);
   status_t FetchUrlLocked(const std::string& url, std::vector<uint8_t>& data);
+  status_t FetchUrlRangeLocked(const std::string& url,
+                               off64_t offset,
+                               int64_t length,
+                               std::vector<uint8_t>& data);
   status_t FetchTextLocked(const std::string& url, std::string& text);
   status_t QueueTsPacketsLocked(
       MediaType media_type,
       const std::shared_ptr<media::mpeg2ts::PacketSource>& source,
       int64_t segment_start_time_us);
-  status_t EnsureTrackStateLocked(MediaType media_type,
-                                  const std::shared_ptr<media::MediaMeta>& format);
+  status_t QueueDemuxedPacketsLocked(
+      MediaType media_type,
+      const std::shared_ptr<media::MediaSource>& source,
+      int64_t segment_start_time_us);
+  status_t EnsureTrackStateLocked(
+      MediaType media_type,
+      const std::shared_ptr<media::MediaMeta>& format);
   TrackState* FindTrackLocked(MediaType media_type);
   const TrackState* FindTrackLocked(MediaType media_type) const;
   status_t FinishPrepareLocked();
   void ResetLocked();
-  static void OffsetFrameTimestamp(const std::shared_ptr<media::MediaFrame>& frame,
-                                   int64_t offset_us);
+  static void OffsetFrameTimestamp(
+      const std::shared_ptr<media::MediaFrame>& frame,
+      int64_t offset_us);
 
   Notify* notify_ = nullptr;
+  std::shared_ptr<DemuxerFactory> demuxer_factory_;
   std::shared_ptr<net::HTTPProvider> http_provider_;
 
   std::string master_url_;
-  std::string media_playlist_url_;
   std::unordered_map<std::string, std::string> headers_;
-  http_live::Playlist playlist_;
   std::shared_ptr<media::MediaMeta> source_format_;
   std::vector<TrackState> tracks_;
+  StreamState primary_stream_;
+  StreamState audio_stream_;
+  http_live::Playlist playlist_;
 
   int64_t duration_us_ = -1;
-  int32_t next_segment_sequence_ = 0;
-  int64_t next_segment_start_time_us_ = 0;
-  int64_t next_playlist_refresh_time_us_ = 0;
   bool prepared_ = false;
   bool started_ = false;
   bool end_of_stream_ = false;

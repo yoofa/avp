@@ -24,12 +24,14 @@ ave_library("http_live_content_source") {
   deps = [
     "../core:packet_source",
     "//api:api_content_source",
+    "//api:api_demuxer",
     "//base:logging",
     "//base:timeutils",
     "//base/data_source:data_source_base",
     "//base/net:http_api",
     "//media/foundation:media_meta",
     "//media/foundation:media_mimes",
+    "//media/foundation:media_source",
     "//media/modules/mpeg2ts:mpeg2ts",
   ]
 }

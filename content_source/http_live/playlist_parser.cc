@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <sstream>
 #include <unordered_map>
 
@@ -33,8 +34,9 @@ std::string Trim(const std::string& value) {
 }
 
 std::string ToLower(std::string value) {
-  std::transform(value.begin(), value.end(), value.begin(),
-                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  std::transform(
+      value.begin(), value.end(), value.begin(),
+      [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   return value;
 }
 
@@ -124,6 +126,28 @@ bool ParseInt32(const std::string& value, int32_t* out) {
   return true;
 }
 
+bool ParseYesNo(const std::string& value) {
+  return ToLower(Trim(value)) == "yes";
+}
+
+bool ParseByteRange(const std::string& value,
+                    int64_t* length,
+                    int64_t* offset) {
+  if (!length || !offset) {
+    return false;
+  }
+  *length = -1;
+  *offset = -1;
+
+  const size_t at = value.find('@');
+  if (at == std::string::npos) {
+    return ParseInt64(value, length);
+  }
+
+  return ParseInt64(value.substr(0, at), length) &&
+         ParseInt64(value.substr(at + 1), offset);
+}
+
 std::string GetBasePrefix(const std::string& uri) {
   size_t slash = uri.rfind('/');
   if (slash == std::string::npos) {
@@ -152,7 +176,8 @@ bool LooksLikeHlsUrl(const std::string& url) {
          lower.find(".m3u") != std::string::npos;
 }
 
-std::string ResolveUri(const std::string& base_uri, const std::string& ref_uri) {
+std::string ResolveUri(const std::string& base_uri,
+                       const std::string& ref_uri) {
   if (ref_uri.empty()) {
     return base_uri;
   }
@@ -182,6 +207,10 @@ status_t ParsePlaylist(const std::string& base_uri,
   VariantPlaylistItem variant;
   int64_t pending_segment_duration_us = -1;
   bool pending_discontinuity = false;
+  int64_t pending_byterange_length = -1;
+  int64_t pending_byterange_offset = -1;
+  int64_t next_byterange_offset = 0;
+  std::string current_byterange_resource;
 
   while (std::getline(stream, raw_line)) {
     std::string line = Trim(raw_line);
@@ -208,17 +237,51 @@ status_t ParsePlaylist(const std::string& base_uri,
       if (it != attrs.end()) {
         ParseInt64(it->second, &variant.bandwidth_bps);
       }
+      it = attrs.find("average-bandwidth");
+      if (it != attrs.end()) {
+        ParseInt64(it->second, &variant.average_bandwidth_bps);
+      }
+      it = attrs.find("codecs");
+      if (it != attrs.end()) {
+        variant.codecs = it->second;
+      }
+      it = attrs.find("audio");
+      if (it != attrs.end()) {
+        variant.audio_group_id = it->second;
+      }
       pending_variant = true;
+      continue;
+    }
+
+    if (line.rfind("#EXT-X-MEDIA:", 0) == 0) {
+      auto attrs = ParseAttributes(line.substr(13));
+      auto type_it = attrs.find("type");
+      auto group_it = attrs.find("group-id");
+      auto uri_it = attrs.find("uri");
+      if (type_it != attrs.end() && ToLower(type_it->second) == "audio" &&
+          group_it != attrs.end() && uri_it != attrs.end()) {
+        MediaRendition rendition;
+        rendition.group_id = group_it->second;
+        rendition.uri = ResolveUri(base_uri, uri_it->second);
+        auto default_it = attrs.find("default");
+        if (default_it != attrs.end()) {
+          rendition.is_default = ParseYesNo(default_it->second);
+        }
+        auto autoselect_it = attrs.find("autoselect");
+        if (autoselect_it != attrs.end()) {
+          rendition.autoselect = ParseYesNo(autoselect_it->second);
+        }
+        playlist.audio_renditions.push_back(std::move(rendition));
+      }
       continue;
     }
 
     if (line.rfind("#EXTINF:", 0) == 0) {
       size_t colon = line.find(':');
       size_t comma = line.find(',', colon == std::string::npos ? 0 : colon + 1);
-      const std::string duration_text =
-          line.substr(colon + 1,
-                      comma == std::string::npos ? std::string::npos
-                                                 : comma - colon - 1);
+      const std::string duration_text = line.substr(
+          colon + 1,
+          comma == std::string::npos ? std::string::npos : comma - colon - 1);
       if (!ParseDurationUs(duration_text, &pending_segment_duration_us)) {
         return BAD_VALUE;
       }
@@ -271,6 +334,31 @@ status_t ParsePlaylist(const std::string& base_uri,
 
     if (line.rfind("#EXT-X-MAP:", 0) == 0) {
       playlist.has_init_segment = true;
+      auto attrs = ParseAttributes(line.substr(11));
+      auto uri_it = attrs.find("uri");
+      if (uri_it != attrs.end()) {
+        playlist.init_segment.uri = ResolveUri(base_uri, uri_it->second);
+      }
+      auto byterange_it = attrs.find("byterange");
+      if (byterange_it != attrs.end()) {
+        ParseByteRange(byterange_it->second,
+                       &playlist.init_segment.byterange_length,
+                       &playlist.init_segment.byterange_offset);
+        if (playlist.init_segment.byterange_length > 0) {
+          if (playlist.init_segment.byterange_offset < 0) {
+            playlist.init_segment.byterange_offset = next_byterange_offset;
+          }
+          current_byterange_resource = playlist.init_segment.uri;
+          next_byterange_offset = playlist.init_segment.byterange_offset +
+                                  playlist.init_segment.byterange_length;
+        }
+      }
+      continue;
+    }
+
+    if (line.rfind("#EXT-X-BYTERANGE:", 0) == 0) {
+      ParseByteRange(line.substr(17), &pending_byterange_length,
+                     &pending_byterange_offset);
       continue;
     }
 
@@ -287,13 +375,29 @@ status_t ParsePlaylist(const std::string& base_uri,
 
     MediaPlaylistSegment segment;
     segment.uri = ResolveUri(base_uri, line);
-    segment.duration_us = pending_segment_duration_us > 0 ? pending_segment_duration_us : 0;
+    segment.duration_us =
+        pending_segment_duration_us > 0 ? pending_segment_duration_us : 0;
     segment.discontinuity = pending_discontinuity;
-    segment.sequence =
-        playlist.media_sequence + static_cast<int32_t>(playlist.segments.size());
+    segment.sequence = playlist.media_sequence +
+                       static_cast<int32_t>(playlist.segments.size());
+    if (pending_byterange_length > 0) {
+      segment.byterange_length = pending_byterange_length;
+      if (pending_byterange_offset >= 0) {
+        segment.byterange_offset = pending_byterange_offset;
+      } else if (segment.uri != current_byterange_resource) {
+        segment.byterange_offset = 0;
+      } else {
+        segment.byterange_offset = next_byterange_offset;
+      }
+      current_byterange_resource = segment.uri;
+      next_byterange_offset =
+          segment.byterange_offset + segment.byterange_length;
+    }
     playlist.segments.push_back(segment);
     pending_segment_duration_us = -1;
     pending_discontinuity = false;
+    pending_byterange_length = -1;
+    pending_byterange_offset = -1;
   }
 
   if (!saw_header) {
@@ -326,13 +430,52 @@ const VariantPlaylistItem* SelectPrimaryVariant(const Playlist& playlist) {
   if (playlist.variants.empty()) {
     return nullptr;
   }
+
+  auto score_variant = [](const VariantPlaylistItem& variant) {
+    const std::string codecs = ToLower(variant.codecs);
+    int score = 0;
+    if (codecs.find("mp4a.") != std::string::npos) {
+      score += 100;
+    }
+    if (codecs.find("ac-3") != std::string::npos ||
+        codecs.find("ec-3") != std::string::npos) {
+      score -= 100;
+    }
+    return score;
+  };
+
   const VariantPlaylistItem* best = &playlist.variants.front();
   for (const auto& variant : playlist.variants) {
-    if (variant.bandwidth_bps > best->bandwidth_bps) {
+    const int variant_score = score_variant(variant);
+    const int best_score = score_variant(*best);
+    if (variant_score > best_score ||
+        (variant_score == best_score &&
+         variant.bandwidth_bps > best->bandwidth_bps)) {
       best = &variant;
     }
   }
   return best;
+}
+
+const MediaRendition* SelectAudioRendition(const Playlist& playlist,
+                                           const std::string& group_id) {
+  if (group_id.empty()) {
+    return nullptr;
+  }
+
+  const MediaRendition* selected = nullptr;
+  for (const auto& rendition : playlist.audio_renditions) {
+    if (rendition.group_id != group_id) {
+      continue;
+    }
+    if (!selected) {
+      selected = &rendition;
+    }
+    if (rendition.is_default) {
+      return &rendition;
+    }
+  }
+  return selected;
 }
 
 }  // namespace http_live

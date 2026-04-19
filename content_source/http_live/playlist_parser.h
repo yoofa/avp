@@ -21,6 +21,16 @@ namespace http_live {
 struct VariantPlaylistItem {
   std::string uri;
   int64_t bandwidth_bps = -1;
+  int64_t average_bandwidth_bps = -1;
+  std::string codecs;
+  std::string audio_group_id;
+};
+
+struct MediaRendition {
+  std::string group_id;
+  std::string uri;
+  bool is_default = false;
+  bool autoselect = false;
 };
 
 struct MediaPlaylistSegment {
@@ -28,6 +38,14 @@ struct MediaPlaylistSegment {
   int64_t duration_us = 0;
   int32_t sequence = 0;
   bool discontinuity = false;
+  int64_t byterange_offset = -1;
+  int64_t byterange_length = -1;
+};
+
+struct InitSegmentInfo {
+  std::string uri;
+  int64_t byterange_offset = -1;
+  int64_t byterange_length = -1;
 };
 
 struct Playlist {
@@ -41,7 +59,9 @@ struct Playlist {
   int64_t duration_us = -1;
   int32_t media_sequence = 0;
 
+  InitSegmentInfo init_segment;
   std::vector<VariantPlaylistItem> variants;
+  std::vector<MediaRendition> audio_renditions;
   std::vector<MediaPlaylistSegment> segments;
 };
 
@@ -51,6 +71,8 @@ status_t ParsePlaylist(const std::string& base_uri,
                        const std::string& playlist_text,
                        Playlist& playlist);
 const VariantPlaylistItem* SelectPrimaryVariant(const Playlist& playlist);
+const MediaRendition* SelectAudioRendition(const Playlist& playlist,
+                                           const std::string& group_id);
 
 }  // namespace http_live
 }  // namespace player
