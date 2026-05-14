@@ -731,25 +731,10 @@ ssize_t AVPAudioRender::WriteAudioData(
     return -1;
   }
 
-  // Use blocking write with 2ms timeout so we make progress without
-  // holding the mutex for an extended period.
-  uint32_t frame_count = 0;
-  if (audio_info && IsCompressedOutputLocked()) {
-    if (audio_info->samples_per_channel > 0) {
-      frame_count = static_cast<uint32_t>(audio_info->samples_per_channel);
-    } else if (audio_info->duration.IsFinite() &&
-               current_audio_config_.sample_rate > 0) {
-      const int64_t scaled =
-          audio_info->duration.us() * current_audio_config_.sample_rate;
-      frame_count = static_cast<uint32_t>((scaled + 500000LL) / 1000000LL);
-    }
-  }
-
-  ssize_t bytes_written = audio_track_->Write(data, size, true, frame_count);
+  ssize_t bytes_written = audio_track_->Write(data, size, true);
 
   AVE_LOG(LS_INFO) << "WriteAudioData: requested=" << size
-                   << " written=" << bytes_written
-                   << " frame_count=" << static_cast<int64_t>(frame_count);
+                   << " written=" << bytes_written;
 
   if (bytes_written < 0) {
     AVE_LOG(LS_WARNING) << "Audio track write failed: " << bytes_written;
