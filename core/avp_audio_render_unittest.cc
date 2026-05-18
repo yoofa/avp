@@ -45,16 +45,6 @@ class MockAudioTrack : public media::AudioTrack {
     return OK;
   }
 
-  int64_t GetPlayedOutDurationUs(int64_t nowUs) const override {
-    return (nowUs - start_time_us_) * (started_ ? 1 : 0);
-  }
-
-  status_t GetFramesWritten(uint32_t* frameswritten) const override {
-    if (frameswritten)
-      *frameswritten = frames_written_;
-    return OK;
-  }
-
   int64_t GetBufferDurationInUs() const override { return buffer_duration_us_; }
 
   status_t Open(media::audio_config_t config,

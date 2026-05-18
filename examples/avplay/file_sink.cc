@@ -239,20 +239,6 @@ status_t WavFileAudioTrack::GetPosition(uint32_t* position) const {
   return 0;
 }
 
-int64_t WavFileAudioTrack::GetPlayedOutDurationUs(int64_t /*nowUs*/) const {
-  if (sample_rate_ == 0) {
-    return 0;
-  }
-  return static_cast<int64_t>(frames_written_) * 1000000LL / sample_rate_;
-}
-
-status_t WavFileAudioTrack::GetFramesWritten(uint32_t* frameswritten) const {
-  if (frameswritten) {
-    *frameswritten = frames_written_;
-  }
-  return 0;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // FileAudioDevice
 // ─────────────────────────────────────────────────────────────────────────────
