@@ -76,7 +76,7 @@ class WavFileAudioTrack : public media::AudioTrack {
   float msecsPerFrame() const override {
     return sample_rate_ ? (1000.0f / sample_rate_) : 0.0f;
   }
-  status_t GetPosition(uint32_t* position) const override;
+  status_t GetTimestamp(AudioTimestamp* ts) const override;
   int64_t GetBufferDurationInUs() const override { return 0; }
 
   status_t Open(media::audio_config_t config,

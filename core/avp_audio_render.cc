@@ -808,9 +808,21 @@ void AVPAudioRender::UpdateCompressedSyncAnchorLocked(
     frame_end_pts_us = passthrough_last_written_end_pts_us_;
   }
 
-  uint32_t played_frames = 0;
-  const bool have_position = audio_track_->GetPosition(&played_frames) == OK;
+  AudioTimestamp ts{};
+  const bool have_position = audio_track_->GetTimestamp(&ts) == OK;
   const int64_t current_sys_time_us = base::TimeMicros();
+
+  // Extrapolate frame position forward from the timestamp's reference point.
+  uint32_t played_frames = ts.position;
+  if (have_position && ts.nanos > 0 && current_audio_config_.sample_rate > 0) {
+    const int64_t current_sys_time_ns = current_sys_time_us * 1000LL;
+    const int64_t elapsed_ns = current_sys_time_ns - ts.nanos;
+    if (elapsed_ns > 0) {
+      played_frames += static_cast<uint32_t>(
+          elapsed_ns * current_audio_config_.sample_rate / 1000000000LL);
+    }
+  }
+
   if (played_frames == 0 && !passthrough_position_started_) {
     if (last_position_log_time_us_ == 0 ||
         current_sys_time_us - last_position_log_time_us_ >= 500000) {

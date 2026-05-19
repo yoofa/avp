@@ -232,11 +232,13 @@ void WavFileAudioTrack::Close() {
   }
 }
 
-status_t WavFileAudioTrack::GetPosition(uint32_t* position) const {
-  if (position) {
-    *position = frames_written_;
+status_t WavFileAudioTrack::GetTimestamp(AudioTimestamp* ts) const {
+  if (!ts) {
+    return -EINVAL;
   }
-  return 0;
+  ts->position = frames_written_;
+  ts->nanos = 0;
+  return OK;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
