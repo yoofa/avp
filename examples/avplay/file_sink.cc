@@ -232,7 +232,7 @@ void WavFileAudioTrack::Close() {
   }
 }
 
-status_t WavFileAudioTrack::GetTimestamp(AudioTimestamp* ts) const {
+status_t WavFileAudioTrack::GetTimestamp(media::AudioTimestamp* ts) const {
   if (!ts) {
     return -EINVAL;
   }

@@ -724,7 +724,6 @@ ssize_t AVPAudioRender::WriteAudioData(
 
   const uint8_t* data = frame->data();
   size_t size = frame->size();
-  auto* audio_info = frame->audio_info();
 
   if (!data || size == 0) {
     AVE_LOG(LS_WARNING) << "Invalid audio data";
@@ -808,7 +807,7 @@ void AVPAudioRender::UpdateCompressedSyncAnchorLocked(
     frame_end_pts_us = passthrough_last_written_end_pts_us_;
   }
 
-  AudioTimestamp ts{};
+  media::AudioTimestamp ts{};
   const bool have_position = audio_track_->GetTimestamp(&ts) == OK;
   const int64_t current_sys_time_us = base::TimeMicros();
 

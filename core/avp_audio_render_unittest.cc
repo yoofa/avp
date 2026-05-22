@@ -39,7 +39,7 @@ class MockAudioTrack : public media::AudioTrack {
   uint32_t latency() const override { return 100; }
   float msecsPerFrame() const override { return 11.6f; }
 
-  status_t GetTimestamp(AudioTimestamp* ts) const override {
+  status_t GetTimestamp(media::AudioTimestamp* ts) const override {
     if (!ts)
       return -EINVAL;
     ts->position = position_;
