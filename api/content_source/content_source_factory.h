@@ -17,6 +17,8 @@
 namespace ave {
 namespace player {
 
+using ave::base::DataSource;
+
 class ContentSourceFactory {
  public:
   virtual ~ContentSourceFactory() = default;
@@ -29,7 +31,7 @@ class ContentSourceFactory {
   CreateContentSource(int fd, int64_t offset, int64_t length) = 0;
 
   virtual std::shared_ptr<ContentSource> CreateContentSource(
-      std::shared_ptr<ave::DataSource> data_source) = 0;
+      std::shared_ptr<DataSource> data_source) = 0;
 };
 
 }  // namespace player

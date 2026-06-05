@@ -14,7 +14,7 @@
 #include "base/checks.h"
 #include "base/logging.h"
 #include "media/codec/codec_id.h"
-#include "media/foundation/aac_utils.h"
+#include "media/foundation/aac/aac_utils.h"
 #include "media/foundation/media_errors.h"
 #include "media/foundation/media_meta.h"
 #include "media/foundation/media_mimes.h"

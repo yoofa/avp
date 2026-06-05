@@ -45,7 +45,7 @@ class GenericSource : public Handler, public ContentSource {
 
   status_t SetDataSource(const char* url /*, http_downloader*/);
   status_t SetDataSource(int fd, int64_t offset, int64_t length);
-  status_t SetDataSource(std::shared_ptr<ave::DataSource> data_source);
+  status_t SetDataSource(std::shared_ptr<DataSource> data_source);
 
   void Prepare() override;
   void Start() override;
@@ -125,7 +125,7 @@ class GenericSource : public Handler, public ContentSource {
   ave::base::unique_fd fd_ GUARDED_BY(lock_);
   int64_t offset_ GUARDED_BY(lock_);
   int64_t length_ GUARDED_BY(lock_);
-  std::shared_ptr<ave::DataSource> data_source_ GUARDED_BY(lock_);
+  std::shared_ptr<DataSource> data_source_ GUARDED_BY(lock_);
   std::shared_ptr<MediaMeta> source_format_ GUARDED_BY(lock_);
   int64_t duration_us_ GUARDED_BY(lock_);
   int64_t bitrate_ GUARDED_BY(lock_);

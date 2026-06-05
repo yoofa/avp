@@ -18,11 +18,12 @@ extern "C" {
 #include "third_party/ffmpeg/libavcodec/bsf.h"
 #include "third_party/ffmpeg/libavformat/avformat.h"
 #include "third_party/ffmpeg/libavformat/avio.h"
-#include "third_party/ffmpeg/libavutil/avutil.h"
 }
 
 namespace ave {
 namespace player {
+
+using ave::base::DataSource;
 
 using ave::media::MediaFrame;
 
@@ -30,7 +31,7 @@ struct FFmpegSource;
 
 class FFmpegDemuxer : public Demuxer {
  public:
-  explicit FFmpegDemuxer(std::shared_ptr<ave::DataSource> dataSource);
+  explicit FFmpegDemuxer(std::shared_ptr<DataSource> dataSource);
   ~FFmpegDemuxer() override;
 
   // Demuxer API
@@ -71,7 +72,7 @@ class FFmpegDemuxer : public Demuxer {
                        size_t index,
                        const ave::media::MediaSource::ReadOptions* options);
 
-  // std::shared_ptr<ave::DataSource> data_source_;
+  // std::shared_ptr<DataSource> data_source_;
   AVFormatContext* av_format_context_;
   AVIOContext* av_io_context_;
   std::shared_ptr<ave::media::MediaMeta> source_format_;

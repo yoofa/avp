@@ -17,7 +17,10 @@
 namespace ave {
 namespace jni {
 
-class JavaHttpConnection : public net::HTTPConnection {
+using ave::base::net::HTTPConnection;
+using ave::base::net::HTTPProvider;
+
+class JavaHttpConnection : public HTTPConnection {
  public:
   JavaHttpConnection(JNIEnv* env, jobject j_connection);
   ~JavaHttpConnection() override = default;
@@ -41,12 +44,12 @@ class JavaHttpConnection : public net::HTTPConnection {
   jmethodID get_uri_method_ = nullptr;
 };
 
-class JavaHttpProvider : public net::HTTPProvider {
+class JavaHttpProvider : public HTTPProvider {
  public:
   JavaHttpProvider(JNIEnv* env, jobject j_provider);
   ~JavaHttpProvider() override = default;
 
-  std::shared_ptr<net::HTTPConnection> CreateConnection() override;
+  std::shared_ptr<HTTPConnection> CreateConnection() override;
   bool SupportsScheme(const std::string& scheme) override;
 
  private:

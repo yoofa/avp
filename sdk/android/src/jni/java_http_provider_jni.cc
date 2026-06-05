@@ -226,7 +226,7 @@ JavaHttpProvider::JavaHttpProvider(JNIEnv* env, jobject j_provider)
   env->DeleteLocalRef(cls);
 }
 
-std::shared_ptr<net::HTTPConnection> JavaHttpProvider::CreateConnection() {
+std::shared_ptr<HTTPConnection> JavaHttpProvider::CreateConnection() {
   JNIEnv* env = AttachCurrentThreadIfNeeded();
   if (!env || !j_provider_.obj() || !create_connection_method_) {
     return nullptr;

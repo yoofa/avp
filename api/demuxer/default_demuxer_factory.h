@@ -24,7 +24,7 @@ class DefaultDemuxerFactory : public DemuxerFactory {
   ~DefaultDemuxerFactory() override = default;
 
   std::shared_ptr<Demuxer> CreateDemuxer(
-      std::shared_ptr<ave::DataSource> dataSource) override;
+      std::shared_ptr<DataSource> dataSource) override;
 
  private:
   std::shared_ptr<DemuxerFactory> internal_factory_;

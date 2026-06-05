@@ -22,7 +22,7 @@ class InternalDemuxerFactory : public DemuxerFactory {
   ~InternalDemuxerFactory() override = default;
 
   std::shared_ptr<Demuxer> CreateDemuxer(
-      std::shared_ptr<ave::DataSource> data_source) override;
+      std::shared_ptr<DataSource> data_source) override;
 };
 
 }  // namespace player

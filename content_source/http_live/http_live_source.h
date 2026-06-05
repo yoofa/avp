@@ -24,7 +24,6 @@
 #include "content_source/http_live/playlist_parser.h"
 
 namespace ave {
-class DataSource;
 namespace media {
 namespace mpeg2ts {
 class PacketSource;
@@ -35,10 +34,12 @@ class PacketSource;
 namespace ave {
 namespace player {
 
+using ave::base::net::HTTPProvider;
+
 class HttpLiveSource : public ContentSource {
  public:
   explicit HttpLiveSource(std::shared_ptr<DemuxerFactory> demuxer_factory,
-                          std::shared_ptr<net::HTTPProvider> http_provider);
+                          std::shared_ptr<HTTPProvider> http_provider);
   ~HttpLiveSource() override;
 
   status_t SetDataSource(
@@ -95,15 +96,14 @@ class HttpLiveSource : public ContentSource {
   status_t LoadSegmentLocked(StreamState& stream,
                              const http_live::MediaPlaylistSegment& segment,
                              int64_t segment_start_time_us);
-  status_t LoadTsSegmentLocked(
-      const std::shared_ptr<ave::DataSource>& data_source,
-      int64_t segment_start_time_us);
+  status_t LoadTsSegmentLocked(const std::shared_ptr<DataSource>& data_source,
+                               int64_t segment_start_time_us);
   status_t LoadFragmentedSegmentLocked(
       StreamState& stream,
       const http_live::MediaPlaylistSegment& segment,
       int64_t segment_start_time_us);
   status_t LoadDemuxedSegmentLocked(
-      const std::shared_ptr<ave::DataSource>& data_source,
+      const std::shared_ptr<DataSource>& data_source,
       int64_t segment_start_time_us);
   status_t FetchUrlLocked(const std::string& url, std::vector<uint8_t>& data);
   status_t FetchUrlRangeLocked(const std::string& url,
@@ -132,7 +132,7 @@ class HttpLiveSource : public ContentSource {
 
   Notify* notify_ = nullptr;
   std::shared_ptr<DemuxerFactory> demuxer_factory_;
-  std::shared_ptr<net::HTTPProvider> http_provider_;
+  std::shared_ptr<HTTPProvider> http_provider_;
 
   std::string master_url_;
   std::unordered_map<std::string, std::string> headers_;

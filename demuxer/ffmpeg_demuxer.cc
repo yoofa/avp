@@ -209,7 +209,7 @@ status_t FFmpegDemuxer::TrackInfo::DequeuePacket(
 
 ////////////////////////////////////
 
-FFmpegDemuxer::FFmpegDemuxer(std::shared_ptr<ave::DataSource> data_source)
+FFmpegDemuxer::FFmpegDemuxer(std::shared_ptr<DataSource> data_source)
     : Demuxer(data_source) {
   av_log_set_level(AV_LOG_QUIET);
   av_format_context_ = avformat_alloc_context();

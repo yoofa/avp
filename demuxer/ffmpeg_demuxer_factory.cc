@@ -15,7 +15,7 @@ namespace ave {
 namespace player {
 
 std::shared_ptr<Demuxer> FFmpegDemuxerFactory::CreateDemuxer(
-    std::shared_ptr<ave::DataSource> dataSource) {
+    std::shared_ptr<DataSource> dataSource) {
   auto demuxer = std::make_shared<FFmpegDemuxer>(std::move(dataSource));
   if (demuxer->Init() != ave::OK) {
     return nullptr;

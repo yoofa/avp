@@ -8,16 +8,15 @@
 #ifndef DEFAULT_CONTENT_SOURCE_FACTORY_H
 #define DEFAULT_CONTENT_SOURCE_FACTORY_H
 
+#include "base/net/http/http_provider.h"
+
 #include "api/content_source/content_source_factory.h"
 
 namespace ave {
-namespace net {
-class HTTPProvider;
-}  // namespace net
-}  // namespace ave
-
-namespace ave {
 namespace player {
+
+using ave::base::DataSource;
+using ave::base::net::HTTPProvider;
 
 class DemuxerFactory;
 
@@ -27,7 +26,7 @@ class DefaultContentSourceFactory : public ContentSourceFactory {
  public:
   explicit DefaultContentSourceFactory(
       std::shared_ptr<DemuxerFactory> demuxer_factory,
-      std::shared_ptr<net::HTTPProvider> http_provider = nullptr)
+      std::shared_ptr<HTTPProvider> http_provider = nullptr)
       : demuxer_factory_(std::move(demuxer_factory)),
         http_provider_(std::move(http_provider)) {}
   ~DefaultContentSourceFactory() override = default;
@@ -41,11 +40,11 @@ class DefaultContentSourceFactory : public ContentSourceFactory {
                                                      int64_t length) override;
 
   std::shared_ptr<ContentSource> CreateContentSource(
-      std::shared_ptr<ave::DataSource> data_source) override;
+      std::shared_ptr<DataSource> data_source) override;
 
  private:
   std::shared_ptr<DemuxerFactory> demuxer_factory_;
-  std::shared_ptr<net::HTTPProvider> http_provider_;
+  std::shared_ptr<HTTPProvider> http_provider_;
 };
 
 }  // namespace player

@@ -16,6 +16,8 @@
 namespace ave {
 namespace isobmff {
 
+using ave::base::DataSourceBase;
+
 // Header of an ISO BMFF box (atom).
 struct BoxHeader {
   uint32_t type;        // FourCC

@@ -48,7 +48,8 @@ status_t ReadBoxHeader(DataSourceBase* source,
     if (source->ReadAt(offset + 8, buf64.data(), 8) != 8) {
       return ERROR_IO;
     }
-    uint64_t size64 = ntoh64(*reinterpret_cast<uint64_t*>(buf64.data()));
+    uint64_t size64 =
+        ave::base::ntoh64(*reinterpret_cast<uint64_t*>(buf64.data()));
     if (size64 < 16) {
       AVE_LOG(LS_ERROR) << "Invalid extended box size: " << size64;
       return ERROR_MALFORMED;

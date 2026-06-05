@@ -17,13 +17,15 @@
 namespace ave {
 namespace player {
 
+using ave::base::DataSource;
+
 class FFmpegDemuxerFactory : public DemuxerFactory {
  public:
   FFmpegDemuxerFactory() = default;
   ~FFmpegDemuxerFactory() override = default;
 
   std::shared_ptr<Demuxer> CreateDemuxer(
-      std::shared_ptr<ave::DataSource> dataSource) override;
+      std::shared_ptr<DataSource> dataSource) override;
 };
 
 }  // namespace player

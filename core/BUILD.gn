@@ -130,7 +130,7 @@ ave_library("avp_decoder") {
     "avp_tunnel_decoder.h",
   ]
   deps = [
-    "//base:buffer",
+    "//base:buffers",
     "//base:logging",
     "//media/audio:audio",
     "//media/foundation:aac_util",
@@ -167,7 +167,7 @@ ave_library("avp_passthrough_decoder_unittest") {
   sources = [ "avp_passthrough_decoder_unittest.cc" ]
   deps = [
     ":avp_decoder",
-    "//base:buffer",
+    "//base:buffers",
     "//test:test_support",
   ]
 }

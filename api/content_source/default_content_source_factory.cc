@@ -13,13 +13,13 @@
 
 #include "api/demuxer/demuxer_factory.h"
 #include "base/data_source/http_source.h"
-#include "base/net/http/http_provider.h"
 #include "content_source/generic_source.h"
 #include "content_source/http_live/http_live_source.h"
 #include "content_source/http_live/playlist_parser.h"
 
 namespace ave {
 namespace player {
+using ave::base::HTTPSource;
 
 namespace {
 
@@ -35,8 +35,8 @@ bool IsHttpUrl(const std::string& url) {
   return lower.rfind("http://", 0) == 0 || lower.rfind("https://", 0) == 0;
 }
 
-std::shared_ptr<ave::DataSource> CreateHttpDataSource(
-    const std::shared_ptr<net::HTTPProvider>& http_provider,
+std::shared_ptr<DataSource> CreateHttpDataSource(
+    const std::shared_ptr<HTTPProvider>& http_provider,
     const char* url,
     const std::unordered_map<std::string, std::string>& headers) {
   if (!http_provider || !url) {
@@ -92,7 +92,7 @@ std::shared_ptr<ContentSource> DefaultContentSourceFactory::CreateContentSource(
 }
 
 std::shared_ptr<ContentSource> DefaultContentSourceFactory::CreateContentSource(
-    std::shared_ptr<ave::DataSource> data_source) {
+    std::shared_ptr<DataSource> data_source) {
   auto source = std::make_shared<GenericSource>(demuxer_factory_);
   source->SetDataSource(std::move(data_source));
   return source;

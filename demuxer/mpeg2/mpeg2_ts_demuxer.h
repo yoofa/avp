@@ -25,10 +25,12 @@ class TSParser;
 namespace ave {
 namespace player {
 
+using ave::base::DataSource;
+
 class Mpeg2TsDemuxer : public Demuxer,
                        public std::enable_shared_from_this<Mpeg2TsDemuxer> {
  public:
-  explicit Mpeg2TsDemuxer(std::shared_ptr<ave::DataSource> data_source);
+  explicit Mpeg2TsDemuxer(std::shared_ptr<DataSource> data_source);
   ~Mpeg2TsDemuxer() override;
 
   status_t Init();

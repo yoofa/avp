@@ -26,8 +26,8 @@ namespace {
 const int32_t kDefaultPollBufferingIntervalUs = 1000000;
 }  // namespace
 
-using ave::DataSource;
-using ave::FileSource;
+using ave::base::DataSource;
+using ave::base::FileSource;
 using ave::media::Looper;
 using ave::media::MediaSource;
 using ave::media::ReplyToken;

@@ -66,7 +66,7 @@ AVE_EXPORT class AvPlayer : public Player,
       const char* url,
       const std::unordered_map<std::string, std::string>& headers) override;
   status_t SetDataSource(int fd, int64_t offset, int64_t length) override;
-  status_t SetDataSource(std::shared_ptr<ave::DataSource> data_source) override;
+  status_t SetDataSource(std::shared_ptr<DataSource> data_source) override;
   status_t SetDataSource(std::shared_ptr<ContentSource> source) override;
   status_t SetVideoRender(std::shared_ptr<VideoRender> video_render) override;
 

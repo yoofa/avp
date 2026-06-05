@@ -62,7 +62,7 @@ bool IsTrackFormatReady(const std::shared_ptr<media::MediaMeta>& format) {
 
 }  // namespace
 
-Mpeg2TsDemuxer::Mpeg2TsDemuxer(std::shared_ptr<ave::DataSource> data_source)
+Mpeg2TsDemuxer::Mpeg2TsDemuxer(std::shared_ptr<DataSource> data_source)
     : Demuxer(std::move(data_source)) {}
 
 Mpeg2TsDemuxer::~Mpeg2TsDemuxer() = default;

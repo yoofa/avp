@@ -98,7 +98,7 @@ status_t PacketSourceTrack::Read(std::shared_ptr<media::MediaFrame>& frame,
   }
 }
 
-bool SniffMpeg2Ts(std::shared_ptr<ave::DataSource> data_source,
+bool SniffMpeg2Ts(std::shared_ptr<DataSource> data_source,
                   TsPacketLayout* layout) {
   std::array<uint8_t, kMaxTsSyncOffset + kTsSniffPacketCount * kM2tsPacketSize>
       probe = {};
@@ -125,7 +125,7 @@ bool SniffMpeg2Ts(std::shared_ptr<ave::DataSource> data_source,
   return false;
 }
 
-bool SniffMpeg2Ps(std::shared_ptr<ave::DataSource> data_source) {
+bool SniffMpeg2Ps(std::shared_ptr<DataSource> data_source) {
   std::array<uint8_t, 14> scratch = {};
   if (data_source->ReadAt(0, scratch.data(), scratch.size()) !=
       static_cast<ssize_t>(scratch.size())) {

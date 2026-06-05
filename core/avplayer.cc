@@ -111,7 +111,7 @@ status_t AvPlayer::SetDataSource(int fd, int64_t offset, int64_t length) {
   }
   return SetDataSource(source);
 }
-status_t AvPlayer::SetDataSource(std::shared_ptr<ave::DataSource> data_source) {
+status_t AvPlayer::SetDataSource(std::shared_ptr<DataSource> data_source) {
   auto source =
       content_source_factory_->CreateContentSource(std::move(data_source));
   if (source == nullptr) {
@@ -1182,7 +1182,7 @@ void AvPlayer::OnRenderNotify(const std::shared_ptr<Message>& msg) {}
 void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
   // make message->what() to 4cc
   char what_str[5] = {0};
-  MakeFourCCString(message->what(), what_str);
+  base::MakeFourCCString(message->what(), what_str);
   AVE_LOG(LS_INFO) << "AvPlayer::onMessageReceived:" << what_str;
   std::lock_guard<std::mutex> l(mutex_);
   status_t err = ave::OK;

@@ -17,9 +17,9 @@
 #include "demuxer/isobmff/box_types.h"
 #include "media/audio/channel_layout.h"
 #include "media/codec/codec_id.h"
-#include "media/foundation/aac_utils.h"
-#include "media/foundation/avc_utils.h"
+#include "media/foundation/aac/aac_utils.h"
 #include "media/foundation/esds.h"
+#include "media/foundation/h264/avc_utils.h"
 #include "media/foundation/media_errors.h"
 #include "media/foundation/media_mimes.h"
 
@@ -65,7 +65,7 @@ status_t Mp4Source::Read(std::shared_ptr<MediaFrame>& frame,
 
 // ========== Mp4Demuxer ==========
 
-Mp4Demuxer::Mp4Demuxer(std::shared_ptr<ave::DataSource> data_source)
+Mp4Demuxer::Mp4Demuxer(std::shared_ptr<DataSource> data_source)
     : Demuxer(std::move(data_source)) {
   AVE_LOG(LS_INFO) << "Mp4Demuxer created";
 }
@@ -155,7 +155,7 @@ status_t Mp4Demuxer::ParseBoxes(off64_t offset, off64_t end_offset, int depth) {
   }
 
   while (offset < end_offset) {
-    BoxHeader header;
+    BoxHeader header{};
     status_t err = ReadBoxHeader(data_source_.get(), offset, &header);
     if (err != OK) {
       if (offset > 0) {
@@ -220,7 +220,7 @@ status_t Mp4Demuxer::ParseMoov(off64_t offset, off64_t size) {
   off64_t pos = offset;
 
   while (pos < end) {
-    BoxHeader header;
+    BoxHeader header{};
     status_t err = ReadBoxHeader(data_source_.get(), pos, &header);
     if (err != OK) {
       break;
@@ -263,7 +263,7 @@ status_t Mp4Demuxer::ParseTrak(off64_t offset, off64_t size) {
 
   // First pass: find mdia and parse it
   while (pos < end) {
-    BoxHeader header;
+    BoxHeader header{};
     status_t err = ReadBoxHeader(data_source_.get(), pos, &header);
     if (err != OK) {
       break;
@@ -277,8 +277,9 @@ status_t Mp4Demuxer::ParseTrak(off64_t offset, off64_t size) {
     }
 
     off64_t next = header.offset + header.size;
-    if (next <= pos)
+    if (next <= pos) {
       break;
+    }
     pos = next;
   }
 
@@ -312,22 +313,25 @@ status_t Mp4Demuxer::ParseMdiaBox(off64_t offset,
   off64_t pos = offset;
 
   while (pos < end) {
-    BoxHeader header;
+    BoxHeader header{};
     status_t err = ReadBoxHeader(data_source_.get(), pos, &header);
-    if (err != OK)
+    if (err != OK) {
       break;
+    }
 
     switch (header.type) {
       case FOURCC_mdhd:
         err = ParseMdhd(header.data_offset(), header.data_size(), &ctx->track);
-        if (err == OK)
+        if (err == OK) {
           ctx->has_mdhd = true;
+        }
         break;
 
       case FOURCC_hdlr:
         err = ParseHdlr(header.data_offset(), header.data_size(), &ctx->track);
-        if (err == OK)
+        if (err == OK) {
           ctx->has_hdlr = true;
+        }
         break;
 
       case FOURCC_minf: {
@@ -335,18 +339,21 @@ status_t Mp4Demuxer::ParseMdiaBox(off64_t offset,
         off64_t minf_end = header.data_offset() + header.data_size();
         off64_t minf_pos = header.data_offset();
         while (minf_pos < minf_end) {
-          BoxHeader sub;
+          BoxHeader sub{};
           err = ReadBoxHeader(data_source_.get(), minf_pos, &sub);
-          if (err != OK)
+          if (err != OK) {
             break;
+          }
           if (sub.type == FOURCC_stbl) {
             err = ParseStbl(sub.data_offset(), sub.data_size(), &ctx->track);
-            if (err == OK)
+            if (err == OK) {
               ctx->has_stbl = true;
+            }
           }
           off64_t next = sub.offset + sub.size;
-          if (next <= minf_pos)
+          if (next <= minf_pos) {
             break;
+          }
           minf_pos = next;
         }
         break;
@@ -357,8 +364,9 @@ status_t Mp4Demuxer::ParseMdiaBox(off64_t offset,
     }
 
     off64_t next = header.offset + header.size;
-    if (next <= pos)
+    if (next <= pos) {
       break;
+    }
     pos = next;
   }
 
@@ -470,7 +478,7 @@ status_t Mp4Demuxer::ParseStbl(off64_t offset, off64_t size, Track* track) {
   off64_t pos = offset;
 
   while (pos < end) {
-    BoxHeader header;
+    BoxHeader header{};
     status_t err = ReadBoxHeader(data_source_.get(), pos, &header);
     if (err != OK) {
       break;

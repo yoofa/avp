@@ -10,7 +10,6 @@
 
 #include <memory>
 
-#include "api/player_interface.h"
 #include "base/data_source/data_source.h"
 #include "media/foundation/media_meta.h"
 #include "media/foundation/media_source.h"
@@ -18,12 +17,13 @@
 namespace ave {
 namespace player {
 
+using ave::base::DataSource;
 using ave::media::MediaMeta;
 using ave::media::MediaSource;
 
 class Demuxer {
  public:
-  explicit Demuxer(std::shared_ptr<ave::DataSource>(data_source))
+  explicit Demuxer(std::shared_ptr<DataSource>(data_source))
       : data_source_(std::move(data_source)) {}
   virtual ~Demuxer() = default;
 
@@ -39,7 +39,7 @@ class Demuxer {
   virtual const char* name() = 0;
 
  protected:
-  std::shared_ptr<ave::DataSource> data_source_;
+  std::shared_ptr<DataSource> data_source_;
 };
 
 }  // namespace player

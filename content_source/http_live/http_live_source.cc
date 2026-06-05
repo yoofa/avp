@@ -140,7 +140,7 @@ bool HasSyncPattern(const uint8_t* data,
   return true;
 }
 
-bool SniffTsSegment(const std::shared_ptr<ave::DataSource>& data_source,
+bool SniffTsSegment(const std::shared_ptr<DataSource>& data_source,
                     TsPacketLayout* layout) {
   if (!data_source || !layout) {
     return false;
@@ -213,7 +213,7 @@ bool IsTsTrackFormatReady(const std::shared_ptr<media::MediaMeta>& format) {
 
 class TsSegmentExtractor {
  public:
-  explicit TsSegmentExtractor(std::shared_ptr<ave::DataSource> data_source)
+  explicit TsSegmentExtractor(std::shared_ptr<DataSource> data_source)
       : data_source_(std::move(data_source)) {}
 
   status_t Parse() {
@@ -348,7 +348,7 @@ class TsSegmentExtractor {
     }
   }
 
-  std::shared_ptr<ave::DataSource> data_source_;
+  std::shared_ptr<DataSource> data_source_;
   std::unique_ptr<media::mpeg2ts::TSParser> parser_;
   std::shared_ptr<media::mpeg2ts::PacketSource> audio_source_;
   std::shared_ptr<media::mpeg2ts::PacketSource> video_source_;
@@ -360,7 +360,7 @@ class TsSegmentExtractor {
 }  // namespace
 
 HttpLiveSource::HttpLiveSource(std::shared_ptr<DemuxerFactory> demuxer_factory,
-                               std::shared_ptr<net::HTTPProvider> http_provider)
+                               std::shared_ptr<HTTPProvider> http_provider)
     : demuxer_factory_(std::move(demuxer_factory)),
       http_provider_(std::move(http_provider)) {}
 
@@ -884,7 +884,7 @@ status_t HttpLiveSource::LoadFragmentedSegmentLocked(
 }
 
 status_t HttpLiveSource::LoadTsSegmentLocked(
-    const std::shared_ptr<ave::DataSource>& data_source,
+    const std::shared_ptr<DataSource>& data_source,
     int64_t segment_start_time_us) {
   TsSegmentExtractor extractor(data_source);
   status_t err = extractor.Parse();
@@ -918,7 +918,7 @@ status_t HttpLiveSource::LoadTsSegmentLocked(
 }
 
 status_t HttpLiveSource::LoadDemuxedSegmentLocked(
-    const std::shared_ptr<ave::DataSource>& data_source,
+    const std::shared_ptr<DataSource>& data_source,
     int64_t segment_start_time_us) {
   auto demuxer =
       demuxer_factory_ ? demuxer_factory_->CreateDemuxer(data_source) : nullptr;

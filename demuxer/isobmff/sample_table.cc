@@ -17,7 +17,8 @@
 namespace ave {
 namespace isobmff {
 
-using media::ERROR_END_OF_STREAM;
+using ave::base::DataSourceBase;
+
 using media::ERROR_IO;
 using media::ERROR_MALFORMED;
 using media::ERROR_OUT_OF_RANGE;
@@ -57,7 +58,8 @@ status_t SampleTable::SetTimeToSampleParams(off64_t data_offset,
       return ERROR_IO;
     }
 
-    stts_entries_[i] = {sample_count, sample_delta};
+    stts_entries_[i] = {.sample_count = sample_count,
+                        .sample_delta = sample_delta};
 
     if (num_samples_ + sample_count < num_samples_) {
       // overflow
@@ -99,7 +101,8 @@ status_t SampleTable::SetCompositionTimeToSampleParams(off64_t data_offset,
       return ERROR_IO;
     }
 
-    ctts_entries_[i] = {sample_count, static_cast<int32_t>(raw_offset)};
+    ctts_entries_[i] = {.sample_count = sample_count,
+                        .sample_offset = static_cast<int32_t>(raw_offset)};
   }
 
   has_ctts_ = true;
@@ -140,7 +143,9 @@ status_t SampleTable::SetSampleToChunkParams(off64_t data_offset,
     if (first_chunk == 0) {
       return ERROR_MALFORMED;  // 1-based in file
     }
-    stsc_entries_[i] = {first_chunk - 1, samples_per_chunk, sample_desc_index};
+    stsc_entries_[i] = {.first_chunk = first_chunk - 1,
+                        .samples_per_chunk = samples_per_chunk,
+                        .sample_description_index = sample_desc_index};
   }
 
   AVE_LOG(LS_INFO) << "stsc: " << entry_count << " entries";
@@ -441,8 +446,7 @@ bool SampleTable::IsSyncSample(uint32_t sample_index) const {
   if (!has_sync_table_) {
     return true;  // No stss means every sample is a sync sample
   }
-  return std::binary_search(sync_samples_.begin(), sync_samples_.end(),
-                            sample_index);
+  return std::ranges::binary_search(sync_samples_, sample_index);
 }
 
 status_t SampleTable::GetSampleInfo(uint32_t sample_index, SampleInfo* info) {
@@ -533,8 +537,7 @@ status_t SampleTable::FindSyncSampleNear(int64_t time_us,
   }
 
   // Binary search in sorted sync_samples_
-  auto it = std::lower_bound(sync_samples_.begin(), sync_samples_.end(),
-                             target_index);
+  auto it = std::ranges::lower_bound(sync_samples_, target_index);
 
   if (flags == kFlagBefore) {
     if (it != sync_samples_.end() && *it == target_index) {

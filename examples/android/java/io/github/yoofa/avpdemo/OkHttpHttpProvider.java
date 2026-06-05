@@ -24,8 +24,8 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
-import java.net.UnknownHostException;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -89,7 +89,8 @@ public final class OkHttpHttpProvider implements HttpProvider {
         }
 
         @Override
-        public synchronized boolean connect(String uri, String[] headerKeys, String[] headerValues) {
+        public synchronized boolean connect(
+                String uri, String[] headerKeys, String[] headerValues) {
             disconnect();
             if (uri == null) {
                 Log.w(TAG, "connect: null uri");
@@ -300,7 +301,8 @@ public final class OkHttpHttpProvider implements HttpProvider {
             if (network == null) {
                 return baseClient;
             }
-            return baseClient.newBuilder()
+            return baseClient
+                    .newBuilder()
                     .dns(hostname -> resolveHostname(network, hostname))
                     .build();
         }
@@ -314,7 +316,12 @@ public final class OkHttpHttpProvider implements HttpProvider {
                         return resolved;
                     }
                 } catch (UnknownHostException e) {
-                    Log.w(TAG, "resolveHostname: DnsResolver fallback for " + hostname + " exception=" + e);
+                    Log.w(
+                            TAG,
+                            "resolveHostname: DnsResolver fallback for "
+                                    + hostname
+                                    + " exception="
+                                    + e);
                 }
             }
             return Dns.SYSTEM.lookup(hostname);
@@ -345,7 +352,13 @@ public final class OkHttpHttpProvider implements HttpProvider {
 
             try {
                 DnsResolver.getInstance()
-                        .query(network, hostname, DnsResolver.FLAG_EMPTY, Runnable::run, null, callback);
+                        .query(
+                                network,
+                                hostname,
+                                DnsResolver.FLAG_EMPTY,
+                                Runnable::run,
+                                null,
+                                callback);
                 if (!latch.await(NETWORK_REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
                     throw new UnknownHostException("DnsResolver timeout for " + hostname);
                 }
@@ -419,7 +432,8 @@ public final class OkHttpHttpProvider implements HttpProvider {
                     new ConnectivityManager.NetworkCallback() {
                         @Override
                         public void onAvailable(Network network) {
-                            if (hasInternetCapability(network) && networkRef.compareAndSet(null, network)) {
+                            if (hasInternetCapability(network)
+                                    && networkRef.compareAndSet(null, network)) {
                                 latch.countDown();
                             }
                         }

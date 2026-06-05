@@ -19,7 +19,7 @@ DefaultDemuxerFactory::DefaultDemuxerFactory(
       ffmpeg_factory_(std::move(ffmpeg_factory)) {}
 
 std::shared_ptr<Demuxer> DefaultDemuxerFactory::CreateDemuxer(
-    std::shared_ptr<ave::DataSource> dataSource) {
+    std::shared_ptr<DataSource> dataSource) {
   // Try internal (native) demuxers first
   if (internal_factory_) {
     auto demuxer = internal_factory_->CreateDemuxer(dataSource);

@@ -13,6 +13,7 @@
 
 #include "base/data_source/data_source.h"
 #include "base/errors.h"
+#include "base/net/http/http_provider.h"
 #include "media/audio/audio_device.h"
 #include "media/codec/codec_factory.h"
 #include "media/foundation/media_meta.h"
@@ -24,13 +25,10 @@
 #include "api/player_interface.h"
 
 namespace ave {
-namespace net {
-class HTTPProvider;
-}  // namespace net
-}  // namespace ave
-
-namespace ave {
 namespace player {
+
+using ave::base::DataSource;
+using ave::base::net::HTTPProvider;
 
 /**
  * @brief Policy for audio passthrough (compressed audio direct output).
@@ -143,8 +141,7 @@ class Player {
       return *this;
     }
 
-    Builder& setHttpProvider(
-        std::shared_ptr<ave::net::HTTPProvider> http_provider) {
+    Builder& setHttpProvider(std::shared_ptr<HTTPProvider> http_provider) {
       http_provider_ = std::move(http_provider);
       return *this;
     }
@@ -160,7 +157,7 @@ class Player {
     std::shared_ptr<DemuxerFactory> demuxer_factory_;
     std::shared_ptr<ave::media::CodecFactory> codec_factory_;
     std::shared_ptr<ave::media::AudioDevice> audio_device_;
-    std::shared_ptr<ave::net::HTTPProvider> http_provider_;
+    std::shared_ptr<HTTPProvider> http_provider_;
     bool sync_enabled_ = true;
     AudioPassthroughPolicy passthrough_policy_ =
         AudioPassthroughPolicy::ALWAYS_PCM;
@@ -274,7 +271,7 @@ class Player {
    * @param source The custom data source object.
    * @return The status of the operation.
    */
-  virtual status_t SetDataSource(std::shared_ptr<ave::DataSource> source) = 0;
+  virtual status_t SetDataSource(std::shared_ptr<DataSource> source) = 0;
 
   /**
    * @brief Sets the data source for the player using a custom content source

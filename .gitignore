@@ -44,11 +44,11 @@
 /.vscode
 
 # project ignore
-/base
+#/base
 /build
 /buildtools
 /common
-/media
+#/media
 /out
 /testing
 /third_party

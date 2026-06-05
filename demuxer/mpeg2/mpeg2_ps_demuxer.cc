@@ -40,7 +40,7 @@ ssize_t FindStartCodeOffset(const uint8_t* data, size_t size) {
 
 }  // namespace
 
-Mpeg2PsDemuxer::Mpeg2PsDemuxer(std::shared_ptr<ave::DataSource> data_source)
+Mpeg2PsDemuxer::Mpeg2PsDemuxer(std::shared_ptr<DataSource> data_source)
     : Demuxer(std::move(data_source)) {}
 
 Mpeg2PsDemuxer::~Mpeg2PsDemuxer() = default;
@@ -150,8 +150,8 @@ bool Mpeg2PsDemuxer::HasMediaType(media::MediaType type) const {
 }
 
 void Mpeg2PsDemuxer::MaybeAddVisibleTrack(unsigned stream_id) {
-  if (std::find(visible_track_ids_.begin(), visible_track_ids_.end(),
-                stream_id) != visible_track_ids_.end()) {
+  if (std::ranges::find(visible_track_ids_, stream_id) !=
+      visible_track_ids_.end()) {
     return;
   }
   visible_track_ids_.push_back(stream_id);

@@ -19,6 +19,8 @@ namespace ave {
 namespace player {
 namespace mpeg2 {
 
+using ave::base::DataSource;
+
 struct TsPacketLayout {
   size_t sync_offset = 0;
   size_t packet_stride = 188;
@@ -45,9 +47,9 @@ class PacketSourceTrack : public media::MediaSource {
   bool waiting_for_video_sync_ = false;
 };
 
-bool SniffMpeg2Ts(std::shared_ptr<ave::DataSource> data_source,
+bool SniffMpeg2Ts(std::shared_ptr<DataSource> data_source,
                   TsPacketLayout* layout);
-bool SniffMpeg2Ps(std::shared_ptr<ave::DataSource> data_source);
+bool SniffMpeg2Ps(std::shared_ptr<DataSource> data_source);
 
 }  // namespace mpeg2
 }  // namespace player

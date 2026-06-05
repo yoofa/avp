@@ -9,7 +9,6 @@
 #define DEMUXER_ISOBMFF_SAMPLE_TABLE_H_
 
 #include <cstdint>
-#include <memory>
 #include <vector>
 
 #include "base/data_source/data_source_base.h"
@@ -17,6 +16,8 @@
 
 namespace ave {
 namespace isobmff {
+
+using ave::base::DataSourceBase;
 
 // Information about a single sample retrieved from the sample table.
 struct SampleInfo {
@@ -113,7 +114,7 @@ class SampleTable {
 
   // --- Iterator state for sequential access ---
   uint32_t cached_sample_index_ = UINT32_MAX;
-  SampleInfo cached_info_;
+  SampleInfo cached_info_{};
 
   // Internal helpers
   status_t GetSampleSize(uint32_t sample_index, uint32_t* size);

@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "api/demuxer/demuxer.h"
+#include "base/data_source/data_source.h"
 
 namespace ave {
 namespace media {
@@ -26,10 +27,12 @@ class TSParser;
 
 namespace player {
 
+using ave::base::DataSource;
+
 class Mpeg2PsDemuxer : public Demuxer,
                        public std::enable_shared_from_this<Mpeg2PsDemuxer> {
  public:
-  explicit Mpeg2PsDemuxer(std::shared_ptr<ave::DataSource> data_source);
+  explicit Mpeg2PsDemuxer(std::shared_ptr<DataSource> data_source);
   ~Mpeg2PsDemuxer() override;
 
   status_t Init();

@@ -16,13 +16,15 @@
 namespace ave {
 namespace player {
 
+using ave::base::DataSource;
+
 class DemuxerFactory {
  public:
   DemuxerFactory() = default;
   virtual ~DemuxerFactory() = default;
 
   virtual std::shared_ptr<Demuxer> CreateDemuxer(
-      std::shared_ptr<ave::DataSource> dataSource) = 0;
+      std::shared_ptr<DataSource> dataSource) = 0;
 };
 
 }  // namespace player

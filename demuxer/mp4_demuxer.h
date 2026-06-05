@@ -22,13 +22,14 @@
 namespace ave {
 namespace player {
 
+using ave::base::DataSource;
 using ave::media::MediaFrame;
 using ave::media::MediaMeta;
 using ave::media::MediaSource;
 
 class Mp4Demuxer : public Demuxer {
  public:
-  explicit Mp4Demuxer(std::shared_ptr<ave::DataSource> data_source);
+  explicit Mp4Demuxer(std::shared_ptr<DataSource> data_source);
   ~Mp4Demuxer() override;
 
   // Demuxer interface

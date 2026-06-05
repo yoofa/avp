@@ -16,7 +16,7 @@ namespace ave {
 namespace player {
 
 std::shared_ptr<Demuxer> InternalDemuxerFactory::CreateDemuxer(
-    std::shared_ptr<ave::DataSource> data_source) {
+    std::shared_ptr<DataSource> data_source) {
   auto mpeg2ts = std::make_shared<Mpeg2TsDemuxer>(data_source);
   status_t err = mpeg2ts->Init();
   if (err == OK) {
