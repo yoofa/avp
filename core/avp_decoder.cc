@@ -374,9 +374,10 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
         frame->SetPts(vinfo.pts);
       }
     }
-    // Data is copied into the frame — release the codec buffer immediately.
-    decoder_->ReleaseOutputBuffer(index, false);
-    already_released = true;
+    // Delay release of the codec buffer to throttle the decoder.
+    // The render callback below will release it when the frame is consumed or
+    // dropped.
+    already_released = false;
     AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: buffer mode video frame, pts="
                      << (frame ? frame->pts().us_or(-1) : -1)
                      << ", size=" << (frame ? frame->size() : 0);
@@ -391,11 +392,11 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
     avp_render_->RenderFrame(frame, [decoder, index, is_surface_mode,
                                      already_released](bool rendered) {
       if (!already_released) {
-        // Surface mode: render=true causes the codec to blit the decoded
-        // frame to the ANativeWindow at this exact moment.
+        // In both surface mode and buffer mode, release the output buffer
+        // (with 'render=true' for surface mode). This throttles the codec
+        // pipeline to the render queue speed.
         decoder->ReleaseOutputBuffer(index, is_surface_mode && rendered);
       }
-      // Buffer mode: already released immediately after data copy above.
     });
     AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: queuing frame to render, "
                      << "surface_mode=" << is_surface_mode

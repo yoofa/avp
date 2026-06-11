@@ -51,7 +51,11 @@ gboolean Draw(GtkWidget* widget, cairo_t* cr, gpointer data) {
 }  // namespace
 
 GtkWnd::GtkWnd()
-    : window_(nullptr), draw_area_(nullptr), video_render_(nullptr) {}
+    : window_(nullptr),
+      draw_area_(nullptr),
+      video_render_(nullptr),
+      width_(0),
+      height_(0) {}
 
 GtkWnd::~GtkWnd() {}
 
@@ -95,7 +99,7 @@ void GtkWnd::onKeyPress(GtkWidget* widget, GdkEventKey* key) {
 void GtkWnd::onClicked(GtkWidget* widget) {}
 
 void GtkWnd::onRedraw() {
-  GDK_THREADS_ENTER();
+  AVE_LOG(ave::LS_INFO) << "GtkWnd::onRedraw called";
 
   if (video_render_ != nullptr && video_render_->image() != nullptr &&
       draw_area_ != nullptr) {
@@ -133,15 +137,25 @@ void GtkWnd::onRedraw() {
     gtk_widget_queue_draw(draw_area_);
 #endif
   }
-  GDK_THREADS_LEAVE();
 }
 
 void GtkWnd::draw(GtkWidget* widget, cairo_t* cr) {
 #if GTK_MAJOR_VERSION != 2
-  cairo_format_t format = CAIRO_FORMAT_ARGB32;
+  if (!draw_buffer_)
+    return;
+  AVE_LOG(ave::LS_INFO) << "GtkWnd::draw, width: " << width_
+                        << " height: " << height_;
+  cairo_format_t format = CAIRO_FORMAT_RGB24;
   cairo_surface_t* surface = cairo_image_surface_create_for_data(
       draw_buffer_.get(), format, width_ * 2, height_ * 2,
       cairo_format_stride_for_width(format, width_ * 2));
+
+  if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS) {
+    AVE_LOG(ave::LS_ERROR) << "Failed to create cairo surface";
+    cairo_surface_destroy(surface);
+    return;
+  }
+
   cairo_set_source_surface(cr, surface, 0, 0);
   cairo_rectangle(cr, 0, 0, width_ * 2, height_ * 2);
   cairo_fill(cr);
@@ -162,6 +176,16 @@ void GtkWnd::GtkVideoRender::OnFrame(const std::shared_ptr<MediaFrame>& frame) {
     return;
   }
 
+  static int frame_count = 0;
+  if (frame_count++ < 3) {
+    AVE_LOG(ave::LS_INFO) << "OnFrame: " << vinfo->width << "x" << vinfo->height
+                          << " stride=" << vinfo->stride
+                          << " size=" << frame->size();
+    uint8_t* y = frame->data();
+    uint8_t* u = frame->data() + vinfo->stride * vinfo->height;
+    AVE_LOG(ave::LS_INFO) << "Y[0]=" << (int)y[0] << ", U[0]=" << (int)u[0];
+  }
+
   int32_t width = vinfo->width;
   int32_t height = vinfo->height;
   // stride == width because the codec packs with alignment=1
@@ -177,7 +201,6 @@ void GtkWnd::GtkVideoRender::OnFrame(const std::shared_ptr<MediaFrame>& frame) {
 }
 
 void GtkWnd::GtkVideoRender::setSize(int width, int height) {
-  GDK_THREADS_ENTER();
   if (width_ == width && height_ == height) {
     return;
   }
@@ -185,7 +208,6 @@ void GtkWnd::GtkVideoRender::setSize(int width, int height) {
   width_ = width;
   height_ = height;
   image_.reset(new uint8_t[width * height * 4]);
-  GDK_THREADS_LEAVE();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

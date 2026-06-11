@@ -6,6 +6,7 @@
  */
 #include <algorithm>
 
+#include "base/logging.h"
 #include "base/time_utils.h"
 
 #include "avsync_controller.h"
@@ -34,13 +35,6 @@ void AVSyncControllerImpl::UpdateAnchor(int64_t media_pts_us,
                                         int64_t max_media_time_us) {
   std::lock_guard<std::mutex> lock(mutex_);
 
-  // Guard against the master clock going backwards.  Audio writes happen in
-  // bursts (e.g. flushing an empty AAudio buffer at startup or after a stall).
-  // Each burst write calls UpdateAnchor with media_pts_us = write_pts -
-  // latency. Between bursts the clock free-runs forward, so by the time the
-  // next burst arrives its proposed media_pts_us may be lower than the current
-  // clock. Skip the anchor update in that case; only update max_media_time so
-  // the end-of-stream clamp stays accurate.
   if (max_media_time_us_ != -1 && !paused_) {
     const int64_t now_us = GetCurrentSystemTimeUs();
     int64_t current_delta = now_us - anchor_sys_time_us_;
@@ -56,6 +50,10 @@ void AVSyncControllerImpl::UpdateAnchor(int64_t media_pts_us,
       // New anchor would move the clock backwards — skip anchor update.
       max_media_time_us_ =
           std::max({media_pts_us, max_media_time_us, max_media_time_us_});
+      AVE_LOG(base::LS_INFO)
+          << "UpdateAnchor SKIPPED: media_pts_us=" << media_pts_us
+          << " < current_clock=" << current_clock
+          << " max_media=" << max_media_time_us_;
       return;
     }
   }
@@ -64,6 +62,12 @@ void AVSyncControllerImpl::UpdateAnchor(int64_t media_pts_us,
   anchor_sys_time_us_ = sys_time_us;
   max_media_time_us_ =
       std::max({media_pts_us, max_media_time_us, max_media_time_us_});
+
+  AVE_LOG(base::LS_INFO) << "UpdateAnchor SET: anchor_media="
+                         << anchor_media_pts_us_
+                         << " anchor_sys=" << anchor_sys_time_us_
+                         << " max_media=" << max_media_time_us_;
+
   if (paused_) {
     // If paused, update pause anchor as well
     pause_media_pts_us_ = media_pts_us;

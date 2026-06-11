@@ -338,17 +338,6 @@ status_t FFmpegDemuxer::ReadAnAvPacket(size_t index) {
     AVE_DCHECK_LT(static_cast<size_t>(pkt.stream_index), tracks_.size());
 
     if (pkt.stream_index == 0) {
-      // AVE_LOG(LS_INFO)
-      //     << "readAnAvPacket, index:" << pkt.stream_index << ", time_base:"
-      //     << av_format_context_->streams[pkt.stream_index]->time_base.num <<
-      //     "/"
-      //     << av_format_context_->streams[pkt.stream_index]->time_base.den
-      //     << ", pts:" << pkt.pts << ",time_us:"
-      //     << media::ffmpeg_utils::ConvertFromTimeBase(
-      //            av_format_context_->streams[pkt.stream_index]->time_base,
-      //            pkt.pts)
-      //     << ", diff:" << (pkt.pts - lastVideoTimeUs);
-
       lastVideoTimeUs = pkt.pts;
     }
 
@@ -357,21 +346,27 @@ status_t FFmpegDemuxer::ReadAnAvPacket(size_t index) {
       auto& track = tracks_[pkt.stream_index];
       // Apply bitstream filter (e.g. AVCC→Annex-B for H.264/HEVC)
       if (track.bsf_ctx) {
-        AVPacket* filtered_pkt = av_packet_alloc();
         av_bsf_send_packet(track.bsf_ctx, &pkt);
-        if (av_bsf_receive_packet(track.bsf_ctx, filtered_pkt) == 0) {
-          // av_bsf_receive_packet may not set time_base; use bsf output
-          // time_base
-          if (filtered_pkt->time_base.den == 0 ||
-              filtered_pkt->time_base.num == 0) {
-            filtered_pkt->time_base = track.bsf_ctx->time_base_out;
+        while (true) {
+          AVPacket* filtered_pkt = av_packet_alloc();
+          int ret = av_bsf_receive_packet(track.bsf_ctx, filtered_pkt);
+          if (ret == 0) {
+            // av_bsf_receive_packet may not set time_base; use bsf output
+            // time_base
+            if (filtered_pkt->time_base.den == 0 ||
+                filtered_pkt->time_base.num == 0) {
+              filtered_pkt->time_base = track.bsf_ctx->time_base_out;
+            }
+            auto packet =
+                media::ffmpeg_utils::CreateMediaFrameFromAVPacket(filtered_pkt);
+            AppendTrackInfoToPacket(packet, track.meta);
+            track.EnqueuePacket(packet);
           }
-          auto packet =
-              media::ffmpeg_utils::CreateMediaFrameFromAVPacket(filtered_pkt);
-          AppendTrackInfoToPacket(packet, track.meta);
-          track.EnqueuePacket(packet);
+          av_packet_free(&filtered_pkt);
+          if (ret != 0) {
+            break;
+          }
         }
-        av_packet_free(&filtered_pkt);
       } else {
         // av_read_frame may not set pkt.time_base; use stream time_base
         if (pkt.time_base.den == 0 || pkt.time_base.num == 0) {
@@ -384,6 +379,9 @@ status_t FFmpegDemuxer::ReadAnAvPacket(size_t index) {
         track.EnqueuePacket(packet);
       }
     }
+
+    av_packet_unref(&pkt);
+
     if (static_cast<size_t>(pkt.stream_index) == index) {
       break;
     }
@@ -401,7 +399,7 @@ status_t FFmpegDemuxer::ReadAvFrame(std::shared_ptr<MediaFrame>& packet,
 
   // TODO(youfa) readOption
 
-  if (tracks_[index].PacketSize() == 0) {
+  while (tracks_[index].PacketSize() == 0) {
     auto st = ReadAnAvPacket(index);
     if (st != ave::OK) {
       return st;

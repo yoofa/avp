@@ -254,9 +254,17 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
     // For video/subtitle, use original logic with drop frame behavior
     // Calculate delay within mutex lock
     int64_t late_us = sync_enabled_ ? CalculateRenderLateUs(frame) : 0;
+    AVE_LOG(LS_INFO) << "OnRenderTask: video frame pts="
+                     << (frame->video_info() ? frame->video_info()->pts.us()
+                                             : -1)
+                     << " late_us=" << late_us
+                     << " rendered_count=" << frames_rendered_count_;
     if (sync_enabled_ && late_us > kVideoDropThresholdUs &&
         frames_rendered_count_ > 0) {
       // too late, drop the frame (only after at least one frame was rendered)
+      AVE_LOG(LS_INFO) << "OnRenderTask: dropping video frame pts="
+                       << (frame->video_info() ? frame->video_info()->pts.us()
+                                               : -1);
       ReleaseFrame(entry, false);
       frame_queue_.pop();
     } else if (late_us > -5000 || frames_rendered_count_ == 0) {

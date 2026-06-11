@@ -7,6 +7,7 @@
 
 #include "packet_source.h"
 
+#include "base/logging.h"
 #include "base/types.h"
 
 namespace ave {
@@ -58,12 +59,19 @@ size_t PacketSource::GetAvailableBufferCount(status_t* result) {
 status_t PacketSource::QueueAccessunit(std::shared_ptr<MediaFrame> packet) {
   std::lock_guard<std::mutex> l(lock_);
   packets_.push(std::move(packet));
+  AVE_LOG(LS_INFO) << "PacketSource::QueueAccessunit: source=" << this
+                   << " size=" << packets_.size();
   return ave::OK;
 }
 
 status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaFrame>& packet) {
   packet.reset();
   std::unique_lock<std::mutex> l(lock_);
+
+  if (!packets_.size()) {
+    AVE_LOG(LS_INFO) << "PacketSource::DequeueAccessUnit: waiting...";
+  }
+
   while (!packets_.size()) {
     condition_.wait(l);
   }
@@ -71,6 +79,8 @@ status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaFrame>& packet) {
   if (packets_.size()) {
     packet = packets_.front();
     packets_.pop();
+    AVE_LOG(LS_INFO) << "PacketSource::DequeueAccessUnit: dequeued, size left="
+                     << packets_.size();
   }
 
   return ave::OK;

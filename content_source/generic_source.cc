@@ -213,12 +213,19 @@ status_t GenericSource::DequeueAccessUnit(
   status_t result = ave::OK;
 
   if (!track.packet_source->HasBufferAvailable(&result)) {
+    AVE_LOG(LS_INFO) << "DequeueAccessUnit: no buffer available, type="
+                     << static_cast<int>(track_type)
+                     << " source=" << track.packet_source.get();
     if (result == ave::OK) {
       PostReadBuffer(track_type);
       return ave::WOULD_BLOCK;
     }
     return result;
   }
+
+  AVE_LOG(LS_INFO) << "DequeueAccessUnit: HAS buffer available, type="
+                   << static_cast<int>(track_type)
+                   << " source=" << track.packet_source.get();
 
   result = track.packet_source->DequeueAccessUnit(access_unit);
 
@@ -686,7 +693,7 @@ void GenericSource::ReadBuffer(MediaType track_type,
     // will unlock later, add reference
     auto& source = track->source;
 
-    //    AVE_LOG(LS_INFO) << "before read type:" << trackType;
+    AVE_LOG(LS_INFO) << "before read type:" << static_cast<int>(track_type);
     lock_.unlock();
     if (could_read_multiple) {
       err = source->ReadMultiple(media_packets, max_buffers - num_buffer,
@@ -699,7 +706,8 @@ void GenericSource::ReadBuffer(MediaType track_type,
       }
     }
     lock_.lock();
-    //    AVE_LOG(LS_INFO) << "after read" << trackType;
+    AVE_LOG(LS_INFO) << "after read type:" << static_cast<int>(track_type)
+                     << " err=" << err << " count=" << media_packets.size();
 
     // maybe reset, return;
     if (track->packet_source == nullptr) {
