@@ -215,7 +215,7 @@ void AvpPlayerJni::Release(JNIEnv* env) {
     player_->StopSync();
     // 2. Join the player looper thread from THIS (JNI) thread. This prevents
     //    ~AvPlayer() from running on the looper thread and self-joining.
-    player_->PrepareDestroy();
+    player_->Release();
     AVE_LOG(LS_INFO)
         << "AvpPlayerJni::Release: looper stopped, destroying player";
     // 3. Now safe to reset: ~AvPlayer() runs here on JNI thread; looper is

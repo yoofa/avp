@@ -84,7 +84,7 @@ AVE_EXPORT class AvPlayer : public Player,
   /// an external thread. Must be called before the last shared_ptr to this
   /// player is released, to ensure ~AvPlayer() runs on the caller's thread
   /// (not on the looper thread, which would cause a self-join deadlock).
-  void PrepareDestroy() override;
+  void Release() override;
   status_t Pause() override;   // Pauses source, decoders, renderers
   status_t Resume() override;  // Resumes decoders and renderers
   status_t SeekTo(int msec, SeekMode mode) override;
@@ -105,6 +105,22 @@ AVE_EXPORT class AvPlayer : public Player,
   status_t SetVolume(float left_volume, float right_volume) override;
 
   // Track management
+  // State machine enum
+  enum class State {
+    kIdle,
+    kInitialized,
+    kPreparing,
+    kPrepared,
+    kStarted,
+    kPaused,
+    kStopped,
+    kPlaybackCompleted,
+    kError,
+    kEnd
+  };
+
+  State GetState() const { return state_; }
+
   size_t GetTrackCount() const override;
   std::shared_ptr<ave::media::MediaMeta> GetTrackInfo(
       size_t index) const override;
@@ -306,10 +322,8 @@ AVE_EXPORT class AvPlayer : public Player,
   std::shared_ptr<AVPVideoRender> video_render_;
   std::shared_ptr<IAVSyncController> sync_controller_;
 
-  bool started_;
+  State state_ = State::kIdle;
   bool pending_start_with_prepare_async_;
-  bool prepared_;
-  bool paused_;
   bool paused_for_buffering_;
   bool sync_enabled_ = true;
   AudioPassthroughPolicy passthrough_policy_ =

@@ -38,10 +38,7 @@ AvPlayer::AvPlayer(std::shared_ptr<ContentSourceFactory> content_source_factory,
       codec_factory_(std::move(codec_factory)),
       audio_device_(std::move(audio_device)),
       player_looper_(std::make_shared<Looper>()),
-      started_(false),
       pending_start_with_prepare_async_(false),
-      prepared_(false),
-      paused_(false),
       paused_for_buffering_(false),
       paused_by_client_(false),
       source_started_(false),
@@ -71,10 +68,10 @@ AvPlayer::~AvPlayer() {
   if (video_render_) {
     video_render_->Stop();
   }
-  // Stop the player looper. If PrepareDestroy() was already called from an
-  // external thread, the looper is already stopped (thread_ is null) and this
-  // is a no-op. If PrepareDestroy() was NOT called (abnormal teardown), this
-  // will attempt to join; if called from the looper thread itself,
+  // Stop the player looper. If Release() was already called from an
+  // external thread before releasing the last shared_ptr, this
+  // is a no-op. If Release() was NOT called (abnormal teardown), this
+  // attempt to join the looper thread from the caller's thread might triggerlf,
   // Looper::stop() will detach instead of join to avoid deadlock.
   player_looper_->unregisterHandler(id());
   player_looper_->stop();
@@ -163,15 +160,16 @@ status_t AvPlayer::StopSync() {
   return err;
 }
 
-void AvPlayer::PrepareDestroy() {
+void AvPlayer::Release() {
+  state_ = State::kEnd;
   // Stop and join the player looper thread from the caller's (external) thread.
   // This ensures ~AvPlayer() runs on the caller's thread rather than on the
   // looper thread itself, preventing a self-join deadlock in
   // player_looper_->stop().
-  AVE_LOG(LS_INFO) << "AvPlayer::PrepareDestroy: stopping player looper";
+  AVE_LOG(LS_INFO) << "AvPlayer::Release: stopping player looper";
   player_looper_->unregisterHandler(id());
   player_looper_->stop();  // blocks until looper thread fully exits
-  AVE_LOG(LS_INFO) << "AvPlayer::PrepareDestroy: looper stopped";
+  AVE_LOG(LS_INFO) << "AvPlayer::Release: looper stopped";
 }
 
 status_t AvPlayer::Pause() {
@@ -233,7 +231,7 @@ status_t AvPlayer::GetCurrentPosition(int* msec) {
 }
 
 bool AvPlayer::IsPlaying() const {
-  return started_ && !paused_;
+  return state_ == State::kStarted;
 }
 
 int AvPlayer::GetVideoWidth() const {
@@ -483,7 +481,7 @@ bool AvPlayer::ShouldUsePassthrough(
 ///////////////////////////////////////////
 
 void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
-  if (!prepared_) {
+  if (state_ < State::kPrepared) {
     AVE_LOG(LS_INFO)
         << "OnStart: called before prepared, will start after prepared";
     pending_start_with_prepare_async_ = true;
@@ -497,10 +495,17 @@ void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
     source_started_ = true;
   }
 
+  if (state_ == State::kPlaybackCompleted) {
+    PerformSeek(0, SeekMode::SEEK_PREVIOUS_SYNC);
+  }
+  state_ = State::kStarted;
+
   audio_eos_ = false;
   video_eos_ = false;
-  started_ = true;
-  paused_ = false;
+  if (state_ == State::kPlaybackCompleted) {
+    PerformSeek(0, SeekMode::SEEK_PREVIOUS_SYNC);
+  }
+  state_ = State::kStarted;
 
   // Create sync controller if needed
   if (!sync_controller_) {
@@ -576,13 +581,12 @@ void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
 }
 
 void AvPlayer::OnStop() {
-  AVE_LOG(LS_INFO) << "OnStop: started_=" << started_;
-  if (!started_) {
+  AVE_LOG(LS_INFO) << "OnStop: state_=" << static_cast<int>(state_);
+  if (state_ == State::kStopped || state_ == State::kIdle) {
     AVE_LOG(LS_INFO) << "OnStop: already stopped, nothing to do";
     return;
   }
-  started_ = false;
-  paused_ = false;
+  state_ = State::kStopped;
 
   // Stop renders FIRST so they reject any frames produced by decoders
   // during their (potentially slow) shutdown sequence.
@@ -623,10 +627,10 @@ void AvPlayer::OnStop() {
 }
 
 void AvPlayer::OnPause() {
-  if (paused_) {
+  if (state_ != State::kStarted) {
     return;
   }
-  paused_ = true;
+  state_ = State::kPaused;
 
   if (source_) {
     source_->Pause();
@@ -649,10 +653,10 @@ void AvPlayer::OnPause() {
 }
 
 void AvPlayer::OnResume() {
-  if (!paused_) {
+  if (state_ != State::kPaused) {
     return;
   }
-  paused_ = false;
+  state_ = State::kStarted;
   if (audio_decoder_) {
     audio_decoder_->Resume();
   }
@@ -687,7 +691,7 @@ void AvPlayer::OnSeek(int64_t seek_to_us, SeekMode seek_mode) {
 
 void AvPlayer::PerformReset() {
   // If still playing, stop renders and decoders first so the reset is clean.
-  if (started_) {
+  if (state_ == State::kStarted || state_ == State::kPaused) {
     if (audio_render_) {
       audio_render_->Stop();
     }
@@ -702,9 +706,8 @@ void AvPlayer::PerformReset() {
       video_decoder_->Shutdown();
       video_decoder_.reset();
     }
-    started_ = false;
-    paused_ = false;
   }
+  state_ = State::kIdle;
 
   resetting_ = false;
   source_.reset();
@@ -763,7 +766,7 @@ void AvPlayer::PerformDecoderFlush(FlushCommand audio, FlushCommand video) {
 void AvPlayer::PerformScanSources() {
   AVE_LOG(LS_DEBUG) << "performScanSources";
 
-  if (!started_) {
+  if (state_ < State::kStarted) {
     return;
   }
 
@@ -964,6 +967,7 @@ void AvPlayer::OnCompletion() {
 }
 
 void AvPlayer::OnError(status_t error) {
+  state_ = State::kError;
   auto msg = std::make_shared<Message>(kWhatSourceNotify, shared_from_this());
   msg->setInt32(kWhat, kWhatSourceError);
   msg->setInt32(kError, error);
@@ -997,7 +1001,7 @@ void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
           listener->OnError(err);
         }
       } else {
-        prepared_ = true;
+        state_ = State::kPrepared;
         AVE_LOG(LS_INFO) << "OnSourceNotify: prepared=true"
                          << ", pending_start="
                          << pending_start_with_prepare_async_;
@@ -1061,7 +1065,9 @@ void AvPlayer::OnSourceNotify(const std::shared_ptr<Message>& msg) {
     }
     case kWhatSourceBufferingEnd: {
       paused_for_buffering_ = false;
-      if (!paused_ && !paused_by_client_) {
+      if (state_ == State::kStarted && !paused_by_client_) {
+        AVE_LOG(LS_INFO)
+            << "OnSourceNotify: kWhatSourceBufferingEnd, resuming playback";
         if (audio_decoder_) {
           audio_decoder_->Resume();
         }
@@ -1214,7 +1220,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
       }
       AVE_LOG(LS_INFO) << "kWhatSetVideoRender (" << video_render_sink_.get()
                        << ", "
-                       << ((started_ && source_ != nullptr &&
+                       << ((state_ == State::kStarted && source_ != nullptr &&
                             source_->GetTrackInfo(MediaType::VIDEO) !=
                                 nullptr) &&
                                    video_decoder_ != nullptr
@@ -1222,7 +1228,9 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
                                : "no")
                        << "video decoder=" << video_decoder_.get() << ")";
 
-      if (source_ == nullptr || !started_ ||
+      if (source_ == nullptr ||
+          (state_ != State::kStarted && state_ != State::kPaused &&
+           state_ != State::kPlaybackCompleted) ||
           source_->GetTrackInfo(MediaType::VIDEO) == nullptr ||
           (video_decoder_ != nullptr &&
            video_decoder_->SetVideoRender(video_render) == ave::OK)) {
@@ -1240,7 +1248,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
       //     &AvPlayer::PerformSetVideoRender, video_render));
 
       if (video_render) {
-        if (started_) {
+        if (state_ == State::kStarted || state_ == State::kPaused) {
           // int64_t current_time_us = 0;
           //  TODO(youfa): do seek
           //  if (GetCurrentPositionUs(current_time_us) == ave::OK) {
@@ -1269,8 +1277,10 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
     }
 
     case kWhatStart: {
-      AVE_LOG(LS_INFO) << "kWhatStart received, started_=" << started_;
-      if (started_) {
+      AVE_LOG(LS_INFO) << "kWhatStart received, state_="
+                       << static_cast<int>(state_);
+      if (state_ == State::kStarted || state_ == State::kPaused ||
+          state_ == State::kPlaybackCompleted) {
         // do not resume yet if the source is still buffering
         if (!paused_for_buffering_) {
           OnResume();
@@ -1354,11 +1364,11 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
       AVE_LOG(LS_VERBOSE) << "kWhatSeek seek_to_us=" << seek_to_us
                           << " us, mode=" << seek_mode;
 
-      if (!started_) {
+      if (state_ != State::kStarted && state_ != State::kPaused) {
         // Seek before the player is started. In order to preview video,
         // need to start the player and pause it.
         OnStart(seek_to_us, static_cast<SeekMode>(seek_mode));
-        if (started_) {
+        if (state_ == State::kStarted || state_ == State::kPaused) {
           OnPause();
           paused_by_client_ = true;
         }

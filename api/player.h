@@ -322,7 +322,7 @@ class Player {
    *        a self-join deadlock when ~Player() is triggered from the looper.
    *        Must NOT be called from the player's internal looper thread.
    */
-  virtual void PrepareDestroy() = 0;
+  virtual void Release() = 0;
 
   /**
    * @return The status of the operation.
