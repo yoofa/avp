@@ -158,6 +158,8 @@ void AVPAudioRender::Stop() {
       ++passthrough_position_poll_generation_;
       passthrough_position_poll_pending_ = false;
       if (audio_track_started_) {
+        audio_track_->Pause();
+        audio_track_->Flush();
         audio_track_->Stop();
         AVE_LOG(LS_INFO) << "Audio track stopped";
       }
@@ -717,7 +719,8 @@ media::audio_config_t AVPAudioRender::ConvertToAudioConfig(
 
 ssize_t AVPAudioRender::WriteAudioData(
     const std::shared_ptr<media::MediaFrame>& frame) {
-  if (!audio_track_ || !audio_track_->ready()) {
+  std::shared_ptr<media::AudioTrack> track = audio_track_;
+  if (!track || !track->ready()) {
     AVE_LOG(LS_WARNING) << "Audio track not ready";
     return -1;
   }
@@ -730,7 +733,9 @@ ssize_t AVPAudioRender::WriteAudioData(
     return -1;
   }
 
-  ssize_t bytes_written = audio_track_->Write(data, size, true);
+  mutex_.unlock();
+  ssize_t bytes_written = track->Write(data, size, true);
+  mutex_.lock();
 
   AVE_LOG(LS_INFO) << "WriteAudioData: requested=" << size
                    << " written=" << bytes_written;

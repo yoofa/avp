@@ -294,6 +294,9 @@ public class PlayerActivity extends Activity {
         if (player != null) {
             if (isFinishing()) {
                 // Activity is being destroyed; release is handled by surfaceDestroyed/onDestroy.
+                if (player.isPlaying()) {
+                    player.pause();
+                }
                 stopPositionUpdates();
             } else if (player.isPlaying()) {
                 player.pause();
