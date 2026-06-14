@@ -165,7 +165,10 @@ public class PlayerActivity extends Activity {
                     });
 
             player.setOnVideoSizeChangedListener(
-                    (p, width, height) -> Log.d(TAG, "Video size: " + width + "x" + height));
+                    (p, width, height) -> {
+                        Log.d(TAG, "Video size: " + width + "x" + height);
+                        updateSurfaceViewSize(width, height);
+                    });
 
             player.setOnBufferingUpdateListener(
                     (p, percent) ->
@@ -310,6 +313,46 @@ public class PlayerActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
         releasePlayer();
+    }
+
+    private void updateSurfaceViewSize(int width, int height) {
+        if (width <= 0 || height <= 0) return;
+
+        runOnUiThread(
+                () -> {
+                    View parent = (View) surfaceView.getParent();
+                    int parentWidth = parent.getWidth();
+                    int parentHeight = parent.getHeight();
+
+                    if (parentWidth <= 0 || parentHeight <= 0) {
+                        parent.post(() -> updateSurfaceViewSize(width, height));
+                        return;
+                    }
+
+                    double videoAspectRatio = (double) width / height;
+                    double parentAspectRatio = (double) parentWidth / parentHeight;
+
+                    android.widget.FrameLayout.LayoutParams lp =
+                            (android.widget.FrameLayout.LayoutParams) surfaceView.getLayoutParams();
+                    if (videoAspectRatio > parentAspectRatio) {
+                        lp.width = parentWidth;
+                        lp.height = (int) (parentWidth / videoAspectRatio);
+                    } else {
+                        lp.height = parentHeight;
+                        lp.width = (int) (parentHeight * videoAspectRatio);
+                    }
+                    surfaceView.setLayoutParams(lp);
+                    Log.d(
+                            TAG,
+                            "Updated SurfaceView size to "
+                                    + lp.width
+                                    + "x"
+                                    + lp.height
+                                    + " for video "
+                                    + width
+                                    + "x"
+                                    + height);
+                });
     }
 
     private String formatDuration(long ms) {
