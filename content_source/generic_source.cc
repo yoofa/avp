@@ -424,8 +424,8 @@ status_t GenericSource::InitFromDataSource() {
     demuxer_->GetTrackFormat(format, i);
 
     if (format == nullptr) {
-      AVE_LOG(LS_ERROR) << "no metadata for track " << i;
-      return ave::UNKNOWN_ERROR;
+      AVE_LOG(LS_WARNING) << "no metadata for track " << i << ", skipping";
+      continue;
     }
     AVE_LOG(LS_INFO) << "GenericSource track[" << i
                      << "] mime=" << format->mime() << " stream_type="

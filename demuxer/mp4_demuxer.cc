@@ -636,6 +636,11 @@ status_t Mp4Demuxer::ParseStsd(off64_t offset, off64_t size, Track* track) {
     case FOURCC_mp4v:
     case FOURCC_vp09:
     case FOURCC_av01:
+    // Dolby Vision — base layer is HEVC or AVC; parse as video track
+    case FOURCC_dvhe:
+    case FOURCC_dvh1:
+    case FOURCC_dvav:
+    case FOURCC_dva1:
       return ParseVideoSampleEntry(entry_header.data_offset(),
                                    entry_header.data_size(), entry_type, track);
 
@@ -692,6 +697,19 @@ status_t Mp4Demuxer::ParseVideoSampleEntry(off64_t offset,
     case FOURCC_hev1:
       codec_id = CodecId::AVE_CODEC_ID_HEVC;
       mime = MEDIA_MIMETYPE_VIDEO_HEVC;
+      break;
+    // Dolby Vision HEVC (dvhe / dvh1) — underlying stream is HEVC,
+    // signal as Dolby Vision so the decoder can be selected appropriately.
+    case FOURCC_dvhe:
+    case FOURCC_dvh1:
+      codec_id = CodecId::AVE_CODEC_ID_HEVC;
+      mime = MEDIA_MIMETYPE_VIDEO_DOLBY_VISION;
+      break;
+    // Dolby Vision AVC (dvav / dva1) — underlying stream is H.264.
+    case FOURCC_dvav:
+    case FOURCC_dva1:
+      codec_id = CodecId::AVE_CODEC_ID_H264;
+      mime = MEDIA_MIMETYPE_VIDEO_DOLBY_VISION;
       break;
     case FOURCC_mp4v:
       codec_id = CodecId::AVE_CODEC_ID_MPEG4;
@@ -758,7 +776,39 @@ status_t Mp4Demuxer::ParseVideoSampleEntry(off64_t offset,
           AVE_LOG(LS_INFO) << "hvcC: " << hvcc_size << " bytes";
         }
       }
-    } else if (child.type == FOURCC_esds) {
+    } else if (child.type == FOURCC_dvcC) {
+      // Dolby Vision Configuration Box — present in dvhe/dvh1/dvav/dva1.
+      // It contains profile/level/compatibility info. We store it as private
+      // data only if no hvcC/avcC has been seen yet (hvcC takes priority for
+      // actual decoder initialization on most Android implementations).
+      off64_t dvcc_size = child.data_size();
+      if (dvcc_size > 0 && dvcc_size < 1024) {
+        std::vector<uint8_t> dvcc_data(dvcc_size);
+        if (data_source_->ReadAt(child.data_offset(), dvcc_data.data(),
+                                 dvcc_size) == dvcc_size) {
+          // Only use dvcC if we haven't already stored hvcC/avcC
+          if (track->meta->private_data() == nullptr) {
+            track->meta->SetPrivateData(static_cast<uint32_t>(dvcc_size),
+                                        dvcc_data.data());
+          }
+          // Log profile/level from dvcC (bytes 0-1 after version+flags)
+          if (dvcc_size >= 5) {
+            uint8_t dv_version_major = dvcc_data[0];
+            uint8_t dv_version_minor = dvcc_data[1] >> 4;
+            uint8_t dv_profile = (dvcc_data[2] >> 1) & 0x7f;
+            uint8_t dv_level =
+                ((dvcc_data[2] & 0x01) << 5) | ((dvcc_data[3] >> 3) & 0x1f);
+            track->meta->SetCodecProfile(dv_profile);
+            track->meta->SetCodecLevel(dv_level);
+            AVE_LOG(LS_INFO)
+                << "dvcC: version=" << static_cast<int>(dv_version_major) << "."
+                << static_cast<int>(dv_version_minor)
+                << " profile=" << static_cast<int>(dv_profile)
+                << " level=" << static_cast<int>(dv_level) << " (" << dvcc_size
+                << " bytes)";
+          }
+        }
+      }
       // MPEG-4 visual esds
       off64_t esds_size = child.data_size();
       if (esds_size > 4 && esds_size < 1024 * 1024) {

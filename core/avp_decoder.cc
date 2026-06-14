@@ -63,8 +63,8 @@ void AVPDecoder::OnConfigure(const std::shared_ptr<MediaMeta>& format) {
 
   AVE_LOG(LS_INFO) << "AVPDecoder::OnConfigure: codec_id="
                    << static_cast<int>(codec_id)
-                   << ", creating decoder via factory";
-  decoder_ = codec_factory_->CreateCodecByType(codec_id, false);
+                   << ", creating decoder via factory for mime=" << mime;
+  decoder_ = codec_factory_->CreateCodecByMime(mime, false);
 
   if (decoder_ == nullptr) {
     AVE_LOG(LS_ERROR) << "AVPDecoder::OnConfigure: decoder create failed"

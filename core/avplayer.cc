@@ -537,7 +537,19 @@ void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
 
   if (has_video && video_decoder_ == nullptr && video_render_sink_ != nullptr) {
     AVE_LOG(LS_INFO) << "OnStart: instantiating video decoder";
-    InstantiateDecoder(false /* audio */, video_decoder_);
+    status_t err = InstantiateDecoder(false /* audio */, video_decoder_);
+    if (err != ave::OK) {
+      // Video decoder failed (e.g. unsupported codec like Dolby Vision on
+      // non-DV hardware). Degrade gracefully to audio-only playback.
+      AVE_LOG(LS_WARNING) << "OnStart: video decoder failed (err=" << err
+                          << "), falling back to audio-only playback";
+      video_decoder_ = nullptr;
+      if (video_render_) {
+        video_render_->Stop();
+        video_render_ = nullptr;
+      }
+      audio_only_ = true;
+    }
   } else if (has_video) {
     AVE_LOG(LS_WARNING)
         << "OnStart: has video but skip decoder: video_decoder_="

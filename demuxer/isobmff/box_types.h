@@ -72,6 +72,16 @@ constexpr uint32_t FOURCC_avcC = FourCC('a', 'v', 'c', 'C');
 constexpr uint32_t FOURCC_hvc1 = FourCC('h', 'v', 'c', '1');
 constexpr uint32_t FOURCC_hev1 = FourCC('h', 'e', 'v', '1');
 constexpr uint32_t FOURCC_hvcC = FourCC('h', 'v', 'c', 'C');
+constexpr uint32_t FOURCC_dvhe =
+    FourCC('d', 'v', 'h', 'e');  // Dolby Vision HEVC (BL+EL+RPU)
+constexpr uint32_t FOURCC_dvh1 =
+    FourCC('d', 'v', 'h', '1');  // Dolby Vision HEVC (BL+RPU)
+constexpr uint32_t FOURCC_dvav =
+    FourCC('d', 'v', 'a', 'v');  // Dolby Vision AVC (BL+EL+RPU)
+constexpr uint32_t FOURCC_dva1 =
+    FourCC('d', 'v', 'a', '1');  // Dolby Vision AVC (BL+RPU)
+constexpr uint32_t FOURCC_dvcC =
+    FourCC('d', 'v', 'c', 'C');  // Dolby Vision Configuration
 constexpr uint32_t FOURCC_vp09 = FourCC('v', 'p', '0', '9');
 constexpr uint32_t FOURCC_vpcC = FourCC('v', 'p', 'c', 'C');
 constexpr uint32_t FOURCC_av01 = FourCC('a', 'v', '0', '1');
