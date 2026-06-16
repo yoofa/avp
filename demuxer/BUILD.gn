@@ -5,10 +5,10 @@ group("demuxer") {
 }
 
 ave_library("ave_demuxer_factory") {
-  deps = [
-    ":ffmpeg_demuxer_factory",
-    ":internal_demuxer_factory",
-  ]
+  deps = [ ":internal_demuxer_factory" ]
+  if (ave_use_ffmpeg_demuxer) {
+    deps += [ ":ffmpeg_demuxer_factory" ]
+  }
 }
 
 ave_library("ffmpeg_demuxer_factory") {
