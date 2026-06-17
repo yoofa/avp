@@ -403,6 +403,29 @@ status_t AvPlayer::InstantiateDecoder(
   AVE_LOG(LS_INFO) << "InstantiateDecoder: configuring decoder...";
   decoder->Configure(format);
 
+  // Start the renderer BEFORE starting the decoder so that no frames are
+  // dropped due to the renderer not being ready.
+  //
+  // This matters equally for audio and video:
+  // - Video: if early frames are dropped the AV clock sees pts values far
+  //   ahead of 0, causing ScheduleNextFrame to delay by seconds and freeze.
+  // - Audio: audio IS the master AV clock. Dropping early audio frames
+  //   anchors the clock at a non-zero offset, permanently desynchronising
+  //   the video track.
+  //
+  // Both the surface (ANativeWindow) and the AudioDevice are already
+  // available by the time playback is triggered, so there is no reason to
+  // defer renderer start.
+  if (audio && audio_render_) {
+    AVE_LOG(LS_INFO)
+        << "InstantiateDecoder: starting audio render before decoder";
+    audio_render_->Start();
+  } else if (!audio && video_render_) {
+    AVE_LOG(LS_INFO)
+        << "InstantiateDecoder: starting video render before decoder";
+    video_render_->Start();
+  }
+
   AVE_LOG(LS_INFO) << "InstantiateDecoder: starting decoder...";
   decoder->Start();
 
@@ -566,13 +589,15 @@ void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
         << audio_decoder_.get() << ", audio_device_=" << audio_device_.get();
   }
 
-  // Start renders to accept frames (ExoPlayer style render lifecycle)
-  if (audio_render_) {
-    AVE_LOG(LS_INFO) << "OnStart: starting audio render";
+  // Fallback: start renderers here only if they were not already started
+  // inside InstantiateDecoder (e.g. when a decoder was already instantiated
+  // in a previous call and InstantiateDecoder was skipped this time).
+  if (audio_render_ && !audio_render_->IsRunning()) {
+    AVE_LOG(LS_INFO) << "OnStart: starting audio render (fallback)";
     audio_render_->Start();
   }
-  if (video_render_) {
-    AVE_LOG(LS_INFO) << "OnStart: starting video render";
+  if (video_render_ && !video_render_->IsRunning()) {
+    AVE_LOG(LS_INFO) << "OnStart: starting video render (fallback)";
     video_render_->Start();
   }
 

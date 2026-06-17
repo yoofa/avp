@@ -137,6 +137,24 @@ class AVPRender {
     sync_enabled_ = enabled;
   }
 
+  /**
+   * @brief Checks if the renderer is running.
+   * @return True if running, false otherwise.
+   */
+  bool IsRunning() const EXCLUDES(mutex_) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return running_;
+  }
+
+  /**
+   * @brief Checks if the renderer is paused.
+   * @return True if paused, false otherwise.
+   */
+  bool IsPaused() const EXCLUDES(mutex_) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return paused_;
+  }
+
  protected:
   struct QueueEntry {
     std::shared_ptr<media::MediaFrame> frame;
@@ -164,24 +182,6 @@ class AVPRender {
   bool IsRunningLocked() const REQUIRES(mutex_) { return running_; }
 
   bool IsPausedLocked() const REQUIRES(mutex_) { return paused_; }
-
-  /**
-   * @brief Checks if the renderer is running.
-   * @return True if running, false otherwise.
-   */
-  bool IsRunning() const EXCLUDES(mutex_) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return running_;
-  }
-
-  /**
-   * @brief Checks if the renderer is paused.
-   * @return True if paused, false otherwise.
-   */
-  bool IsPaused() const EXCLUDES(mutex_) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return paused_;
-  }
 
   mutable std::mutex mutex_;
   std::unique_ptr<base::TaskRunner> task_runner_;
