@@ -87,6 +87,13 @@ uint64_t AVPVideoRender::RenderFrameInternal(
     }
   }
 
+  if (frame->eos() && frame->size() == 0) {
+    AVE_LOG(LS_INFO)
+        << "RenderFrameInternal: video EOS frame, skipping video sink write";
+    consumed = true;
+    return 0;
+  }
+
   // Pass frame to video render sink
   AVE_LOG(LS_INFO) << "RenderFrameInternal: rendering video frame, pts="
                    << frame->pts().us_or(-1)

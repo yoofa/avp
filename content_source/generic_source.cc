@@ -727,7 +727,9 @@ void GenericSource::ReadBuffer(MediaType track_type,
       break;
     }
     if (err != ave::OK) {
-      // TODO(youfa)
+      if (track->packet_source != nullptr) {
+        track->packet_source->SignalEOS(err);
+      }
       break;
     }
   }

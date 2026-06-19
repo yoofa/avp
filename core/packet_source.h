@@ -46,13 +46,17 @@ class PacketSource {
   size_t GetAvailableBufferCount(status_t* result);
 
   status_t QueueAccessunit(std::shared_ptr<MediaFrame> packet);
-  status_t DequeueAccessUnit(std::shared_ptr<MediaFrame>& packet);
+  status_t DequeueAccessUnit(std::shared_ptr<MediaFrame>& packet)
+      NO_THREAD_SAFETY_ANALYSIS;
+
+  void SignalEOS(status_t result);
 
  private:
   mutable std::mutex lock_;
   std::condition_variable condition_;
   std::shared_ptr<MediaMeta> format_ GUARDED_BY(lock_);
   std::queue<std::shared_ptr<MediaFrame>> packets_ /*GUARDED_BY(lock_)*/;
+  status_t eos_result_ GUARDED_BY(lock_) = ave::OK;
 
   AVE_DISALLOW_COPY_AND_ASSIGN(PacketSource);
 };

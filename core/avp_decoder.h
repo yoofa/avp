@@ -102,6 +102,8 @@ class AVPDecoder : public AVPDecoderBase, public CodecCallback {
 
   bool is_audio_;
   std::list<std::shared_ptr<MediaFrame>> input_packet_queue_;
+  bool eos_reached_ = false;
+  bool eos_sent_ = false;
 };
 
 }  // namespace player

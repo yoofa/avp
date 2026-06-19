@@ -330,6 +330,17 @@ uint64_t AVPAudioRender::RenderFrameInternal(
   const size_t requested_size = frame_to_write ? frame_to_write->size() : 0;
   const bool is_compressed = (current_audio_config_.format & 0xFF000000u) != 0;
 
+  if (frame_to_write && frame_to_write->eos() && requested_size == 0) {
+    AVE_LOG(LS_INFO)
+        << "RenderFrameInternal[AUDIO]: EOS frame, skipping audio track write";
+    if (master_stream_) {
+      UpdateSyncAnchor(frame_to_write);
+    }
+    cached_frame_.reset();
+    consumed = true;
+    return 0;
+  }
+
   if (!is_compressed && frame_to_write) {
     static int s_pcm_debug_frames = 0;
     if (s_pcm_debug_frames < 8) {

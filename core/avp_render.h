@@ -8,6 +8,7 @@
 #ifndef AVE_AVP_AVP_RENDER_H_H_
 #define AVE_AVP_AVP_RENDER_H_H_
 
+#include <condition_variable>
 #include <memory>
 #include <queue>
 
@@ -71,7 +72,7 @@ class AVPRender {
    */
   void RenderFrame(std::shared_ptr<media::MediaFrame> frame,
                    std::unique_ptr<RenderEvent> render_event = nullptr)
-      EXCLUDES(mutex_);
+      NO_THREAD_SAFETY_ANALYSIS;
 
   /**
    * @brief Renders a media frame with proper timing.
@@ -226,6 +227,7 @@ class AVPRender {
   static constexpr size_t kMaxQueueSize = 100;  // Prevent memory overflow
                                                 // Frame queue management
   std::queue<QueueEntry> frame_queue_ GUARDED_BY(mutex_);
+  std::condition_variable queue_cond_;
 };
 
 }  // namespace player

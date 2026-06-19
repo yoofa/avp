@@ -32,7 +32,9 @@ AVPDecoder::AVPDecoder(std::shared_ptr<CodecFactory> codec_factory,
                        std::shared_ptr<AVPRender> render)
     : AVPDecoderBase(notify, source, render),
       codec_factory_(std::move(codec_factory)),
-      is_audio_(false) {}
+      is_audio_(false),
+      eos_reached_(false),
+      eos_sent_(false) {}
 
 AVPDecoder::~AVPDecoder() {
   if (decoder_) {
@@ -166,6 +168,8 @@ void AVPDecoder::OnFlush() {
     decoder_->Flush();
   }
   input_packet_queue_.clear();
+  eos_reached_ = false;
+  eos_sent_ = false;
 }
 
 void AVPDecoder::OnShutdown() {
@@ -194,7 +198,7 @@ bool AVPDecoder::DoRequestInputBuffers() {
 
     if (err != OK) {
       if (err == media::ERROR_END_OF_STREAM) {
-        // TODO: send EOS
+        eos_reached_ = true;
         AVE_LOG(LS_INFO) << "End of stream reached";
       } else {
         ReportError(err);
@@ -250,7 +254,9 @@ void AVPDecoder::FillCodecBuffer(std::shared_ptr<CodecBuffer>& buffer) {
 /************* CodecCallback event handler *************/
 void AVPDecoder::HandleAnInputBuffer(size_t index) {
   AVE_LOG(LS_INFO) << "HandleAnInputBuffer: index=" << index
-                   << ", queue_size=" << input_packet_queue_.size();
+                   << ", queue_size=" << input_packet_queue_.size()
+                   << ", eos_reached=" << eos_reached_
+                   << ", eos_sent=" << eos_sent_;
   if (decoder_ == nullptr) {
     AVE_LOG(LS_ERROR) << "HandleAnInputBuffer: decoder is nullptr";
     ReportError(ave::NO_INIT);
@@ -269,6 +275,25 @@ void AVPDecoder::HandleAnInputBuffer(size_t index) {
   OnRequestInputBuffers();
 
   if (input_packet_queue_.empty()) {
+    if (eos_reached_) {
+      if (!eos_sent_) {
+        codec_buffer->SetRange(0, 0);
+        if (codec_buffer->format()) {
+          codec_buffer->format()->SetEos(true);
+        }
+        AVE_LOG(LS_INFO) << "HandleAnInputBuffer: queuing EOS buffer index="
+                         << index;
+        status_t err = decoder_->QueueInputBuffer(index);
+        if (err == OK) {
+          eos_sent_ = true;
+        } else {
+          AVE_LOG(LS_ERROR) << "Queue EOS buffer failed: " << err;
+          ReportError(err);
+        }
+      }
+      return;
+    }
+
     // No data yet; schedule a retry so we don't send an empty (EOS) buffer
     auto retry_msg =
         std::make_shared<Message>(kWhatRetryInputBuffer, shared_from_this());
@@ -383,19 +408,36 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
                      << ", size=" << (frame ? frame->size() : 0);
   }
 
+  if (frame && buffer->format() && buffer->format()->eos()) {
+    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: setting EOS flag on frame, pts="
+                     << frame->pts().us_or(-1);
+    frame->SetEos(true);
+  }
+
   if (avp_render_) {
     AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: calling RenderFrame, "
                      << "is_audio=" << is_audio_
                      << ", surface_mode=" << is_surface_mode
                      << ", already_released=" << already_released;
     auto decoder = decoder_;
+    bool is_eos = frame ? frame->eos() : false;
+    auto notify = notify_->dup();
+    auto is_audio = is_audio_;
     avp_render_->RenderFrame(frame, [decoder, index, is_surface_mode,
-                                     already_released](bool rendered) {
+                                     already_released, is_eos, notify,
+                                     is_audio](bool rendered) {
       if (!already_released) {
         // In both surface mode and buffer mode, release the output buffer
         // (with 'render=true' for surface mode). This throttles the codec
         // pipeline to the render queue speed.
         decoder->ReleaseOutputBuffer(index, is_surface_mode && rendered);
+      }
+      if (is_eos) {
+        AVE_LOG(LS_INFO) << "EOS frame rendered, notifying player, is_audio="
+                         << is_audio;
+        notify->setInt32(kWhat, kWhatEOS);
+        notify->setInt32("is_audio", is_audio ? 1 : 0);
+        notify->post();
       }
     });
     AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: queuing frame to render, "

@@ -533,6 +533,8 @@ void AvPlayer::OnStart(int64_t start_us, SeekMode seek_mode) {
   // Create sync controller if needed
   if (!sync_controller_) {
     sync_controller_ = std::make_shared<AVSyncControllerImpl>();
+  } else {
+    sync_controller_->SetClockType(IAVSyncController::ClockType::kAudio);
   }
 
   // Instantiate decoders immediately based on current track info (NuPlayer
@@ -709,6 +711,9 @@ void AvPlayer::OnResume() {
 }
 
 void AvPlayer::OnSeek(int64_t seek_to_us, SeekMode seek_mode) {
+  if (sync_controller_) {
+    sync_controller_->SetClockType(IAVSyncController::ClockType::kAudio);
+  }
   if (source_) {
     PerformSeek(seek_to_us, seek_mode);
   }
@@ -1194,6 +1199,11 @@ void AvPlayer::OnDecoderNotify(const std::shared_ptr<Message>& msg) {
       msg->findInt32("is_audio", &is_audio);
       if (is_audio) {
         audio_eos_ = true;
+        if (sync_controller_) {
+          AVE_LOG(LS_INFO)
+              << "Audio EOS reached, switching master clock to system clock";
+          sync_controller_->SetClockType(IAVSyncController::ClockType::kSystem);
+        }
       } else {
         video_eos_ = true;
       }

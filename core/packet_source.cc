@@ -30,6 +30,7 @@ void PacketSource::Clear() {
   std::lock_guard<std::mutex> l(lock_);
   std::queue<std::shared_ptr<MediaFrame>> empty;
   packets_.swap(empty);
+  eos_result_ = ave::OK;
   condition_.notify_all();
 }
 
@@ -42,7 +43,12 @@ bool PacketSource::HasBufferAvailable(status_t* result) {
   std::lock_guard<std::mutex> l(lock_);
   *result = ave::OK;
 
-  return !packets_.empty();
+  if (!packets_.empty()) {
+    return true;
+  }
+
+  *result = eos_result_;
+  return false;
 }
 
 size_t PacketSource::GetAvailableBufferCount(status_t* result) {
@@ -53,6 +59,7 @@ size_t PacketSource::GetAvailableBufferCount(status_t* result) {
     return packets_.size();
   }
 
+  *result = eos_result_;
   return 0;
 }
 
@@ -61,18 +68,20 @@ status_t PacketSource::QueueAccessunit(std::shared_ptr<MediaFrame> packet) {
   packets_.push(std::move(packet));
   AVE_LOG(LS_INFO) << "PacketSource::QueueAccessunit: source=" << this
                    << " size=" << packets_.size();
+  condition_.notify_one();
   return ave::OK;
 }
 
-status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaFrame>& packet) {
+status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaFrame>& packet)
+    NO_THREAD_SAFETY_ANALYSIS {
   packet.reset();
   std::unique_lock<std::mutex> l(lock_);
 
-  if (!packets_.size()) {
+  if (!packets_.size() && eos_result_ == ave::OK) {
     AVE_LOG(LS_INFO) << "PacketSource::DequeueAccessUnit: waiting...";
   }
 
-  while (!packets_.size()) {
+  while (!packets_.size() && eos_result_ == ave::OK) {
     condition_.wait(l);
   }
 
@@ -81,9 +90,20 @@ status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaFrame>& packet) {
     packets_.pop();
     AVE_LOG(LS_INFO) << "PacketSource::DequeueAccessUnit: dequeued, size left="
                      << packets_.size();
+    return ave::OK;
   }
 
-  return ave::OK;
+  return eos_result_;
+}
+
+void PacketSource::SignalEOS(status_t result) {
+  if (result == ave::OK) {
+    AVE_LOG(LS_ERROR) << "SignalEOS: result must not be OK";
+    return;
+  }
+  std::lock_guard<std::mutex> l(lock_);
+  eos_result_ = result;
+  condition_.notify_all();
 }
 
 }  // namespace player

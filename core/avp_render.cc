@@ -36,7 +36,7 @@ AVPRender::~AVPRender() {
 
 void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame,
                             std::unique_ptr<RenderEvent> render_event) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::unique_lock<std::mutex> lock(mutex_);
 
   if (!running_) {
     AVE_LOG(LS_WARNING) << "RenderFrame: renderer not running, dropping "
@@ -56,23 +56,18 @@ void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame,
     return;
   }
 
-  // Check queue size to prevent memory overflow
-  if (frame_queue_.size() >= kMaxQueueSize) {
+  // Check queue size to prevent memory overflow (do not drop EOS frames)
+  while (running_ && frame_queue_.size() >= kMaxQueueSize && !frame->eos()) {
     if (frame->stream_type() == media::MediaType::AUDIO) {
-      // For audio: reject the incoming frame (preserve playback order).
-      // Fire the render_event so the producer's byte-accounting stays correct.
-      AVE_LOG(LS_WARNING)
-          << "Audio frame queue full, dropping incoming frame (back-pressure)";
-      if (render_event) {
-        render_event->OnRenderEvent(false);
-      }
-      return;
+      AVE_LOG(LS_INFO) << "Audio queue full, waiting for space";
+      queue_cond_.wait(lock);
+    } else {
+      // For video: drop oldest to show the most recent frame when behind.
+      // Release the oldest frame's codec buffer via its callback.
+      AVE_LOG(LS_WARNING) << "Frame queue full, dropping oldest frame";
+      ReleaseFrame(frame_queue_.front(), false);
+      frame_queue_.pop();
     }
-    // For video: drop oldest to show the most recent frame when behind.
-    // Release the oldest frame's codec buffer via its callback.
-    AVE_LOG(LS_WARNING) << "Frame queue full, dropping oldest frame";
-    ReleaseFrame(frame_queue_.front(), false);
-    frame_queue_.pop();
   }
 
   // Add frame to queue
@@ -131,6 +126,7 @@ void AVPRender::Stop() {
     while (!frame_queue_.empty()) {
       frame_queue_.pop();
     }
+    queue_cond_.notify_all();
   }
 }
 
@@ -139,6 +135,7 @@ void AVPRender::Pause() {
   if (running_ && !paused_) {
     paused_ = true;
     update_generation_++;
+    queue_cond_.notify_all();
   }
 }
 
@@ -151,6 +148,7 @@ void AVPRender::Resume() {
     if (!frame_queue_.empty()) {
       ScheduleNextFrame();
     }
+    queue_cond_.notify_all();
   }
 }
 
@@ -162,6 +160,7 @@ void AVPRender::Flush() {
   while (!frame_queue_.empty()) {
     frame_queue_.pop();
   }
+  queue_cond_.notify_all();
 }
 
 void AVPRender::ScheduleNextFrame(uint32_t delay_us) {
@@ -249,6 +248,7 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
       ReleaseFrame(entry, true);
       frame_queue_.pop();
       frames_rendered_count_++;
+      queue_cond_.notify_all();
     }
   } else {
     // For video/subtitle, use original logic with drop frame behavior
@@ -267,6 +267,7 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
                                                : -1);
       ReleaseFrame(entry, false);
       frame_queue_.pop();
+      queue_cond_.notify_all();
     } else if (late_us > -5000 || frames_rendered_count_ == 0) {
       // Render if: not too early, OR this is the very first frame ever
       // (first frame may arrive "late" due to codec startup latency while
@@ -281,6 +282,7 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
         ReleaseFrame(entry, true);
         frame_queue_.pop();
         frames_rendered_count_++;
+        queue_cond_.notify_all();
       }
     } else {
       // too early, schedule next frame
