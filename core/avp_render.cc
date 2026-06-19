@@ -73,7 +73,8 @@ void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame,
   // Add frame to queue
   bool was_empty = frame_queue_.empty();
   auto stream_type = frame->stream_type();
-  frame_queue_.push(QueueEntry{std::move(frame), std::move(render_event)});
+  frame_queue_.push(QueueEntry{.frame = std::move(frame),
+                               .render_event = std::move(render_event)});
 
   AVE_LOG(LS_INFO) << "RenderFrame: enqueued "
                    << (stream_type == media::MediaType::AUDIO ? "AUDIO"
@@ -90,7 +91,7 @@ void AVPRender::RenderFrame(std::shared_ptr<media::MediaFrame> frame,
 }
 
 int64_t AVPRender::GetCurrentTimeStamp() const {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (avsync_controller_) {
     return avsync_controller_->GetMasterClock();
   }
@@ -98,12 +99,12 @@ int64_t AVPRender::GetCurrentTimeStamp() const {
 }
 
 size_t AVPRender::QueueSize() const {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   return frame_queue_.size();
 }
 
 void AVPRender::Start() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (!running_) {
     running_ = true;
     paused_ = false;
@@ -116,7 +117,7 @@ void AVPRender::Start() {
 }
 
 void AVPRender::Stop() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (running_) {
     running_ = false;
     paused_ = false;
@@ -131,7 +132,7 @@ void AVPRender::Stop() {
 }
 
 void AVPRender::Pause() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (running_ && !paused_) {
     paused_ = true;
     update_generation_++;
@@ -140,7 +141,7 @@ void AVPRender::Pause() {
 }
 
 void AVPRender::Resume() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (running_ && paused_) {
     paused_ = false;
 
@@ -153,7 +154,7 @@ void AVPRender::Resume() {
 }
 
 void AVPRender::Flush() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   update_generation_++;
 
   // Clear the frame queue
@@ -214,7 +215,7 @@ int64_t AVPRender::CalculateRenderLateUs(
 }
 
 void AVPRender::OnRenderTask(int64_t update_generation) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
 
   // Check if renderer is still in valid state
   if (!running_ || paused_) {

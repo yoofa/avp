@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <array>
 #include <cstdio>
 #include <iostream>
 #include <memory>
@@ -22,7 +23,6 @@
 #include "base/logging.h"
 #include "examples/avplay/file_sink.h"
 
-using namespace ave;
 using ave::player::Player;
 using ave::player::YuvFileVideoRender;
 
@@ -53,16 +53,26 @@ int main(int argc, char* argv[]) {
   int duration_s = 0;
   int choice = -1;
 
-  while (1) {
-    static struct option long_options[] = {
-        {"help", no_argument, 0, 'h'},
-        {"file", required_argument, 0, 'f'},
-        {"output", required_argument, 0, 'o'},
-        {"duration", required_argument, 0, 'd'},
-        {0, 0, 0, 0}};
+  while (true) {
+    static const std::array<struct option, 5> long_options = {
+        {{.name = "help", .has_arg = no_argument, .flag = nullptr, .val = 'h'},
+         {.name = "file",
+          .has_arg = required_argument,
+          .flag = nullptr,
+          .val = 'f'},
+         {.name = "output",
+          .has_arg = required_argument,
+          .flag = nullptr,
+          .val = 'o'},
+         {.name = "duration",
+          .has_arg = required_argument,
+          .flag = nullptr,
+          .val = 'd'},
+         {.name = nullptr, .has_arg = 0, .flag = nullptr, .val = 0}}};
 
     int option_index = 0;
-    choice = getopt_long(argc, argv, "hf:o:d:", long_options, &option_index);
+    choice =
+        getopt_long(argc, argv, "hf:o:d:", long_options.data(), &option_index);
     if (choice == -1) {
       break;
     }

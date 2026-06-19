@@ -34,9 +34,9 @@ std::string Trim(const std::string& value) {
 }
 
 std::string ToLower(std::string value) {
-  std::transform(
-      value.begin(), value.end(), value.begin(),
-      [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  std::ranges::transform(value, value.begin(), [](unsigned char c) {
+    return static_cast<char>(std::tolower(c));
+  });
   return value;
 }
 
@@ -46,7 +46,7 @@ std::string GetScheme(const std::string& uri) {
     return {};
   }
   for (size_t i = 0; i < colon; ++i) {
-    unsigned char c = static_cast<unsigned char>(uri[i]);
+    auto c = static_cast<unsigned char>(uri[i]);
     if (!std::isalpha(c) && !std::isdigit(c) && c != '+' && c != '-' &&
         c != '.') {
       return {};
@@ -184,7 +184,7 @@ std::string ResolveUri(const std::string& base_uri,
   if (!GetScheme(ref_uri).empty()) {
     return ref_uri;
   }
-  if (ref_uri.rfind("//", 0) == 0) {
+  if (ref_uri.starts_with("//")) {
     const std::string scheme = GetScheme(base_uri);
     return scheme.empty() ? ref_uri : scheme + ":" + ref_uri;
   }
@@ -229,7 +229,7 @@ status_t ParsePlaylist(const std::string& base_uri,
       continue;
     }
 
-    if (line.rfind("#EXT-X-STREAM-INF:", 0) == 0) {
+    if (line.starts_with("#EXT-X-STREAM-INF:")) {
       playlist.is_master = true;
       variant = VariantPlaylistItem();
       auto attrs = ParseAttributes(line.substr(18));
@@ -253,7 +253,7 @@ status_t ParsePlaylist(const std::string& base_uri,
       continue;
     }
 
-    if (line.rfind("#EXT-X-MEDIA:", 0) == 0) {
+    if (line.starts_with("#EXT-X-MEDIA:")) {
       auto attrs = ParseAttributes(line.substr(13));
       auto type_it = attrs.find("type");
       auto group_it = attrs.find("group-id");
@@ -276,7 +276,7 @@ status_t ParsePlaylist(const std::string& base_uri,
       continue;
     }
 
-    if (line.rfind("#EXTINF:", 0) == 0) {
+    if (line.starts_with("#EXTINF:")) {
       size_t colon = line.find(':');
       size_t comma = line.find(',', colon == std::string::npos ? 0 : colon + 1);
       const std::string duration_text = line.substr(
@@ -288,7 +288,7 @@ status_t ParsePlaylist(const std::string& base_uri,
       continue;
     }
 
-    if (line.rfind("#EXT-X-TARGETDURATION:", 0) == 0) {
+    if (line.starts_with("#EXT-X-TARGETDURATION:")) {
       int64_t duration_seconds = -1;
       if (ParseInt64(line.substr(22), &duration_seconds)) {
         playlist.target_duration_us = duration_seconds * 1000000LL;
@@ -296,7 +296,7 @@ status_t ParsePlaylist(const std::string& base_uri,
       continue;
     }
 
-    if (line.rfind("#EXT-X-MEDIA-SEQUENCE:", 0) == 0) {
+    if (line.starts_with("#EXT-X-MEDIA-SEQUENCE:")) {
       ParseInt32(line.substr(22), &playlist.media_sequence);
       continue;
     }
@@ -307,7 +307,7 @@ status_t ParsePlaylist(const std::string& base_uri,
       continue;
     }
 
-    if (line.rfind("#EXT-X-PLAYLIST-TYPE:", 0) == 0) {
+    if (line.starts_with("#EXT-X-PLAYLIST-TYPE:")) {
       const std::string type = ToLower(Trim(line.substr(22)));
       if (type == "event") {
         playlist.is_event = true;
@@ -323,7 +323,7 @@ status_t ParsePlaylist(const std::string& base_uri,
       continue;
     }
 
-    if (line.rfind("#EXT-X-KEY:", 0) == 0) {
+    if (line.starts_with("#EXT-X-KEY:")) {
       auto attrs = ParseAttributes(line.substr(11));
       auto it = attrs.find("method");
       if (it != attrs.end() && ToLower(it->second) != "none") {
@@ -332,7 +332,7 @@ status_t ParsePlaylist(const std::string& base_uri,
       continue;
     }
 
-    if (line.rfind("#EXT-X-MAP:", 0) == 0) {
+    if (line.starts_with("#EXT-X-MAP:")) {
       playlist.has_init_segment = true;
       auto attrs = ParseAttributes(line.substr(11));
       auto uri_it = attrs.find("uri");
@@ -356,7 +356,7 @@ status_t ParsePlaylist(const std::string& base_uri,
       continue;
     }
 
-    if (line.rfind("#EXT-X-BYTERANGE:", 0) == 0) {
+    if (line.starts_with("#EXT-X-BYTERANGE:")) {
       ParseByteRange(line.substr(17), &pending_byterange_length,
                      &pending_byterange_offset);
       continue;

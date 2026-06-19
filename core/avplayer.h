@@ -234,8 +234,8 @@ AVE_EXPORT class AvPlayer : public Player,
   // Set video render sink action
   class SetVideoRenderSinkAction : public Action {
    public:
-    SetVideoRenderSinkAction(std::shared_ptr<VideoRender> video_render)
-        : video_render_(video_render) {}
+    explicit SetVideoRenderSinkAction(std::shared_ptr<VideoRender> video_render)
+        : video_render_(std::move(video_render)) {}
     void Execute(AvPlayer* player) override;
 
    private:
@@ -301,7 +301,7 @@ AVE_EXPORT class AvPlayer : public Player,
   void ClearFlushComplete();
   void FlushDecoder(bool audio, bool need_shutdown);
   void CancelPollDuration();
-  void SchedulePollDuration();
+  static void SchedulePollDuration();
 
   //
   std::mutex mutex_;
@@ -349,7 +349,7 @@ AVE_EXPORT class AvPlayer : public Player,
 
   FlushStatus flushing_audio_;
   FlushStatus flushing_video_;
-  bool flush_complete_[2][2];  // [audio/video][decoder/renderer]
+  bool flush_complete_[2][2]{};  // [audio/video][decoder/renderer]
 
   std::weak_ptr<Listener> listener_;
 };

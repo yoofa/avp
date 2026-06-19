@@ -165,7 +165,7 @@ AVPDecoderFactory::DecoderType AVPDecoderFactory::DetermineDecoderType(
 }
 
 bool AVPDecoderFactory::SupportsPassthrough(
-    const std::shared_ptr<MediaMeta>& format) {
+    const std::shared_ptr<MediaMeta>& /*format*/) {
   return true;
 }
 

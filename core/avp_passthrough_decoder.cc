@@ -41,7 +41,7 @@ const int64_t kAggregateBufferDurationUs = 200000;
 const size_t kMaxPassthroughQueueFrames = 10;
 media::audio_config_t ConvertTrackInfoToAudioConfig(
     std::shared_ptr<MediaMeta> meta) {
-  auto audio_info = &(meta->track_info()->audio());
+  auto* audio_info = &(meta->track_info()->audio());
   media::audio_config_t config = media::DefaultAudioConfig;
 
   if (audio_info) {
@@ -153,7 +153,7 @@ void AVPPassthroughDecoder::OnSetParameters(
 }
 
 void AVPPassthroughDecoder::OnSetVideoRender(
-    const std::shared_ptr<VideoRender>& video_render) {
+    const std::shared_ptr<VideoRender>& /*video_render*/) {
   // Passthrough decoder doesn't need video render
   AVE_LOG(LS_VERBOSE) << "OnSetVideoRender: ignored for passthrough decoder";
 }
@@ -406,7 +406,8 @@ void AVPPassthroughDecoder::OnInputBufferFilled(
   cached_bytes_ += prepared_packet->size();
 
   avp_render_->RenderFrame(
-      prepared_packet, [this, size = prepared_packet->size()](bool rendered) {
+      prepared_packet,
+      [this, size = prepared_packet->size()](bool /*rendered*/) {
         auto msg =
             std::make_shared<Message>(kWhatBufferConsumed, shared_from_this());
         msg->setInt32("generation", buffer_generation_);
@@ -429,7 +430,7 @@ void AVPPassthroughDecoder::OnBufferConsumed(int32_t size) {
   OnRequestInputBuffers();
 }
 
-void AVPPassthroughDecoder::DoFlush(bool notifyComplete) {
+void AVPPassthroughDecoder::DoFlush(bool /*notifyComplete*/) {
   ++buffer_generation_;
   skip_rendering_until_media_time_us_ = -1;
   if (aggregate_buffer_) {

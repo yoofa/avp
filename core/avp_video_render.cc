@@ -30,7 +30,7 @@ AVPVideoRender::~AVPVideoRender() {
 }
 
 void AVPVideoRender::SetSink(std::shared_ptr<media::VideoRender> video_render) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   video_render_ = video_render;
   AVE_LOG(LS_INFO) << "Video sink set: " << (video_render_ ? "valid" : "null");
 }

@@ -4,7 +4,7 @@
  *
  * Distributed under terms of the GPLv2 license.
  */
-#include "player/avsync_controller.h"
+#include "avsync_controller.h"
 
 #include <gtest/gtest.h>
 #include <thread>

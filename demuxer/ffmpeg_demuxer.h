@@ -31,7 +31,7 @@ struct FFmpegSource;
 
 class FFmpegDemuxer : public Demuxer {
  public:
-  explicit FFmpegDemuxer(std::shared_ptr<DataSource> dataSource);
+  explicit FFmpegDemuxer(std::shared_ptr<DataSource> data_source);
   ~FFmpegDemuxer() override;
 
   // Demuxer API

@@ -53,7 +53,7 @@ void AVPSubtitleDecoder::OnSetParameters(
 }
 
 void AVPSubtitleDecoder::OnSetVideoRender(
-    const std::shared_ptr<VideoRender>& video_render) {
+    const std::shared_ptr<VideoRender>& /*video_render*/) {
   // Subtitle decoder doesn't need video render directly
   AVE_LOG(LS_VERBOSE) << "OnSetVideoRender: ignored for subtitle decoder";
 }

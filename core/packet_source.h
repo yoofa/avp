@@ -31,12 +31,12 @@ class PacketSource {
   ~PacketSource();
 
   MediaType type() const {
-    std::lock_guard<std::mutex> l(lock_);
+    std::scoped_lock l(lock_);
     return format_->stream_type();
   }
 
-  status_t Start();
-  status_t Stop();
+  static status_t Start();
+  static status_t Stop();
 
   void Clear();
 

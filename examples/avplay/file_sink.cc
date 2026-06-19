@@ -7,8 +7,10 @@
 
 #include "file_sink.h"
 
+#include <array>
 #include <cstdint>
 #include <cstring>
+#include <utility>
 
 #include "base/logging.h"
 #include "media/audio/audio_format.h"
@@ -28,11 +30,11 @@ constexpr uint32_t kWavAudioFormatFloat = 3;
 
 struct WavHeader {
   // RIFF chunk
-  char riff[4] = {'R', 'I', 'F', 'F'};
+  std::array<char, 4> riff = {'R', 'I', 'F', 'F'};
   uint32_t riff_size = 36;  // updated at close
-  char wave[4] = {'W', 'A', 'V', 'E'};
+  std::array<char, 4> wave = {'W', 'A', 'V', 'E'};
   // fmt sub-chunk
-  char fmt[4] = {'f', 'm', 't', ' '};
+  std::array<char, 4> fmt = {'f', 'm', 't', ' '};
   uint32_t fmt_size = 16;
   uint16_t audio_fmt = 1;  // PCM
   uint16_t channels = 2;
@@ -41,7 +43,7 @@ struct WavHeader {
   uint16_t block_align = 0;
   uint16_t bits = 16;
   // data sub-chunk
-  char data[4] = {'d', 'a', 't', 'a'};
+  std::array<char, 4> data = {'d', 'a', 't', 'a'};
   uint32_t data_size = 0;  // updated at close
 } __attribute__((packed));
 
@@ -113,7 +115,8 @@ void YuvFileVideoRender::OnFrame(
 // WavFileAudioTrack
 // ─────────────────────────────────────────────────────────────────────────────
 
-WavFileAudioTrack::WavFileAudioTrack(const std::string& path) : path_(path) {}
+WavFileAudioTrack::WavFileAudioTrack(std::string path)
+    : path_(std::move(path)) {}
 
 WavFileAudioTrack::~WavFileAudioTrack() {
   Close();
@@ -122,7 +125,7 @@ WavFileAudioTrack::~WavFileAudioTrack() {
 status_t WavFileAudioTrack::Open(media::audio_config_t config,
                                  AudioCallback /*cb*/,
                                  void* /*cookie*/) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   sample_rate_ = config.sample_rate;
   channels_ = media::ChannelLayoutToChannelCount(config.channel_layout);
 
@@ -171,7 +174,7 @@ void WavFileAudioTrack::UpdateWavHeader() {
   if (!file_) {
     return;
   }
-  uint32_t data_size = static_cast<uint32_t>(bytes_written_);
+  auto data_size = static_cast<uint32_t>(bytes_written_);
   uint32_t riff_size = data_size + sizeof(WavHeader) - 8;
   // Patch riff_size at offset 4
   fseek(file_, 4, SEEK_SET);
@@ -185,7 +188,7 @@ void WavFileAudioTrack::UpdateWavHeader() {
 ssize_t WavFileAudioTrack::Write(const void* buffer,
                                  size_t size,
                                  bool /*blocking*/) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (!file_ || !ready_) {
     return -1;
   }
@@ -221,7 +224,7 @@ void WavFileAudioTrack::Pause() {
 }
 
 void WavFileAudioTrack::Close() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (file_) {
     UpdateWavHeader();
     fclose(file_);
@@ -245,7 +248,7 @@ status_t WavFileAudioTrack::GetTimestamp(media::AudioTimestamp* ts) const {
 // FileAudioDevice
 // ─────────────────────────────────────────────────────────────────────────────
 
-FileAudioDevice::FileAudioDevice(const std::string& path) : path_(path) {}
+FileAudioDevice::FileAudioDevice(std::string path) : path_(std::move(path)) {}
 
 std::shared_ptr<media::AudioTrack> FileAudioDevice::CreateAudioTrack() {
   return std::make_shared<WavFileAudioTrack>(path_);

@@ -113,12 +113,11 @@ class AVPVideoRenderTest : public ::testing::Test {
   }
 
   // Helper method to create test video frames
-  std::shared_ptr<media::MediaFrame> CreateTestVideoFrame(int64_t pts_us,
-                                                          int width = 1920,
-                                                          int height = 1080) {
+  static std::shared_ptr<media::MediaFrame>
+  CreateTestVideoFrame(int64_t pts_us, int width = 1920, int height = 1080) {
     auto frame = std::make_shared<media::MediaFrame>(
         media::MediaFrame::Create(1024));  // Create with some data size
-    frame->SetMediaType(media::MediaType::VIDEO);
+    frame->SetStreamType(media::MediaType::VIDEO);
 
     auto* video_info = frame->video_info();
     if (video_info) {
@@ -133,10 +132,11 @@ class AVPVideoRenderTest : public ::testing::Test {
   }
 
   // Helper method to create test audio frames (for negative testing)
-  std::shared_ptr<media::MediaFrame> CreateTestAudioFrame(int64_t pts_us) {
+  static std::shared_ptr<media::MediaFrame> CreateTestAudioFrame(
+      int64_t /*pts_us*/) {
     auto frame =
         std::make_shared<media::MediaFrame>(media::MediaFrame::Create(1024));
-    frame->SetMediaType(media::MediaType::AUDIO);
+    frame->SetStreamType(media::MediaType::AUDIO);
     return frame;
   }
 

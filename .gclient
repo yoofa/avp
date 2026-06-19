@@ -4,7 +4,9 @@ solutions = [
     "deps_file"   : 'DEPS',
     "managed"     : False,
     "custom_deps" : {},
-    "custom_vars": {},
+    "custom_vars": {
+      'checkout_clang_tidy': True,
+    },
   },
 ]
 target_os = ["android", "unix"]

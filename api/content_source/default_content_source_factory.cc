@@ -24,15 +24,15 @@ using ave::base::HTTPSource;
 namespace {
 
 std::string ToLower(std::string value) {
-  std::transform(
-      value.begin(), value.end(), value.begin(),
-      [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  std::ranges::transform(value, value.begin(), [](unsigned char c) {
+    return static_cast<char>(std::tolower(c));
+  });
   return value;
 }
 
 bool IsHttpUrl(const std::string& url) {
   const std::string lower = ToLower(url);
-  return lower.rfind("http://", 0) == 0 || lower.rfind("https://", 0) == 0;
+  return lower.starts_with("http://") || lower.starts_with("https://");
 }
 
 std::shared_ptr<DataSource> CreateHttpDataSource(

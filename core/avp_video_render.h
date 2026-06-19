@@ -46,7 +46,7 @@ class AVPVideoRender : public AVPRender {
    * @return Shared pointer to the video render sink, or nullptr if not set.
    */
   std::shared_ptr<media::VideoRender> GetSink() const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     return video_render_;
   }
 

@@ -8,26 +8,106 @@
 #include "mp4_demuxer.h"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
+#include <utility>
 
 #include "base/logging.h"
 #include "base/units/time_delta.h"
 #include "base/units/timestamp.h"
 #include "demuxer/isobmff/box_reader.h"
 #include "demuxer/isobmff/box_types.h"
+#include "demuxer/isobmff/sample_table.h"
 #include "media/audio/channel_layout.h"
 #include "media/codec/codec_id.h"
 #include "media/foundation/aac/aac_utils.h"
 #include "media/foundation/esds.h"
-#include "media/foundation/h264/avc_utils.h"
 #include "media/foundation/media_errors.h"
 #include "media/foundation/media_mimes.h"
 
 namespace ave {
 namespace player {
 
-using namespace isobmff;
-using namespace media;
+using isobmff::BoxHeader;
+using isobmff::SampleInfo;
+using isobmff::SampleTable;
+
+using isobmff::FourCCToString;
+using isobmff::ReadBoxHeader;
+using isobmff::ReadFullBoxHeader;
+
+using isobmff::FOURCC_ac_3;
+using isobmff::FOURCC_alac;
+using isobmff::FOURCC_av01;
+using isobmff::FOURCC_avc1;
+using isobmff::FOURCC_avc3;
+using isobmff::FOURCC_avcC;
+using isobmff::FOURCC_co64;
+using isobmff::FOURCC_ctts;
+using isobmff::FOURCC_dac3;
+using isobmff::FOURCC_dec3;
+using isobmff::FOURCC_dfLa;
+using isobmff::FOURCC_dOps;
+using isobmff::FOURCC_dva1;
+using isobmff::FOURCC_dvav;
+using isobmff::FOURCC_dvcC;
+using isobmff::FOURCC_dvh1;
+using isobmff::FOURCC_dvhe;
+using isobmff::FOURCC_ec_3;
+using isobmff::FOURCC_esds;
+using isobmff::FOURCC_fLaC;
+using isobmff::FOURCC_free;
+using isobmff::FOURCC_ftyp;
+using isobmff::FOURCC_hdlr;
+using isobmff::FOURCC_hev1;
+using isobmff::FOURCC_hvc1;
+using isobmff::FOURCC_hvcC;
+using isobmff::FOURCC_mdat;
+using isobmff::FOURCC_mdhd;
+using isobmff::FOURCC_mdia;
+using isobmff::FOURCC_minf;
+using isobmff::FOURCC_moof;
+using isobmff::FOURCC_moov;
+using isobmff::FOURCC_mp4a;
+using isobmff::FOURCC_mp4v;
+using isobmff::FOURCC_mvhd;
+using isobmff::FOURCC_Opus;
+using isobmff::FOURCC_samr;
+using isobmff::FOURCC_sawb;
+using isobmff::FOURCC_skip;
+using isobmff::FOURCC_soun;
+using isobmff::FOURCC_stbl;
+using isobmff::FOURCC_stco;
+using isobmff::FOURCC_stsc;
+using isobmff::FOURCC_stsd;
+using isobmff::FOURCC_stss;
+using isobmff::FOURCC_stsz;
+using isobmff::FOURCC_stts;
+using isobmff::FOURCC_stz2;
+using isobmff::FOURCC_subt;
+using isobmff::FOURCC_text;
+using isobmff::FOURCC_trak;
+using isobmff::FOURCC_vide;
+using isobmff::FOURCC_vp09;
+using isobmff::FOURCC_wide;
+
+using media::CodecId;
+using media::ERROR_END_OF_STREAM;
+using media::ERROR_IO;
+using media::ERROR_MALFORMED;
+using media::ERROR_UNSUPPORTED;
+using media::MEDIA_MIMETYPE_AUDIO_AAC;
+using media::MEDIA_MIMETYPE_AUDIO_AC3;
+using media::MEDIA_MIMETYPE_AUDIO_ALAC;
+using media::MEDIA_MIMETYPE_AUDIO_EAC3;
+using media::MEDIA_MIMETYPE_AUDIO_FLAC;
+using media::MEDIA_MIMETYPE_AUDIO_OPUS;
+using media::MEDIA_MIMETYPE_VIDEO_AV1;
+using media::MEDIA_MIMETYPE_VIDEO_AVC;
+using media::MEDIA_MIMETYPE_VIDEO_DOLBY_VISION;
+using media::MEDIA_MIMETYPE_VIDEO_HEVC;
+using media::MEDIA_MIMETYPE_VIDEO_MPEG4;
+using media::MEDIA_MIMETYPE_VIDEO_VP9;
 
 static constexpr int kMaxBoxDepth = 64;
 static constexpr off64_t kMaxBoxSize = 256LL * 1024 * 1024;  // 256 MB
@@ -171,9 +251,10 @@ status_t Mp4Demuxer::ParseBoxes(off64_t offset, off64_t end_offset, int depth) {
       continue;
     }
 
-    char fourcc[5];
-    FourCCToString(header.type, fourcc);
-    AVE_LOG(LS_VERBOSE) << "Box '" << fourcc << "' offset=" << header.offset
+    std::array<char, 5> fourcc = {0};
+    FourCCToString(header.type, fourcc.data());
+    AVE_LOG(LS_VERBOSE) << "Box '" << fourcc.data()
+                        << "' offset=" << header.offset
                         << " size=" << header.size << " depth=" << depth;
 
     switch (header.type) {
@@ -192,13 +273,7 @@ status_t Mp4Demuxer::ParseBoxes(off64_t offset, off64_t end_offset, int depth) {
       case FOURCC_free:
       case FOURCC_skip:
       case FOURCC_wide:
-        // Skip data boxes
-        break;
-
       case FOURCC_ftyp:
-        // Could validate compatible brands; skip for now.
-        break;
-
       default:
         break;
     }
@@ -235,9 +310,6 @@ status_t Mp4Demuxer::ParseMoov(off64_t offset, off64_t size) {
         break;
 
       case FOURCC_mvhd:
-        // Could parse movie header for timescale; not strictly needed.
-        break;
-
       default:
         break;
     }
@@ -460,9 +532,10 @@ status_t Mp4Demuxer::ParseHdlr(off64_t offset, off64_t size, Track* track) {
       track->media_type = media::MediaType::SUBTITLE;
       break;
     default: {
-      char fourcc[5];
-      FourCCToString(handler_type, fourcc);
-      AVE_LOG(LS_INFO) << "hdlr: unknown handler type '" << fourcc << "'";
+      std::array<char, 5> fourcc = {0};
+      FourCCToString(handler_type, fourcc.data());
+      AVE_LOG(LS_INFO) << "hdlr: unknown handler type '" << fourcc.data()
+                       << "'";
       track->media_type = media::MediaType::UNKNOWN;
       break;
     }
@@ -524,16 +597,7 @@ status_t Mp4Demuxer::ParseStbl(off64_t offset, off64_t size, Track* track) {
         break;
 
       case FOURCC_stsz:
-        err = ReadFullBoxHeader(data_source_.get(), data_offset, &version,
-                                &flags);
-        if (err == OK) {
-          err = track->sample_table->SetSampleSizeParams(data_offset + 4,
-                                                         data_size - 4);
-        }
-        break;
-
-      case FOURCC_stz2:
-        // Compact sample sizes — treat same as stsz for now
+      case FOURCC_stz2:  // Compact sample sizes — treat same as stsz for now
         err = ReadFullBoxHeader(data_source_.get(), data_offset, &version,
                                 &flags);
         if (err == OK) {
@@ -574,15 +638,16 @@ status_t Mp4Demuxer::ParseStbl(off64_t offset, off64_t size, Track* track) {
     }
 
     if (err != OK) {
-      char fourcc[5];
-      FourCCToString(header.type, fourcc);
-      AVE_LOG(LS_WARNING) << "Failed to parse stbl child '" << fourcc
+      std::array<char, 5> fourcc = {0};
+      FourCCToString(header.type, fourcc.data());
+      AVE_LOG(LS_WARNING) << "Failed to parse stbl child '" << fourcc.data()
                           << "': " << err;
     }
 
     off64_t next = header.offset + header.size;
-    if (next <= pos)
+    if (next <= pos) {
       break;
+    }
     pos = next;
   }
 
@@ -620,7 +685,7 @@ status_t Mp4Demuxer::ParseStsd(off64_t offset, off64_t size, Track* track) {
     return ERROR_MALFORMED;
   }
 
-  BoxHeader entry_header;
+  BoxHeader entry_header{};
   err = ReadBoxHeader(data_source_.get(), entry_offset, &entry_header);
   if (err != OK) {
     return err;
@@ -656,9 +721,10 @@ status_t Mp4Demuxer::ParseStsd(off64_t offset, off64_t size, Track* track) {
                                    entry_header.data_size(), entry_type, track);
 
     default: {
-      char fourcc[5];
-      FourCCToString(entry_type, fourcc);
-      AVE_LOG(LS_WARNING) << "Unknown stsd entry type: '" << fourcc << "'";
+      std::array<char, 5> fourcc = {0};
+      FourCCToString(entry_type, fourcc.data());
+      AVE_LOG(LS_WARNING) << "Unknown stsd entry type: '" << fourcc.data()
+                          << "'";
       return ERROR_UNSUPPORTED;
     }
   }
@@ -747,7 +813,7 @@ status_t Mp4Demuxer::ParseVideoSampleEntry(off64_t offset,
   off64_t child_end = offset + size;
 
   while (child_offset < child_end) {
-    BoxHeader child;
+    BoxHeader child{};
     status_t err = ReadBoxHeader(data_source_.get(), child_offset, &child);
     if (err != OK) {
       break;
@@ -823,8 +889,7 @@ status_t Mp4Demuxer::ParseVideoSampleEntry(off64_t offset,
             if (esds.getCodecSpecificInfo(&codec_data, &codec_data_size) ==
                 OK) {
               track->meta->SetPrivateData(
-                  static_cast<uint32_t>(codec_data_size),
-                  const_cast<void*>(codec_data));
+                  static_cast<uint32_t>(codec_data_size), codec_data);
             }
           }
         }
@@ -832,8 +897,9 @@ status_t Mp4Demuxer::ParseVideoSampleEntry(off64_t offset,
     }
 
     off64_t next = child.offset + child.size;
-    if (next <= child_offset)
+    if (next <= child_offset) {
       break;
+    }
     child_offset = next;
   }
 
@@ -937,7 +1003,7 @@ status_t Mp4Demuxer::ParseAudioSampleEntry(off64_t offset,
   off64_t child_end = offset + size;
 
   while (child_offset < child_end) {
-    BoxHeader child;
+    BoxHeader child{};
     status_t err = ReadBoxHeader(data_source_.get(), child_offset, &child);
     if (err != OK) {
       break;
@@ -957,8 +1023,7 @@ status_t Mp4Demuxer::ParseAudioSampleEntry(off64_t offset,
             if (esds.getCodecSpecificInfo(&codec_data, &codec_data_size) ==
                 OK) {
               track->meta->SetPrivateData(
-                  static_cast<uint32_t>(codec_data_size),
-                  const_cast<void*>(codec_data));
+                  static_cast<uint32_t>(codec_data_size), codec_data);
             }
 
             // Update sample rate from esds if available (may override stsd)
@@ -966,7 +1031,7 @@ status_t Mp4Demuxer::ParseAudioSampleEntry(off64_t offset,
             esds.getObjectTypeIndication(&object_type);
             // 0x40 = Audio ISO/IEC 14496-3
             if (object_type == 0x40 && codec_data_size >= 2) {
-              const uint8_t* asc = static_cast<const uint8_t*>(codec_data);
+              const auto* asc = static_cast<const uint8_t*>(codec_data);
               uint8_t freq_index = ((asc[0] & 0x07) << 1) | (asc[1] >> 7);
               uint32_t asc_sr = ave::media::GetSamplingRate(freq_index);
               if (asc_sr > 0) {
@@ -976,7 +1041,8 @@ status_t Mp4Demuxer::ParseAudioSampleEntry(off64_t offset,
               uint8_t ch_config = (asc[1] >> 3) & 0x0f;
               uint8_t asc_ch = ave::media::GetChannelCount(ch_config);
               if (asc_ch > 0 && asc_ch != channel_count) {
-                AVE_LOG(LS_INFO) << "AAC ASC channels=" << (int)asc_ch;
+                AVE_LOG(LS_INFO)
+                    << "AAC ASC channels=" << static_cast<int>(asc_ch);
               }
             }
           }
@@ -1018,8 +1084,9 @@ status_t Mp4Demuxer::ParseAudioSampleEntry(off64_t offset,
     }
 
     off64_t next = child.offset + child.size;
-    if (next <= child_offset)
+    if (next <= child_offset) {
       break;
+    }
     child_offset = next;
   }
 
@@ -1031,7 +1098,7 @@ status_t Mp4Demuxer::ParseAudioSampleEntry(off64_t offset,
 status_t Mp4Demuxer::ReadSample(size_t track_index,
                                 std::shared_ptr<MediaFrame>& frame,
                                 const MediaSource::ReadOptions* options) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
 
   if (track_index >= tracks_.size()) {
     return BAD_VALUE;
@@ -1042,7 +1109,8 @@ status_t Mp4Demuxer::ReadSample(size_t track_index,
   // Handle seek
   if (options) {
     int64_t seek_time_us = 0;
-    MediaSource::ReadOptions::SeekMode mode;
+    MediaSource::ReadOptions::SeekMode mode =
+        MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC;
     if (options->GetSeekTo(&seek_time_us, &mode)) {
       int flags = SampleTable::kFlagBefore;
       switch (mode) {
@@ -1072,7 +1140,7 @@ status_t Mp4Demuxer::ReadSample(size_t track_index,
     return ERROR_END_OF_STREAM;
   }
 
-  SampleInfo info;
+  SampleInfo info{};
   status_t err = track.sample_table->GetSampleInfo(track.current_sample, &info);
   if (err != OK) {
     return err;
@@ -1086,7 +1154,7 @@ status_t Mp4Demuxer::ReadSample(size_t track_index,
 
   ssize_t bytes_read =
       data_source_->ReadAt(info.offset, frame->data(), info.size);
-  if (bytes_read < 0 || static_cast<uint32_t>(bytes_read) != info.size) {
+  if (bytes_read < 0 || std::cmp_not_equal(bytes_read, info.size)) {
     return ERROR_IO;
   }
   frame->setRange(0, info.size);

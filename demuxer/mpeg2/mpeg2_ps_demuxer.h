@@ -65,8 +65,8 @@ class Mpeg2PsDemuxer : public Demuxer,
 
   TrackState* GetOrCreateTrack(unsigned stream_id);
   unsigned GuessStreamType(unsigned stream_id) const;
-  std::unique_ptr<media::mpeg2ts::ESQueue> CreateQueueForStreamType(
-      unsigned stream_type) const;
+  static std::unique_ptr<media::mpeg2ts::ESQueue> CreateQueueForStreamType(
+      unsigned stream_type);
   status_t AppendPesData(TrackState* track,
                          bool has_pts,
                          uint64_t pts,

@@ -138,7 +138,7 @@ class AVPRenderTest : public ::testing::Test {
   // 只推进媒体时钟
   void AdvanceMediaClockUs(uint64_t delta_us) {
     int64_t current_clock = avsync_controller_->GetMasterClock();
-    int64_t new_time = current_clock + delta_us;
+    int64_t new_time = current_clock + static_cast<int64_t>(delta_us);
     avsync_controller_->SetCurrentTime(new_time);
   }
   // 同时推进两者
@@ -152,10 +152,11 @@ class AVPRenderTest : public ::testing::Test {
     mock_task_runner_factory_->runner()->RunDueTasks();
   }
 
-  std::shared_ptr<media::MediaFrame> CreateTestFrame(media::MediaType type,
-                                                     int64_t pts_us) {
+  static std::shared_ptr<media::MediaFrame> CreateTestFrame(
+      media::MediaType type,
+      int64_t pts_us) {
     auto frame = media::MediaFrame::Create(1024);
-    frame.SetMediaType(type);
+    frame.SetStreamType(type);
 
     if (type == media::MediaType::AUDIO) {
       auto* audio_info = frame.audio_info();
@@ -192,7 +193,7 @@ TEST_F(AVPRenderTest, InitialState) {
             IAVSyncController::ClockType::kSystem);
 
   // Test avsync_controller_ directly
-  MockAVSyncController* mock_ptr =
+  auto* mock_ptr =
       dynamic_cast<MockAVSyncController*>(avsync_controller_.get());
   EXPECT_NE(mock_ptr, nullptr);
 

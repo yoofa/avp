@@ -40,8 +40,9 @@ class MockAudioTrack : public media::AudioTrack {
   float msecsPerFrame() const override { return 11.6f; }
 
   status_t GetTimestamp(media::AudioTimestamp* ts) const override {
-    if (!ts)
+    if (!ts) {
       return -EINVAL;
+    }
     ts->position = position_;
     ts->nanos = 0;
     return OK;
@@ -59,20 +60,22 @@ class MockAudioTrack : public media::AudioTrack {
     return OK;
   }
 
-  ssize_t Write(const void* buffer, size_t size, bool blocking) override {
-    if (!ready_)
+  ssize_t Write(const void* buffer, size_t size, bool /*blocking*/) override {
+    if (!ready_) {
       return -1;
+    }
 
     const auto* bytes = static_cast<const uint8_t*>(buffer);
     last_write_data_.assign(bytes, bytes + size);
     bytes_written_ += size;
     frames_written_ += size / frameSize();
-    return size;
+    return static_cast<ssize_t>(size);
   }
 
   status_t Start() override {
-    if (!ready_)
+    if (!ready_) {
       return -1;
+    }
     started_ = true;
     start_time_us_ = base::TimeMicros();
     return OK;
@@ -103,7 +106,7 @@ class MockAudioTrack : public media::AudioTrack {
   bool started_;
   media::audio_config_t config_;
   AudioCallback callback_;
-  void* cookie_;
+  void* cookie_{};
   uint32_t position_ = 0;
   uint32_t frames_written_ = 0;
   size_t bytes_written_ = 0;
@@ -138,8 +141,8 @@ class MockAudioDevice : public media::AudioDevice {
     return {};
   }
 
-  status_t SetAudioInputDevice(int device_id) override { return OK; }
-  status_t SetAudioOutputDevice(int device_id) override { return OK; }
+  status_t SetAudioInputDevice(int /*device_id*/) override { return OK; }
+  status_t SetAudioOutputDevice(int /*device_id*/) override { return OK; }
 
   std::shared_ptr<MockAudioTrack> last_track() const { return last_track_; }
 
@@ -207,7 +210,7 @@ std::shared_ptr<media::MediaFrame> CreateTestAudioFrame(
   }
 
   // Fill with dummy audio data
-  uint8_t* data = const_cast<uint8_t*>(frame.data());
+  auto* data = const_cast<uint8_t*>(frame.data());
   for (size_t i = 0; i < data_size; i++) {
     data[i] = static_cast<uint8_t>(i % 256);
   }

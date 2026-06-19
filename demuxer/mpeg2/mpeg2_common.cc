@@ -8,6 +8,7 @@
 #include "demuxer/mpeg2/mpeg2_common.h"
 
 #include <array>
+#include <utility>
 
 #include "base/logging.h"
 
@@ -103,7 +104,7 @@ bool SniffMpeg2Ts(std::shared_ptr<DataSource> data_source,
   std::array<uint8_t, kMaxTsSyncOffset + kTsSniffPacketCount * kM2tsPacketSize>
       probe = {};
   ssize_t bytes_read = data_source->ReadAt(0, probe.data(), probe.size());
-  if (bytes_read < static_cast<ssize_t>(kTsPacketSize * kTsSniffPacketCount)) {
+  if (std::cmp_less(bytes_read, kTsPacketSize * kTsSniffPacketCount)) {
     return false;
   }
 
@@ -156,7 +157,8 @@ bool SniffMpeg2Ps(std::shared_ptr<DataSource> data_source) {
 
   const size_t stuffing_length = scratch[13] & 0x07;
   std::array<uint8_t, 3> prefix = {};
-  if (data_source->ReadAt(14 + stuffing_length, prefix.data(), prefix.size()) !=
+  if (data_source->ReadAt(static_cast<off64_t>(14 + stuffing_length),
+                          prefix.data(), prefix.size()) !=
       static_cast<ssize_t>(prefix.size())) {
     return false;
   }

@@ -7,11 +7,17 @@
 
 #include "avp_decoder.h"
 
+#include <array>
 #include <memory>
+#include <queue>
+#include <thread>
+#include <vector>
 
 #include "base/test/mock_task_runner_factory.h"
+#include "media/audio/channel_layout.h"
 #include "media/codec/codec_factory.h"
 #include "media/codec/test/dummy_codec_factory.h"
+#include "media/foundation/media_errors.h"
 #include "media/foundation/media_frame.h"
 #include "media/foundation/media_meta.h"
 #include "test/gtest.h"
@@ -40,28 +46,32 @@ class MockContentSource : public ContentSource {
   void Resume() override {}
 
   status_t DequeueAccessUnit(
-      MediaType track_type,
+      MediaType /*track_type*/,
       std::shared_ptr<MediaFrame>& access_unit) override {
     if (packets_.empty()) {
       return WOULD_BLOCK;
     }
     access_unit = packets_.front();
     packets_.pop();
+    if (access_unit && access_unit->eos()) {
+      return media::ERROR_END_OF_STREAM;
+    }
     return OK;
   }
 
   std::shared_ptr<MediaMeta> GetFormat() override { return format_; }
-  status_t GetDuration(int64_t* duration_us) override {
+  status_t GetDuration(int64_t* /*duration_us*/) override {
     return INVALID_OPERATION;
   }
   size_t GetTrackCount() const override { return 1; }
-  std::shared_ptr<MediaMeta> GetTrackInfo(size_t track_index) const override {
+  std::shared_ptr<MediaMeta> GetTrackInfo(
+      size_t /*track_index*/) const override {
     return format_;
   }
-  status_t SelectTrack(size_t track_index, bool select) override {
+  status_t SelectTrack(size_t /*track_index*/, bool /*select*/) override {
     return INVALID_OPERATION;
   }
-  status_t SeekTo(int64_t seek_time_us, SeekMode mode) override {
+  status_t SeekTo(int64_t /*seek_time_us*/, SeekMode /*mode*/) override {
     return INVALID_OPERATION;
   }
   bool IsStreaming() const override { return false; }
@@ -82,9 +92,8 @@ class MockAVPRender : public AVPRender {
   MockAVPRender() : AVPRender(nullptr, nullptr) {}
   ~MockAVPRender() override = default;
 
-  void RenderFrame(
-      std::shared_ptr<media::MediaFrame> frame,
-      std::unique_ptr<RenderEvent> render_event = nullptr) override {
+  void RenderFrame(std::shared_ptr<media::MediaFrame> frame,
+                   std::unique_ptr<RenderEvent> render_event = nullptr) {
     rendered_frames_.push_back(frame);
     if (render_event) {
       render_event->OnRenderEvent(true);
@@ -105,8 +114,8 @@ class MockAVPRender : public AVPRender {
   void ClearRenderedFrames() { rendered_frames_.clear(); }
 
  protected:
-  uint64_t RenderFrameInternal(std::shared_ptr<media::MediaFrame>& frame,
-                               bool& consumed) override {
+  uint64_t RenderFrameInternal(std::shared_ptr<media::MediaFrame>& /*frame*/,
+                               bool& /*consumed*/) override {
     return 0;
   }
 
@@ -120,7 +129,7 @@ class AVPDecoderTest : public ::testing::Test {
     task_runner_factory_ = std::make_unique<MockTaskRunnerFactory>();
     codec_factory_ = std::make_shared<DummyCodecFactory>();
     content_source_ = std::make_shared<MockContentSource>();
-    render_ = std::make_unique<MockAVPRender>();
+    render_ = std::make_shared<MockAVPRender>();
     notify_ = std::make_shared<Message>();
   }
 
@@ -132,33 +141,33 @@ class AVPDecoderTest : public ::testing::Test {
 
   std::shared_ptr<AVPDecoder> CreateDecoder() {
     return std::make_shared<AVPDecoder>(codec_factory_, notify_,
-                                        content_source_, render_.get());
+                                        content_source_, render_);
   }
 
-  std::shared_ptr<MediaMeta> CreateAudioFormat() {
+  static std::shared_ptr<MediaMeta> CreateAudioFormat() {
     auto format = std::make_shared<MediaMeta>();
-    format->setMime("audio/aac");
-    format->setInt32("sample_rate", 44100);
-    format->setInt32("channel_count", 2);
+    format->SetMime("audio/aac");
+    format->SetSampleRate(44100);
+    format->SetChannelLayout(media::CHANNEL_LAYOUT_STEREO);
     return format;
   }
 
-  std::shared_ptr<MediaMeta> CreateVideoFormat() {
+  static std::shared_ptr<MediaMeta> CreateVideoFormat() {
     auto format = std::make_shared<MediaMeta>();
-    format->setMime("video/avc");
-    format->setInt32("width", 1920);
-    format->setInt32("height", 1080);
+    format->SetMime("video/avc");
+    format->SetWidth(1920);
+    format->SetHeight(1080);
     return format;
   }
 
-  std::shared_ptr<MediaFrame> CreatePacket(const uint8_t* data,
-                                           size_t size,
-                                           int64_t pts = 0) {
+  static std::shared_ptr<MediaFrame> CreatePacket(const uint8_t* data,
+                                                  size_t size,
+                                                  int64_t pts = 0) {
     auto packet = MediaFrame::CreateShared(size);
     if (data && size > 0) {
       memcpy(packet->data(), data, size);
     }
-    packet->setPts(pts);
+    packet->SetPts(base::Timestamp::Micros(pts));
     packet->setRange(0, size);
     return packet;
   }
@@ -166,7 +175,7 @@ class AVPDecoderTest : public ::testing::Test {
   std::unique_ptr<MockTaskRunnerFactory> task_runner_factory_;
   std::shared_ptr<DummyCodecFactory> codec_factory_;
   std::shared_ptr<MockContentSource> content_source_;
-  std::unique_ptr<MockAVPRender> render_;
+  std::shared_ptr<MockAVPRender> render_;
   std::shared_ptr<Message> notify_;
   std::shared_ptr<AVPDecoder> decoder_;
 };
@@ -186,8 +195,8 @@ TEST_F(AVPDecoderTest, ConfigureAudio) {
   decoder_->Start();
 
   // Add some test packets
-  uint8_t test_data[] = {0x00, 0x01, 0x02, 0x03};
-  auto packet = CreatePacket(test_data, sizeof(test_data), 1000);
+  std::array<uint8_t, 4> test_data = {0x00, 0x01, 0x02, 0x03};
+  auto packet = CreatePacket(test_data.data(), test_data.size(), 1000);
   content_source_->AddPacket(packet);
 
   // Let the decoder process
@@ -208,8 +217,8 @@ TEST_F(AVPDecoderTest, ConfigureVideo) {
   decoder_->Start();
 
   // Add some test packets
-  uint8_t test_data[] = {0x00, 0x01, 0x02, 0x03};
-  auto packet = CreatePacket(test_data, sizeof(test_data), 1000);
+  std::array<uint8_t, 4> test_data = {0x00, 0x01, 0x02, 0x03};
+  auto packet = CreatePacket(test_data.data(), test_data.size(), 1000);
   content_source_->AddPacket(packet);
 
   // Let the decoder process
@@ -231,7 +240,7 @@ TEST_F(AVPDecoderTest, HandleEndOfStream) {
 
   // Add EOS packet
   auto eos_packet = CreatePacket(nullptr, 0, 0);
-  eos_packet->setFlags(MediaFrame::FLAG_END_OF_STREAM);
+  eos_packet->SetEos(true);
   content_source_->AddPacket(eos_packet);
 
   // Let the decoder process
@@ -243,7 +252,7 @@ TEST_F(AVPDecoderTest, ErrorHandling) {
 
   // Try to configure with invalid format
   auto invalid_format = std::make_shared<MediaMeta>();
-  invalid_format->setMime("invalid/mime");
+  invalid_format->SetMime("invalid/mime");
 
   decoder_->Init();
   decoder_->Configure(invalid_format);

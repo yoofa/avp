@@ -33,7 +33,7 @@ int64_t AVSyncControllerImpl::GetCurrentSystemTimeUs() const {
 void AVSyncControllerImpl::UpdateAnchor(int64_t media_pts_us,
                                         int64_t sys_time_us,
                                         int64_t max_media_time_us) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
 
   if (max_media_time_us_ != -1 && !paused_) {
     const int64_t now_us = GetCurrentSystemTimeUs();
@@ -76,7 +76,7 @@ void AVSyncControllerImpl::UpdateAnchor(int64_t media_pts_us,
 }
 
 int64_t AVSyncControllerImpl::GetMasterClock() const {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
 
   if (max_media_time_us_ == -1) {
     return 0;
@@ -113,7 +113,7 @@ int64_t AVSyncControllerImpl::GetMasterClock() const {
 }
 
 void AVSyncControllerImpl::SetPlaybackRate(float rate) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (rate < 0.0f) {
     rate = 0.0f;  // Clamp to non-negative
   }
@@ -121,22 +121,22 @@ void AVSyncControllerImpl::SetPlaybackRate(float rate) {
 }
 
 float AVSyncControllerImpl::GetPlaybackRate() const {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   return playback_rate_;
 }
 
 void AVSyncControllerImpl::SetClockType(ClockType type) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   clock_type_ = type;
 }
 
 IAVSyncController::ClockType AVSyncControllerImpl::GetClockType() const {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   return clock_type_;
 }
 
 void AVSyncControllerImpl::Pause() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (!paused_) {
     // Record the pause anchor
     pause_sys_time_us_ = GetCurrentSystemTimeUs();
@@ -152,7 +152,7 @@ void AVSyncControllerImpl::Pause() {
 }
 
 void AVSyncControllerImpl::Resume() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (paused_) {
     const int64_t now_us = GetCurrentSystemTimeUs();
     // Adjust anchor to account for pause duration
@@ -163,7 +163,7 @@ void AVSyncControllerImpl::Resume() {
 }
 
 void AVSyncControllerImpl::Reset() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   anchor_media_pts_us_ = 0;
   anchor_sys_time_us_ = 0;
   max_media_time_us_ = -1;

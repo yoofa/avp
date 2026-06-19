@@ -8,6 +8,7 @@
 #include "ffmpeg_demuxer.h"
 
 #include <iostream>
+#include <utility>
 
 #include "base/checks.h"
 #include "base/hexdump.h"
@@ -56,6 +57,8 @@ void AppendTrackInfoToPacket(std::shared_ptr<MediaFrame>& packet,
       break;
     }
     case media::MediaType::VIDEO: {
+      // TODO: Set codec-specific information for video streams if needed
+      packet->SetWidth(track_meta->width());
       break;
     }
 
@@ -121,7 +124,6 @@ static int64_t AVIOSeekOperation(void* opaque, int64_t offset, int whence) {
 
 ////////////////////////////////////
 
-using ave::media::Buffer;
 using ave::media::MediaMeta;
 using ave::media::MediaSource;
 
@@ -342,7 +344,7 @@ status_t FFmpegDemuxer::ReadAnAvPacket(size_t index) {
     }
 
     if (pkt.stream_index >= 0 &&
-        pkt.stream_index < static_cast<int>(tracks_.size())) {
+        std::cmp_less(pkt.stream_index, tracks_.size())) {
       auto& track = tracks_[pkt.stream_index];
       // Apply bitstream filter (e.g. AVCC→Annex-B for H.264/HEVC)
       if (track.bsf_ctx) {
@@ -382,7 +384,7 @@ status_t FFmpegDemuxer::ReadAnAvPacket(size_t index) {
 
     av_packet_unref(&pkt);
 
-    if (static_cast<size_t>(pkt.stream_index) == index) {
+    if (std::cmp_equal(pkt.stream_index, index)) {
       break;
     }
   }
@@ -390,9 +392,10 @@ status_t FFmpegDemuxer::ReadAnAvPacket(size_t index) {
   return err;
 }
 
-status_t FFmpegDemuxer::ReadAvFrame(std::shared_ptr<MediaFrame>& packet,
-                                    size_t index,
-                                    const MediaSource::ReadOptions* options) {
+status_t FFmpegDemuxer::ReadAvFrame(
+    std::shared_ptr<MediaFrame>& packet,
+    size_t index,
+    const MediaSource::ReadOptions* /*options*/) {
   if (index >= tracks_.size()) {
     return ave::UNKNOWN_ERROR;
   }

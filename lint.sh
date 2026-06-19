@@ -187,7 +187,7 @@ run_clang_tidy() {
 
   # 头文件过滤：只报告 TIDY_DIRS 中的头文件问题，排除 gen/（自动生成）
   local header_filter
-  header_filter=".*(${dir_pattern})/(?!.*gen/).*"
+  header_filter="^${REPO_ROOT}/(${dir_pattern})/(?!.*gen/).*"
 
   log_info "检查目录：${TIDY_DIRS[*]}"
   log_info "并行度：$JOBS"
@@ -205,7 +205,7 @@ run_clang_tidy() {
       -quiet \
       -header-filter="${header_filter}" \
       -source-filter="${header_filter}" \
-      "${dir_pattern}" \
+      "^${REPO_ROOT}/(${dir_pattern})/" \
       2>&1 || true
   )
 

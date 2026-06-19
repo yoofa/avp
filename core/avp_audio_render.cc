@@ -7,6 +7,8 @@
 
 #include "avp_audio_render.h"
 
+#include <utility>
+
 #include "base/checks.h"
 #include "base/errors.h"
 #include "base/logging.h"
@@ -45,7 +47,7 @@ AVPAudioRender::~AVPAudioRender() {
 }
 
 status_t AVPAudioRender::OpenAudioSink(const media::audio_config_t& config) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
 
   AVE_LOG(LS_INFO) << "Opening audio sink with sample_rate: "
                    << config.sample_rate
@@ -84,7 +86,7 @@ status_t AVPAudioRender::OpenAudioSink(const media::audio_config_t& config) {
 }
 
 void AVPAudioRender::CloseAudioSink() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
 
   if (audio_sink_ready_) {
     AVE_LOG(LS_INFO) << "Closing audio sink";
@@ -95,12 +97,12 @@ void AVPAudioRender::CloseAudioSink() {
 }
 
 bool AVPAudioRender::IsAudioSinkReady() const {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   return audio_sink_ready_ && audio_track_ && audio_track_->ready();
 }
 
 void AVPAudioRender::SetPlaybackRate(float rate) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
 
   if (rate <= 0.0f) {
     AVE_LOG(LS_WARNING) << "Invalid playback rate: " << rate;
@@ -121,7 +123,7 @@ void AVPAudioRender::SetPlaybackRate(float rate) {
 
 void AVPAudioRender::Start() {
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
 
     // Reset audio pacing state on every fresh start so the new session
     // measures ahead-ness relative to its own start time.
@@ -152,7 +154,7 @@ void AVPAudioRender::Start() {
 
 void AVPAudioRender::Stop() {
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
 
     if (audio_track_) {
       ++passthrough_position_poll_generation_;
@@ -171,7 +173,7 @@ void AVPAudioRender::Stop() {
 
 void AVPAudioRender::Pause() {
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
 
     if (audio_track_) {
       ++passthrough_position_poll_generation_;
@@ -185,7 +187,7 @@ void AVPAudioRender::Pause() {
 
 void AVPAudioRender::Resume() {
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
 
     if (audio_track_) {
       if (audio_track_started_) {
@@ -211,7 +213,7 @@ void AVPAudioRender::Resume() {
 
 void AVPAudioRender::Flush() {
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
 
     // Reset audio pacing so the next burst of frames after a seek/flush is
     // measured from the new position, not the old one.
@@ -370,7 +372,7 @@ uint64_t AVPAudioRender::RenderFrameInternal(
   if (bytes_written > 0) {
     total_bytes_written_ += bytes_written;
     const bool full_frame_written =
-        static_cast<size_t>(bytes_written) >= requested_size;
+        std::cmp_greater_equal(bytes_written, requested_size);
 
     if (is_compressed && full_frame_written && written_audio_info &&
         written_audio_info->pts.IsFinite()) {
@@ -522,8 +524,7 @@ void AVPAudioRender::MaybeStartCompressedTrackLocked(
     preroll_us = 0;
   }
 
-  const bool sink_backpressured =
-      static_cast<size_t>(bytes_written) < requested_size;
+  const bool sink_backpressured = std::cmp_less(bytes_written, requested_size);
   if (!sink_backpressured && preroll_us < kCompressedStartPrerollUs) {
     return;
   }
@@ -550,7 +551,7 @@ void AVPAudioRender::MaybeScheduleCompressedPositionPollLocked(
 }
 
 void AVPAudioRender::OnCompressedPositionPoll(int32_t generation) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   passthrough_position_poll_pending_ = false;
 
   if (generation != passthrough_position_poll_generation_ || !master_stream_ ||
@@ -635,8 +636,8 @@ bool AVPAudioRender::HasAudioFormatChanged(
   }
 
   // Check sample rate
-  if (current_audio_config_.sample_rate !=
-      static_cast<uint32_t>(audio_info->sample_rate_hz)) {
+  if (std::cmp_not_equal(current_audio_config_.sample_rate,
+                         audio_info->sample_rate_hz)) {
     return true;
   }
 
@@ -894,13 +895,10 @@ bool AVPAudioRender::SupportsPlaybackRateChange() const {
 
   // For now, assume PCM tracks don't support rate changes but offload tracks
   // might
-  if (current_audio_config_.format == media::AUDIO_FORMAT_PCM_16_BIT ||
-      current_audio_config_.format == media::AUDIO_FORMAT_PCM_24_BIT_PACKED ||
-      current_audio_config_.format == media::AUDIO_FORMAT_PCM_FLOAT) {
-    return false;  // PCM tracks typically don't support rate changes
-  }
-
-  return true;  // Offload tracks might support rate changes
+  return current_audio_config_.format != media::AUDIO_FORMAT_PCM_16_BIT &&
+         current_audio_config_.format !=
+             media::AUDIO_FORMAT_PCM_24_BIT_PACKED &&
+         current_audio_config_.format != media::AUDIO_FORMAT_PCM_FLOAT;
 }
 
 void AVPAudioRender::ApplyPlaybackRate() {

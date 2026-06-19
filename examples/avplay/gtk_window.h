@@ -22,7 +22,7 @@ class GtkWnd {
  protected:
   class GtkVideoRender : public VideoRender {
    public:
-    GtkVideoRender(GtkWnd* window);
+    explicit GtkVideoRender(GtkWnd* window);
     ~GtkVideoRender() override;
 
     void OnFrame(const std::shared_ptr<MediaFrame>& frame) override;
@@ -46,8 +46,8 @@ class GtkWnd {
   bool destroy();
   void addVideoRender();
 
-  void onDestroyed(GtkWidget* widget);
-  void onKeyPress(GtkWidget* widget, GdkEventKey* key);
+  static void onDestroyed(GtkWidget* widget);
+  static void onKeyPress(GtkWidget* widget, GdkEventKey* key);
   void onClicked(GtkWidget* widget);
   void onRedraw();
 
@@ -62,7 +62,7 @@ class GtkWnd {
   int width_;
   int height_;
   std::unique_ptr<uint8_t[]> draw_buffer_;
-  int draw_buffer_size_;
+  int draw_buffer_size_{};
 };
 
 #endif /* !GTK_WINDOW_H */

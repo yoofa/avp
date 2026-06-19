@@ -73,7 +73,7 @@ class AVPAudioRender : public AVPRender {
    * @return The current playback rate.
    */
   float GetPlaybackRate() const {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock l(mutex_);
     return playback_rate_;
   }
 
@@ -184,7 +184,7 @@ class AVPAudioRender : public AVPRender {
    * latency.
    * @return Delay in microseconds for the next audio frame.
    */
-  int64_t CalculateNextAudioFrameDelay() REQUIRES(mutex_);
+  static int64_t CalculateNextAudioFrameDelay() REQUIRES(mutex_);
 
   std::shared_ptr<media::AudioDevice> audio_device_ GUARDED_BY(mutex_);
   std::shared_ptr<media::AudioTrack> audio_track_ GUARDED_BY(mutex_);

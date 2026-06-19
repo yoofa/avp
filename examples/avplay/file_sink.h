@@ -62,7 +62,7 @@ class WavFileAudioTrack : public media::AudioTrack {
   /**
    * @param path Path to output .wav file.
    */
-  explicit WavFileAudioTrack(const std::string& path);
+  explicit WavFileAudioTrack(std::string path);
   ~WavFileAudioTrack() override;
 
   // AudioTrack interface
@@ -115,7 +115,7 @@ class FileAudioDevice : public media::AudioDevice {
   /**
    * @param path Path prefix for audio output (e.g. "output" → "output.wav").
    */
-  explicit FileAudioDevice(const std::string& path);
+  explicit FileAudioDevice(std::string path);
   ~FileAudioDevice() override = default;
 
   status_t Init() override { return 0; }

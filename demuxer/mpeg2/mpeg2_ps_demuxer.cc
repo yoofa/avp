@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cerrno>
 #include <cstring>
+#include <utility>
 
 #include "base/logging.h"
 #include "demuxer/mpeg2/mpeg2_common.h"
@@ -188,7 +189,7 @@ status_t Mpeg2PsDemuxer::FeedMore() {
 
       buffer_->setRange(0, buffer_->size() + bytes_read);
       offset_ += bytes_read;
-      if (bytes_read < static_cast<ssize_t>(kChunkSize)) {
+      if (std::cmp_less(bytes_read, kChunkSize)) {
         final_result_ = media::ERROR_END_OF_STREAM;
       }
       continue;
@@ -360,13 +361,13 @@ ssize_t Mpeg2PsDemuxer::DequeuePES() {
     }
     br.getBits(32);  // CRC32
     program_stream_map_valid_ = true;
-    return packet_size;
+    return static_cast<ssize_t>(packet_size);
   }
 
   if (stream_id == 0xBE || stream_id == 0xBF || stream_id == 0xF0 ||
       stream_id == 0xF1 || stream_id == 0xFF || stream_id == 0xF2 ||
       stream_id == 0xF8) {
-    return packet_size;
+    return static_cast<ssize_t>(packet_size);
   }
 
   if (br.numBitsLeft() < 24) {
@@ -508,7 +509,7 @@ unsigned Mpeg2PsDemuxer::GuessStreamType(unsigned stream_id) const {
 }
 
 std::unique_ptr<media::mpeg2ts::ESQueue>
-Mpeg2PsDemuxer::CreateQueueForStreamType(unsigned stream_type) const {
+Mpeg2PsDemuxer::CreateQueueForStreamType(unsigned stream_type) {
   using TSParser = media::mpeg2ts::TSParser;
   using ESQueue = media::mpeg2ts::ESQueue;
 

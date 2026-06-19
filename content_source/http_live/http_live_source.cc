@@ -149,7 +149,7 @@ bool SniffTsSegment(const std::shared_ptr<DataSource>& data_source,
   std::array<uint8_t, kMaxTsSyncOffset + kTsSniffPacketCount * kM2tsPacketSize>
       probe = {};
   const ssize_t bytes_read = data_source->ReadAt(0, probe.data(), probe.size());
-  if (bytes_read < static_cast<ssize_t>(kTsPacketSize * kTsSniffPacketCount)) {
+  if (std::cmp_less(bytes_read, kTsPacketSize * kTsSniffPacketCount)) {
     return false;
   }
 
@@ -285,13 +285,13 @@ class TsSegmentExtractor {
       return media::ERROR_END_OF_STREAM;
     }
 
-    uint8_t probe[kResyncProbeSize];
-    uint8_t packet[kTsPacketSize];
+    std::array<uint8_t, kResyncProbeSize> probe{};
+    std::array<uint8_t, kTsPacketSize> packet{};
 
     for (;;) {
       const ssize_t probe_read =
-          data_source_->ReadAt(offset_, probe, sizeof(probe));
-      if (probe_read < static_cast<ssize_t>(kTsPacketSize)) {
+          data_source_->ReadAt(offset_, probe.data(), probe.size());
+      if (std::cmp_less(probe_read, kTsPacketSize)) {
         const status_t final_result =
             probe_read < 0 ? static_cast<status_t>(probe_read)
                            : static_cast<status_t>(media::ERROR_END_OF_STREAM);
@@ -302,15 +302,15 @@ class TsSegmentExtractor {
       bool found_candidate = false;
       const size_t limit = static_cast<size_t>(probe_read) - kTsPacketSize + 1;
       for (size_t candidate = 0; candidate < limit; ++candidate) {
-        if (!LooksLikePacketStart(probe, static_cast<size_t>(probe_read),
+        if (!LooksLikePacketStart(probe.data(), static_cast<size_t>(probe_read),
                                   candidate)) {
           continue;
         }
 
         const off64_t packet_offset = offset_ + static_cast<off64_t>(candidate);
         const ssize_t bytes_read =
-            data_source_->ReadAt(packet_offset, packet, sizeof(packet));
-        if (bytes_read < static_cast<ssize_t>(sizeof(packet))) {
+            data_source_->ReadAt(packet_offset, packet.data(), packet.size());
+        if (std::cmp_less(bytes_read, packet.size())) {
           const status_t final_result =
               bytes_read < 0
                   ? static_cast<status_t>(bytes_read)
@@ -321,7 +321,7 @@ class TsSegmentExtractor {
 
         media::mpeg2ts::TSParser::SyncEvent event(packet_offset);
         const status_t err =
-            parser_->FeedTSPacket(packet, sizeof(packet), &event);
+            parser_->FeedTSPacket(packet.data(), packet.size(), &event);
         if (err == media::ERROR_MALFORMED) {
           offset_ = packet_offset + 1;
           found_candidate = true;
@@ -339,7 +339,7 @@ class TsSegmentExtractor {
         continue;
       }
 
-      if (probe_read < static_cast<ssize_t>(sizeof(probe))) {
+      if (std::cmp_less(probe_read, sizeof(probe))) {
         SignalParserEOS(media::ERROR_END_OF_STREAM);
         return media::ERROR_END_OF_STREAM;
       }
@@ -372,7 +372,7 @@ status_t HttpLiveSource::SetDataSource(
   if (!url) {
     return BAD_VALUE;
   }
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   ResetLocked();
   master_url_ = url;
   headers_ = headers;
@@ -380,7 +380,7 @@ status_t HttpLiveSource::SetDataSource(
 }
 
 void HttpLiveSource::SetNotify(Notify* notify) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   notify_ = notify;
 }
 
@@ -391,7 +391,7 @@ void HttpLiveSource::Prepare() {
   int32_t flags = FLAG_CAN_PAUSE;
 
   {
-    std::lock_guard<std::mutex> lock(lock_);
+    std::scoped_lock lock(lock_);
     err = PrepareLocked();
     notify = notify_;
     if (err == OK) {
@@ -420,29 +420,29 @@ void HttpLiveSource::Prepare() {
 }
 
 void HttpLiveSource::Start() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   started_ = true;
 }
 
 void HttpLiveSource::Stop() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   started_ = false;
 }
 
 void HttpLiveSource::Pause() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   started_ = false;
 }
 
 void HttpLiveSource::Resume() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   started_ = true;
 }
 
 status_t HttpLiveSource::DequeueAccessUnit(
     MediaType track_type,
     std::shared_ptr<media::MediaFrame>& access_unit) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   access_unit.reset();
 
   if (!prepared_ || !started_) {
@@ -464,7 +464,7 @@ status_t HttpLiveSource::DequeueAccessUnit(
 }
 
 std::shared_ptr<media::MediaMeta> HttpLiveSource::GetFormat() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   return source_format_;
 }
 
@@ -472,19 +472,19 @@ status_t HttpLiveSource::GetDuration(int64_t* duration_us) {
   if (!duration_us) {
     return BAD_VALUE;
   }
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   *duration_us = duration_us_;
   return duration_us_ >= 0 ? OK : INVALID_OPERATION;
 }
 
 size_t HttpLiveSource::GetTrackCount() const {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   return tracks_.size();
 }
 
 std::shared_ptr<media::MediaMeta> HttpLiveSource::GetTrackInfo(
     size_t track_index) const {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (track_index >= tracks_.size()) {
     return nullptr;
   }
@@ -493,13 +493,13 @@ std::shared_ptr<media::MediaMeta> HttpLiveSource::GetTrackInfo(
 
 std::shared_ptr<media::MediaMeta> HttpLiveSource::GetTrackInfo(
     MediaType track_type) const {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   const TrackState* track = FindTrackLocked(track_type);
   return track ? track->format : nullptr;
 }
 
 status_t HttpLiveSource::SelectTrack(size_t track_index, bool select) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (track_index >= tracks_.size()) {
     return INVALID_OPERATION;
   }
@@ -511,7 +511,7 @@ status_t HttpLiveSource::SelectTrack(size_t track_index, bool select) {
 
 status_t HttpLiveSource::SeekTo(int64_t seek_time_us, SeekMode /* mode */) {
   {
-    std::lock_guard<std::mutex> lock(lock_);
+    std::scoped_lock lock(lock_);
     if (playlist_.is_live || playlist_.segments.empty()) {
       return INVALID_OPERATION;
     }
@@ -563,12 +563,12 @@ status_t HttpLiveSource::SeekTo(int64_t seek_time_us, SeekMode /* mode */) {
 }
 
 bool HttpLiveSource::IsStreaming() const {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   return primary_stream_.is_live() || audio_stream_.is_live();
 }
 
 status_t HttpLiveSource::FeedMoreESData() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (!prepared_) {
     return INVALID_OPERATION;
   }
@@ -786,8 +786,8 @@ status_t HttpLiveSource::LoadNextSegmentLocked(StreamState& stream) {
     }
   }
 
-  const size_t index = static_cast<size_t>(stream.next_segment_sequence -
-                                           stream.playlist.media_sequence);
+  const auto index = static_cast<size_t>(stream.next_segment_sequence -
+                                         stream.playlist.media_sequence);
   if (index >= stream.playlist.segments.size()) {
     return WOULD_BLOCK;
   }
@@ -1026,7 +1026,7 @@ status_t HttpLiveSource::FetchUrlRangeLocked(const std::string& url,
   }
   connection->Disconnect();
 
-  if (length > 0 && static_cast<int64_t>(data.size()) < length) {
+  if (length > 0 && std::cmp_less(data.size(), length)) {
     AVE_LOG(LS_ERROR) << "HttpLiveSource short read: url=" << url
                       << " offset=" << offset << " length=" << length
                       << " actual=" << data.size();

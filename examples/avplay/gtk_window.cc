@@ -20,7 +20,7 @@
 namespace {
 
 gboolean OnDestroyedCallback(GtkWidget* widget,
-                             GdkEvent* event,
+                             GdkEvent* /*event*/,
                              gpointer data) {
   reinterpret_cast<GtkWnd*>(data)->onDestroyed(widget);
   return FALSE;
@@ -38,13 +38,13 @@ gboolean OnKeyPressCallback(GtkWidget* widget,
 //}
 
 gboolean Redraw(gpointer data) {
-  GtkWnd* wnd = reinterpret_cast<GtkWnd*>(data);
+  auto* wnd = reinterpret_cast<GtkWnd*>(data);
   wnd->onRedraw();
   return false;
 }
 
 gboolean Draw(GtkWidget* widget, cairo_t* cr, gpointer data) {
-  GtkWnd* wnd = reinterpret_cast<GtkWnd*>(data);
+  auto* wnd = reinterpret_cast<GtkWnd*>(data);
   wnd->draw(widget, cr);
   return false;
 }
@@ -57,7 +57,7 @@ GtkWnd::GtkWnd()
       width_(0),
       height_(0) {}
 
-GtkWnd::~GtkWnd() {}
+GtkWnd::~GtkWnd() = default;
 
 bool GtkWnd::create() {
   window_ = gtk_window_new(GTK_WINDOW_TOPLEVEL);
@@ -84,15 +84,15 @@ void GtkWnd::addVideoRender() {
   gtk_container_add(GTK_CONTAINER(window_), draw_area_);
   g_signal_connect(G_OBJECT(draw_area_), "draw", G_CALLBACK(Draw), this);
   gtk_widget_show_all(window_);
-  video_render_.reset(new GtkVideoRender(this));
+  video_render_ = std::make_shared<GtkVideoRender>(this);
 }
 
-void GtkWnd::onDestroyed(GtkWidget* widget) {
+void GtkWnd::onDestroyed(GtkWidget* /*widget*/) {
   AVE_LOG(ave::LS_INFO) << "onDestroyed";
   gtk_main_quit();
 }
 
-void GtkWnd::onKeyPress(GtkWidget* widget, GdkEventKey* key) {
+void GtkWnd::onKeyPress(GtkWidget* /*widget*/, GdkEventKey* key) {
   AVE_LOG(ave::LS_INFO) << "onKeyPress, type:" << key->type;
 }
 
@@ -139,10 +139,11 @@ void GtkWnd::onRedraw() {
   }
 }
 
-void GtkWnd::draw(GtkWidget* widget, cairo_t* cr) {
+void GtkWnd::draw(GtkWidget* /*widget*/, cairo_t* cr) {
 #if GTK_MAJOR_VERSION != 2
-  if (!draw_buffer_)
+  if (!draw_buffer_) {
     return;
+  }
   AVE_LOG(ave::LS_INFO) << "GtkWnd::draw, width: " << width_
                         << " height: " << height_;
   cairo_format_t format = CAIRO_FORMAT_RGB24;
@@ -168,7 +169,7 @@ void GtkWnd::draw(GtkWidget* widget, cairo_t* cr) {
 GtkWnd::GtkVideoRender::GtkVideoRender(GtkWnd* window)
     : gtkwnd_(window), image_(nullptr), width_(0), height_(0) {}
 
-GtkWnd::GtkVideoRender::~GtkVideoRender() {}
+GtkWnd::GtkVideoRender::~GtkVideoRender() = default;
 
 void GtkWnd::GtkVideoRender::OnFrame(const std::shared_ptr<MediaFrame>& frame) {
   auto* vinfo = frame->video_info();
@@ -183,7 +184,8 @@ void GtkWnd::GtkVideoRender::OnFrame(const std::shared_ptr<MediaFrame>& frame) {
                           << " size=" << frame->size();
     uint8_t* y = frame->data();
     uint8_t* u = frame->data() + vinfo->stride * vinfo->height;
-    AVE_LOG(ave::LS_INFO) << "Y[0]=" << (int)y[0] << ", U[0]=" << (int)u[0];
+    AVE_LOG(ave::LS_INFO) << "Y[0]=" << static_cast<int>(y[0])
+                          << ", U[0]=" << static_cast<int>(u[0]);
   }
 
   int32_t width = vinfo->width;

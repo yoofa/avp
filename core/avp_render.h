@@ -134,7 +134,7 @@ class AVPRender {
    * @param enabled True to enable A/V sync (default), false to disable.
    */
   void SetSyncEnabled(bool enabled) EXCLUDES(mutex_) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock l(mutex_);
     sync_enabled_ = enabled;
   }
 
@@ -143,7 +143,7 @@ class AVPRender {
    * @return True if running, false otherwise.
    */
   bool IsRunning() const EXCLUDES(mutex_) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock l(mutex_);
     return running_;
   }
 
@@ -152,7 +152,7 @@ class AVPRender {
    * @return True if paused, false otherwise.
    */
   bool IsPaused() const EXCLUDES(mutex_) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock l(mutex_);
     return paused_;
   }
 
@@ -204,7 +204,7 @@ class AVPRender {
    * @param entry The queue entry to release.
    * @param render Whether to render the frame.
    */
-  void ReleaseFrame(QueueEntry& entry, bool render) REQUIRES(mutex_);
+  static void ReleaseFrame(QueueEntry& entry, bool render);
 
   /**
    * @brief Calculates render delay for a frame.

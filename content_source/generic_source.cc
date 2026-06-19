@@ -50,7 +50,7 @@ GenericSource::GenericSource(std::shared_ptr<DemuxerFactory> demuxer_factory)
 GenericSource::~GenericSource() = default;
 
 void GenericSource::SetNotify(Notify* notify) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   notify_ = notify;
 }
 
@@ -75,7 +75,7 @@ void GenericSource::ResetDataSource() {
 
 // TODO: implement http source
 status_t GenericSource::SetDataSource(const char* url) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   ResetDataSource();
 
   uri_ = url;
@@ -83,7 +83,7 @@ status_t GenericSource::SetDataSource(const char* url) {
 }
 
 status_t GenericSource::SetDataSource(int fd, int64_t offset, int64_t length) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   AVE_LOG(LS_VERBOSE) << "SetDataSource fd: " << fd << ", offset: " << offset
                       << ", length: " << length;
   ResetDataSource();
@@ -96,14 +96,14 @@ status_t GenericSource::SetDataSource(int fd, int64_t offset, int64_t length) {
 }
 
 status_t GenericSource::SetDataSource(std::shared_ptr<DataSource> data_source) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   ResetDataSource();
   data_source_ = std::move(data_source);
   return 0;
 }
 
 void GenericSource::Prepare() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (looper_ == nullptr) {
     looper_ = std::make_shared<Looper>();
     looper_->setName("GenericSource");
@@ -116,7 +116,7 @@ void GenericSource::Prepare() {
 }
 
 void GenericSource::Start() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
 
   if (audio_track_.source != nullptr) {
     PostReadBuffer(MediaType::AUDIO);
@@ -130,17 +130,17 @@ void GenericSource::Start() {
 }
 
 void GenericSource::Stop() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   started_ = false;
 }
 
 void GenericSource::Pause() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   started_ = false;
 }
 
 void GenericSource::Resume() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   started_ = true;
 }
 
@@ -159,13 +159,13 @@ status_t GenericSource::SeekTo(int64_t seek_time_us, SeekMode mode) {
 }
 
 std::shared_ptr<MediaMeta> GenericSource::GetFormat() {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   return source_format_;
 }
 
 std::shared_ptr<MediaMeta> GenericSource::GetTrackInfo(
     size_t track_index) const {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   AVE_DCHECK(track_index < sources_.size());
   if (track_index >= sources_.size()) {
     return nullptr;
@@ -176,7 +176,7 @@ std::shared_ptr<MediaMeta> GenericSource::GetTrackInfo(
 
 std::shared_ptr<MediaMeta> GenericSource::GetTrackInfo(
     MediaType track_type) const {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
 
   switch (track_type) {
     case MediaType::VIDEO:
@@ -197,7 +197,7 @@ std::shared_ptr<MediaMeta> GenericSource::GetTrackInfo(
 status_t GenericSource::DequeueAccessUnit(
     MediaType track_type,
     std::shared_ptr<MediaFrame>& access_unit) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   AVE_LOG(LS_VERBOSE) << "DequeueAccessUnit, type: " << track_type;
 
   if (!started_) {
@@ -269,18 +269,18 @@ status_t GenericSource::DequeueAccessUnit(
 }
 
 status_t GenericSource::GetDuration(int64_t* duration_us) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   *duration_us = duration_us_;
   return ave::OK;
 }
 
 size_t GenericSource::GetTrackCount() const {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   return sources_.size();
 }
 
 status_t GenericSource::SelectTrack(size_t track_index, bool select) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   if (track_index >= sources_.size()) {
     return ave::INVALID_OPERATION;
   }
@@ -467,7 +467,7 @@ status_t GenericSource::InitFromDataSource() {
   AVE_LOG(LS_VERBOSE) << "initFromDataSource done. tracks.size: "
                       << sources_.size();
 
-  if (sources_.size() == 0) {
+  if (sources_.empty()) {
     return ave::UNKNOWN_ERROR;
   }
 
@@ -492,7 +492,7 @@ void GenericSource::OnPrepare() {
       } else if (!strncasecmp("fd://", uri, 5)) {
         uri += 5;
         char* end = nullptr;
-        int fd = strtol(uri, &end, 10);
+        int fd = static_cast<int>(strtol(uri, &end, 10));
         if (end != uri) {
           int64_t offset = 0;
           int64_t length = -1;
@@ -763,7 +763,7 @@ status_t GenericSource::DoSeek(int64_t seek_time_us, SeekMode mode) {
 }
 
 void GenericSource::onMessageReceived(const std::shared_ptr<Message>& message) {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::scoped_lock lock(lock_);
   switch (message->what()) {
     case kWhatPrepare: {
       OnPrepare();

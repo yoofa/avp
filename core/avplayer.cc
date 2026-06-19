@@ -6,6 +6,8 @@
  */
 #include "avplayer.h"
 
+#include <array>
+#include <mutex>
 #include "base/byte_utils.h"
 #include "base/checks.h"
 #include "base/errors.h"
@@ -901,9 +903,9 @@ void AvPlayer::FinishFlushIfPossible() {
 }
 
 void AvPlayer::ClearFlushComplete() {
-  for (int i = 0; i < 2; ++i) {
-    for (int j = 0; j < 2; ++j) {
-      flush_complete_[i][j] = false;
+  for (auto& i : flush_complete_) {
+    for (auto& j : i) {
+      j = false;
     }
   }
 }
@@ -1234,10 +1236,10 @@ void AvPlayer::OnRenderNotify(const std::shared_ptr<Message>& msg) {}
 
 void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
   // make message->what() to 4cc
-  char what_str[5] = {0};
-  base::MakeFourCCString(message->what(), what_str);
-  AVE_LOG(LS_INFO) << "AvPlayer::onMessageReceived:" << what_str;
-  std::lock_guard<std::mutex> l(mutex_);
+  std::array<char, 5> what_str = {0};
+  base::MakeFourCCString(message->what(), what_str.data());
+  AVE_LOG(LS_INFO) << "AvPlayer::onMessageReceived:" << what_str.data();
+  std::scoped_lock l(mutex_);
   status_t err = ave::OK;
   switch (message->what()) {
       /************* from avplayer ***************/
@@ -1297,7 +1299,7 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
       if (video_render) {
         if (state_ == State::kStarted || state_ == State::kPaused) {
           // int64_t current_time_us = 0;
-          //  TODO(youfa): do seek
+          // TODO(youfa): do seek
           //  if (GetCurrentPositionUs(current_time_us) == ave::OK) {
           //   deferred_actions_.push_back(std::make_shared<SeekAction>(
           //       current_time_us, SeekMode::SEEK_PREVIOUS_SYNC));
@@ -1384,11 +1386,13 @@ void AvPlayer::onMessageReceived(const std::shared_ptr<Message>& message) {
       // try to feed some data
       if ((err = source_->FeedMoreESData()) != OK) {
         if (audio_decoder_ == nullptr && video_decoder_ == nullptr) {
-          if (err == media::ERROR_END_OF_STREAM) {
-            // TODO(youfa): notify listener end of stream
-
-          } else {
-            // TODO(youfa): notify listener error
+          auto listener = listener_.lock();
+          if (listener) {
+            if (err == media::ERROR_END_OF_STREAM) {
+              listener->OnCompletion();
+            } else {
+              listener->OnError(err);
+            }
           }
         }
         // do nothing

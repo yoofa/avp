@@ -8,7 +8,6 @@
 #include "packet_source.h"
 
 #include "base/logging.h"
-#include "base/types.h"
 
 namespace ave {
 namespace player {
@@ -27,7 +26,7 @@ status_t PacketSource::Stop() {
 }
 
 void PacketSource::Clear() {
-  std::lock_guard<std::mutex> l(lock_);
+  std::scoped_lock l(lock_);
   std::queue<std::shared_ptr<MediaFrame>> empty;
   packets_.swap(empty);
   eos_result_ = ave::OK;
@@ -35,12 +34,12 @@ void PacketSource::Clear() {
 }
 
 void PacketSource::SetFormat(std::shared_ptr<MediaMeta> format) {
-  std::lock_guard<std::mutex> l(lock_);
+  std::scoped_lock l(lock_);
   format_ = std::move(format);
 }
 
 bool PacketSource::HasBufferAvailable(status_t* result) {
-  std::lock_guard<std::mutex> l(lock_);
+  std::scoped_lock l(lock_);
   *result = ave::OK;
 
   if (!packets_.empty()) {
@@ -52,7 +51,7 @@ bool PacketSource::HasBufferAvailable(status_t* result) {
 }
 
 size_t PacketSource::GetAvailableBufferCount(status_t* result) {
-  std::lock_guard<std::mutex> l(lock_);
+  std::scoped_lock l(lock_);
   *result = ave::OK;
 
   if (!packets_.empty()) {
@@ -64,7 +63,7 @@ size_t PacketSource::GetAvailableBufferCount(status_t* result) {
 }
 
 status_t PacketSource::QueueAccessunit(std::shared_ptr<MediaFrame> packet) {
-  std::lock_guard<std::mutex> l(lock_);
+  std::scoped_lock l(lock_);
   packets_.push(std::move(packet));
   AVE_LOG(LS_INFO) << "PacketSource::QueueAccessunit: source=" << this
                    << " size=" << packets_.size();
@@ -77,15 +76,15 @@ status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaFrame>& packet)
   packet.reset();
   std::unique_lock<std::mutex> l(lock_);
 
-  if (!packets_.size() && eos_result_ == ave::OK) {
+  if (packets_.empty() && eos_result_ == ave::OK) {
     AVE_LOG(LS_INFO) << "PacketSource::DequeueAccessUnit: waiting...";
   }
 
-  while (!packets_.size() && eos_result_ == ave::OK) {
+  while (packets_.empty() && eos_result_ == ave::OK) {
     condition_.wait(l);
   }
 
-  if (packets_.size()) {
+  if (!packets_.empty()) {
     packet = packets_.front();
     packets_.pop();
     AVE_LOG(LS_INFO) << "PacketSource::DequeueAccessUnit: dequeued, size left="
@@ -101,7 +100,7 @@ void PacketSource::SignalEOS(status_t result) {
     AVE_LOG(LS_ERROR) << "SignalEOS: result must not be OK";
     return;
   }
-  std::lock_guard<std::mutex> l(lock_);
+  std::scoped_lock l(lock_);
   eos_result_ = result;
   condition_.notify_all();
 }

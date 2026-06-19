@@ -7,6 +7,9 @@
 
 #include "demuxer/mpeg2/mpeg2_ts_demuxer.h"
 
+#include <array>
+#include <utility>
+
 #include "base/logging.h"
 #include "demuxer/mpeg2/mpeg2_common.h"
 #include "media/foundation/media_errors.h"
@@ -193,8 +196,8 @@ void Mpeg2TsDemuxer::MaybeAddTrack(unsigned type) {
   AVE_LOG(LS_INFO) << "Mpeg2TsDemuxer add track: type=" << type
                    << " mime=" << format->mime();
   tracks_.push_back(TrackEntry{
-      type,
-      source,
+      .source_type = type,
+      .packet_source = source,
   });
 }
 
@@ -203,12 +206,13 @@ status_t Mpeg2TsDemuxer::FeedMore() {
     return media::ERROR_END_OF_STREAM;
   }
 
-  uint8_t probe[kResyncProbeSize];
-  uint8_t packet[kTsPacketSize];
+  std::array<uint8_t, kResyncProbeSize> probe{};
+  std::array<uint8_t, kTsPacketSize> packet{};
 
   for (;;) {
-    ssize_t probe_read = data_source_->ReadAt(offset_, probe, sizeof(probe));
-    if (probe_read < static_cast<ssize_t>(kTsPacketSize)) {
+    ssize_t probe_read =
+        data_source_->ReadAt(offset_, probe.data(), probe.size());
+    if (std::cmp_less(probe_read, kTsPacketSize)) {
       status_t final_result = probe_read < 0 ? static_cast<status_t>(probe_read)
                                              : media::ERROR_END_OF_STREAM;
       if (!eos_signaled_) {
@@ -221,15 +225,15 @@ status_t Mpeg2TsDemuxer::FeedMore() {
     bool found_candidate = false;
     const size_t limit = static_cast<size_t>(probe_read) - kTsPacketSize + 1;
     for (size_t candidate = 0; candidate < limit; ++candidate) {
-      if (!LooksLikePacketStart(probe, static_cast<size_t>(probe_read),
+      if (!LooksLikePacketStart(probe.data(), static_cast<size_t>(probe_read),
                                 candidate)) {
         continue;
       }
 
       const off64_t packet_offset = offset_ + static_cast<off64_t>(candidate);
       ssize_t bytes_read =
-          data_source_->ReadAt(packet_offset, packet, sizeof(packet));
-      if (bytes_read < static_cast<ssize_t>(sizeof(packet))) {
+          data_source_->ReadAt(packet_offset, packet.data(), packet.size());
+      if (std::cmp_less(bytes_read, packet.size())) {
         status_t final_result = bytes_read < 0
                                     ? static_cast<status_t>(bytes_read)
                                     : media::ERROR_END_OF_STREAM;
@@ -241,14 +245,15 @@ status_t Mpeg2TsDemuxer::FeedMore() {
       }
 
       media::mpeg2ts::TSParser::SyncEvent event(packet_offset);
-      status_t err = parser_->FeedTSPacket(packet, sizeof(packet), &event);
+      status_t err =
+          parser_->FeedTSPacket(packet.data(), packet.size(), &event);
       if (err == media::ERROR_MALFORMED) {
         offset_ = packet_offset + 1;
         found_candidate = true;
         break;
       }
 
-      offset_ = packet_offset + static_cast<off64_t>(sizeof(packet));
+      offset_ = packet_offset + static_cast<off64_t>(packet.size());
       MaybeAddTrack(media::mpeg2ts::TSParser::VIDEO);
       MaybeAddTrack(media::mpeg2ts::TSParser::AUDIO);
 
@@ -264,7 +269,7 @@ status_t Mpeg2TsDemuxer::FeedMore() {
       continue;
     }
 
-    if (probe_read < static_cast<ssize_t>(sizeof(probe))) {
+    if (std::cmp_less(probe_read, sizeof(probe))) {
       if (!eos_signaled_) {
         parser_->SignalEOS(media::ERROR_END_OF_STREAM);
         eos_signaled_ = true;

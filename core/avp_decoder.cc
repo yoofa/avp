@@ -343,7 +343,7 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
 
   if (is_audio_) {
     AVE_LOG(LS_INFO) << "HandleAnOutputBuffer[AUDIO]: copying buffer, "
-                     << "data=" << (void*)buffer->data()
+                     << "data=" << reinterpret_cast<void*>(buffer->data())
                      << ", size=" << buffer->size();
     frame = media::MediaFrame::CreateSharedAsCopy(
         buffer->data(), buffer->size(), MediaType::AUDIO);
@@ -451,7 +451,7 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
 }
 
 void AVPDecoder::HandleAnOutputFormatChanged(
-    const std::shared_ptr<MediaMeta>& format) {
+    const std::shared_ptr<MediaMeta>& /*format*/) {
   if (is_audio_) {
     auto notify = notify_->dup();
     notify->setInt32(kWhat, kWhatAudioOutputFormatChanged);
@@ -499,7 +499,7 @@ void AVPDecoder::OnError(status_t err) {
   msg->post();
 }
 
-void AVPDecoder::OnFrameRendered(std::shared_ptr<Message> notify) {
+void AVPDecoder::OnFrameRendered(std::shared_ptr<Message> /*notify*/) {
   auto msg = std::make_shared<Message>(AVPDecoder::kWhatFrameRendered,
                                        shared_from_this());
   msg->post();
