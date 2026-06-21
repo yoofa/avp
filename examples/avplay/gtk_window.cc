@@ -8,6 +8,7 @@
 #include "gtk_window.h"
 
 #include <gtk/gtk.h>
+#include <atomic>
 #include <memory>
 #include <string>
 
@@ -47,6 +48,11 @@ gboolean Draw(GtkWidget* widget, cairo_t* cr, gpointer data) {
   auto* wnd = reinterpret_cast<GtkWnd*>(data);
   wnd->draw(widget, cr);
   return false;
+}
+
+gboolean QuitGtkMain(gpointer /*data*/) {
+  gtk_main_quit();
+  return G_SOURCE_REMOVE;
 }
 }  // namespace
 
@@ -221,15 +227,31 @@ namespace player {
 
 class GtkExListener : public ave::player::Player::Listener {
  public:
-  GtkExListener() = default;
+  explicit GtkExListener(
+      std::shared_ptr<ave::player::Player::Listener> listener)
+      : listener_(std::move(listener)) {}
+
   void OnCompletion() override {
     AVE_LOG(base::LS_INFO) << "onCompletion";
-    gtk_main_quit();
+    if (listener_) {
+      listener_->OnCompletion();
+    }
+    g_idle_add(QuitGtkMain, nullptr);
   }
   void OnError(ave::status_t error) override {
     AVE_LOG(base::LS_ERROR) << "onError: " << error;
-    gtk_main_quit();
+    failed_.store(true);
+    if (listener_) {
+      listener_->OnError(error);
+    }
+    g_idle_add(QuitGtkMain, nullptr);
   }
+
+  bool failed() const { return failed_.load(); }
+
+ private:
+  std::shared_ptr<ave::player::Player::Listener> listener_;
+  std::atomic_bool failed_{false};
 };
 
 }  // namespace player
@@ -244,7 +266,8 @@ void gtk_main_avplay(const std::string& url,
   gtkWindow->create();
 
   auto player = ave::player::Player::Builder().build();
-  AVE_DCHECK(player->SetListener(listener) == ave::OK);
+  auto gtk_listener = std::make_shared<ave::player::GtkExListener>(listener);
+  AVE_DCHECK(player->SetListener(gtk_listener) == ave::OK);
   AVE_DCHECK(player->Init() == ave::OK);
   gtkWindow->addVideoRender();
   AVE_DCHECK(player->SetVideoRender(gtkWindow->videoRender()) == ave::OK);
@@ -253,6 +276,9 @@ void gtk_main_avplay(const std::string& url,
   sleep(2);
   player->Start();
   gtk_main();
-  player->Stop();
+  if (!gtk_listener->failed()) {
+    player->StopSync();
+  }
+  player->Release();
   player.reset();
 }

@@ -13,9 +13,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <array>
+#include <chrono>
+#include <condition_variable>
 #include <cstdio>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include "api/player.h"
@@ -41,10 +44,39 @@ class ExListener : public Player::Listener {
  public:
   ExListener() = default;
   ~ExListener() override = default;
-  void OnCompletion() override { std::cout << "onCompletion" << std::endl; }
+  void OnCompletion() override {
+    std::cout << "onCompletion" << std::endl;
+    SignalTerminal(false);
+  }
   void OnError(ave::status_t error) override {
     std::cout << "onError: " << error << std::endl;
+    SignalTerminal(true);
   }
+
+  bool WaitForTerminal(std::chrono::seconds timeout) {
+    std::unique_lock lock(mutex_);
+    return terminal_cv_.wait_for(lock, timeout, [this] { return terminal_; });
+  }
+
+  bool failed() const {
+    std::scoped_lock lock(mutex_);
+    return failed_;
+  }
+
+ private:
+  void SignalTerminal(bool failed) {
+    {
+      std::scoped_lock lock(mutex_);
+      terminal_ = true;
+      failed_ = failed;
+    }
+    terminal_cv_.notify_all();
+  }
+
+  mutable std::mutex mutex_;
+  std::condition_variable terminal_cv_;
+  bool terminal_ = false;
+  bool failed_ = false;
 };
 
 int main(int argc, char* argv[]) {
@@ -130,14 +162,23 @@ int main(int argc, char* argv[]) {
 
     int wait_s = (duration_s > 0) ? duration_s : 40;
     std::cout << "Playing for up to " << wait_s << "s ..." << std::endl;
-    sleep(wait_s);
+    const bool reached_terminal =
+        listener->WaitForTerminal(std::chrono::seconds(wait_s));
+    if (!reached_terminal) {
+      std::cout << "Playback duration reached" << std::endl;
+    }
 
-    player->Stop();
+    if (!listener->failed()) {
+      player->StopSync();
+    }
+    player->Release();
     player.reset();
 
     std::cout << "Video frames written: " << video_render->frames_written()
               << " (" << video_render->width() << "x" << video_render->height()
               << ")" << std::endl;
+
+    return listener->failed() ? 1 : 0;
 
   } else {
     // ── GTK display mode ─────────────────────────────────────────────────────
@@ -147,12 +188,11 @@ int main(int argc, char* argv[]) {
     extern void gtk_main_avplay(const std::string& url,
                                 std::shared_ptr<Player::Listener> listener);
     gtk_main_avplay(url, listener);
+    return listener->failed() ? 1 : 0;
 #else
     std::cerr << "Display mode not supported. Use -o for headless output."
               << std::endl;
     return 1;
 #endif
   }
-
-  return 0;
 }

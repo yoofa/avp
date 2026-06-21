@@ -297,6 +297,7 @@ AVE_EXPORT class AvPlayer : public Player,
   void FinishResume();
   void NotifyDriverSeekComplete();
   void HandleFlushComplete(bool audio, bool is_decoder);
+  void HandleDecoderError(status_t err);
   void FinishFlushIfPossible();
   void ClearFlushComplete();
   void FlushDecoder(bool audio, bool need_shutdown);

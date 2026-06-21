@@ -318,6 +318,9 @@ void AvPlayer::PerformSetVideoRender(
 }
 
 void AvPlayer::PostScanSources() {
+  if (state_ != State::kStarted && state_ != State::kPaused) {
+    return;
+  }
   if (scan_sources_pending_) {
     return;
   }
@@ -1235,17 +1238,40 @@ void AvPlayer::OnDecoderNotify(const std::shared_ptr<Message>& msg) {
       }
       break;
     }
+    case AVPDecoderBase::kWhatDecoderError:
     case AVPDecoder::kWhatError: {
       status_t err = UNKNOWN_ERROR;
       msg->findInt32(kError, &err);
-      auto listener = listener_.lock();
-      if (listener) {
-        listener->OnError(err);
-      }
+      HandleDecoderError(err);
       break;
     }
     default:
       break;
+  }
+}
+
+void AvPlayer::HandleDecoderError(status_t err) {
+  if (state_ == State::kError || state_ == State::kStopped ||
+      state_ == State::kIdle || state_ == State::kEnd) {
+    AVE_LOG(LS_INFO) << "Ignoring decoder error while player is not running, "
+                     << "state=" << static_cast<int>(state_) << ", err=" << err;
+    return;
+  }
+
+  AVE_LOG(LS_ERROR) << "Decoder error, terminating playback: " << err;
+
+  // Decoder Configure() is asynchronous. Once it reports a failure, stop all
+  // player components before notifying the client so the source cannot keep
+  // feeding data into a decoder that was never initialized.
+  ++scan_sources_generation_;
+  scan_sources_pending_ = false;
+  deferred_actions_.clear();
+  OnStop();
+  state_ = State::kError;
+
+  auto listener = listener_.lock();
+  if (listener) {
+    listener->OnError(err);
   }
 }
 
