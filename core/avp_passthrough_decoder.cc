@@ -39,8 +39,10 @@ const int64_t kAggregateBufferDurationUs = 200000;
 // than real-time, which would cause queue overflow, oldest-frame drops, and
 // a broken passthrough pacing anchor in the audio renderer.
 const size_t kMaxPassthroughQueueFrames = 10;
-media::audio_config_t ConvertTrackInfoToAudioConfig(
-    std::shared_ptr<MediaMeta> meta) {
+}  // namespace
+
+media::audio_config_t AVPPassthroughDecoder::ConvertTrackInfoToAudioConfig(
+    const std::shared_ptr<MediaMeta>& meta) {
   auto* audio_info = &(meta->track_info()->audio());
   media::audio_config_t config = media::DefaultAudioConfig;
 
@@ -75,9 +77,21 @@ media::audio_config_t ConvertTrackInfoToAudioConfig(
         config.offload_info.sample_rate = config.sample_rate;
         config.offload_info.channel_layout = config.channel_layout;
         break;
+      case media::CodecId::AVE_CODEC_ID_EAC3:
+        config.format = media::AUDIO_FORMAT_E_AC3;
+        config.offload_info.format = media::AUDIO_FORMAT_E_AC3;
+        config.offload_info.sample_rate = config.sample_rate;
+        config.offload_info.channel_layout = config.channel_layout;
+        break;
       case media::CodecId::AVE_CODEC_ID_DTS:
         config.format = media::AUDIO_FORMAT_DTS;
         config.offload_info.format = media::AUDIO_FORMAT_DTS;
+        config.offload_info.sample_rate = config.sample_rate;
+        config.offload_info.channel_layout = config.channel_layout;
+        break;
+      case media::CodecId::AVE_CODEC_ID_TRUEHD:
+        config.format = media::AUDIO_FORMAT_DOLBY_TRUEHD;
+        config.offload_info.format = media::AUDIO_FORMAT_DOLBY_TRUEHD;
         config.offload_info.sample_rate = config.sample_rate;
         config.offload_info.channel_layout = config.channel_layout;
         break;
@@ -104,8 +118,6 @@ media::audio_config_t ConvertTrackInfoToAudioConfig(
 
   return config;
 }
-
-}  // namespace
 
 AVPPassthroughDecoder::AVPPassthroughDecoder(
     const std::shared_ptr<Message>& notify,
@@ -140,7 +152,9 @@ void AVPPassthroughDecoder::OnConfigure(
   auto audio_render = std::static_pointer_cast<AVPAudioRender>(avp_render_);
   codec_private_data_ = format ? format->private_data() : nullptr;
   audio_config_ = ConvertTrackInfoToAudioConfig(format);
-  audio_render->OpenAudioSink(audio_config_);
+  if (!audio_render->IsAudioSinkReady()) {
+    audio_render->OpenAudioSink(audio_config_);
+  }
 
   // Request input buffers to start the decoding process
   OnRequestInputBuffers();

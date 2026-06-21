@@ -43,6 +43,9 @@ class AVPPassthroughDecoder : public AVPDecoderBase {
       const media::audio_config_t& audio_config,
       const std::shared_ptr<base::Buffer>& codec_private_data);
 
+  static media::audio_config_t ConvertTrackInfoToAudioConfig(
+      const std::shared_ptr<MediaMeta>& format);
+
  protected:
   // AVPDecoderBase implementation
   void OnConfigure(const std::shared_ptr<MediaMeta>& format) override;

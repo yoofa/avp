@@ -22,6 +22,7 @@
 
 #include "content_source/generic_source.h"
 
+#include "avp_passthrough_decoder.h"
 #include "message_def.h"
 
 namespace ave {
@@ -367,6 +368,22 @@ status_t AvPlayer::InstantiateDecoder(
     audio_render_ = std::make_shared<AVPAudioRender>(task_runner_factory_.get(),
                                                      sync_controller_.get(),
                                                      audio_device_, true);
+
+    // Passthrough cannot recover from an asynchronously reported sink-open
+    // failure.  Probe the compressed output synchronously before committing
+    // to that decoder, as NuPlayer does for offload playback.
+    if (decoder_type == AVPDecoderFactory::DECODER_PASSTHROUGH) {
+      const auto audio_config =
+          AVPPassthroughDecoder::ConvertTrackInfoToAudioConfig(format);
+      const status_t err = audio_render_->OpenAudioSink(audio_config);
+      if (err != ave::OK) {
+        AVE_LOG(LS_WARNING)
+            << "InstantiateDecoder: passthrough audio sink open failed, err="
+            << err << "; falling back to PCM decoder";
+        decoder_type = AVPDecoderFactory::DECODER_NORMAL;
+      }
+    }
+
     decoder = AVPDecoderFactory::CreateDecoder(codec_factory_, notify, source_,
                                                audio_render_, format, nullptr,
                                                decoder_type);

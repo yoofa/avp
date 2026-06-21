@@ -72,13 +72,17 @@ status_t AVPAudioRender::OpenAudioSink(const media::audio_config_t& config) {
         status_t start_result =
             StartAudioTrackLocked("audio sink opened while renderer running");
         if (start_result != OK) {
+          DestroyAudioTrack();
           audio_sink_ready_ = false;
+          format_initialized_ = false;
           return start_result;
         }
       }
     }
     AVE_LOG(LS_INFO) << "Audio sink opened successfully";
   } else {
+    audio_sink_ready_ = false;
+    format_initialized_ = false;
     AVE_LOG(LS_ERROR) << "Failed to open audio sink, error: " << result;
   }
 
