@@ -8,6 +8,7 @@
 #include "internal_demuxer_factory.h"
 
 #include "base/logging.h"
+#include "matroska/mkv_demuxer.h"
 #include "mp4_demuxer.h"
 #include "mpeg2/mpeg2_ps_demuxer.h"
 #include "mpeg2/mpeg2_ts_demuxer.h"
@@ -37,6 +38,14 @@ std::shared_ptr<Demuxer> InternalDemuxerFactory::CreateDemuxer(
   if (err == OK) {
     AVE_LOG(LS_INFO) << "InternalDemuxerFactory: using Mp4Demuxer";
     return mp4;
+  }
+
+  // Try MkvDemuxer
+  auto mkv = std::make_shared<MkvDemuxer>(data_source);
+  err = mkv->Init();
+  if (err == OK) {
+    AVE_LOG(LS_INFO) << "InternalDemuxerFactory: using MkvDemuxer";
+    return mkv;
   }
 
   // Add more internal demuxers here in the future (e.g. fMP4, TS, etc.)

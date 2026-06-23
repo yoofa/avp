@@ -1,0 +1,32 @@
+import("//avp.gni")
+
+source_set("matroska") {
+  sources = [
+    "mkv_demuxer.cc",
+    "mkv_demuxer.h",
+  ]
+
+  deps = [
+    "../../api:player_interface",
+    "//base:logging",
+    "//media/codec:codec_id",
+    "//media/foundation:media_frame",
+    "//media/foundation:media_meta",
+    "//media/foundation:media_source",
+    "//third_party/libebml:libebml",
+    "//third_party/libmatroska:libmatroska",
+  ]
+
+  # libebml and libmatroska use C++ exceptions and dynamic_cast (RTTI).
+  # We must align compiler configs by enabling them for this target.
+  configs -= [
+    "//build/config/compiler:no_exceptions",
+    "//build/config/compiler:no_rtti",
+  ]
+  configs += [
+    "//build/config/compiler:exceptions",
+    "//build/config/compiler:rtti",
+  ]
+
+  cflags_cc = [ "-Wno-extra-semi" ]
+}
