@@ -50,7 +50,7 @@ void AVSyncControllerImpl::UpdateAnchor(int64_t media_pts_us,
       // New anchor would move the clock backwards — skip anchor update.
       max_media_time_us_ =
           std::max({media_pts_us, max_media_time_us, max_media_time_us_});
-      AVE_LOG(base::LS_INFO)
+      AVE_LOG(base::LS_VERBOSE)
           << "UpdateAnchor SKIPPED: media_pts_us=" << media_pts_us
           << " < current_clock=" << current_clock
           << " max_media=" << max_media_time_us_;
@@ -63,10 +63,10 @@ void AVSyncControllerImpl::UpdateAnchor(int64_t media_pts_us,
   max_media_time_us_ =
       std::max({media_pts_us, max_media_time_us, max_media_time_us_});
 
-  AVE_LOG(base::LS_INFO) << "UpdateAnchor SET: anchor_media="
-                         << anchor_media_pts_us_
-                         << " anchor_sys=" << anchor_sys_time_us_
-                         << " max_media=" << max_media_time_us_;
+  AVE_LOG(base::LS_VERBOSE)
+      << "UpdateAnchor SET: anchor_media=" << anchor_media_pts_us_
+      << " anchor_sys=" << anchor_sys_time_us_
+      << " max_media=" << max_media_time_us_;
 
   if (paused_) {
     // If paused, update pause anchor as well

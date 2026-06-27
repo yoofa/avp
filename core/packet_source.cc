@@ -65,8 +65,8 @@ size_t PacketSource::GetAvailableBufferCount(status_t* result) {
 status_t PacketSource::QueueAccessunit(std::shared_ptr<MediaFrame> packet) {
   std::scoped_lock l(lock_);
   packets_.push(std::move(packet));
-  AVE_LOG(LS_INFO) << "PacketSource::QueueAccessunit: source=" << this
-                   << " size=" << packets_.size();
+  AVE_LOG(LS_VERBOSE) << "PacketSource::QueueAccessunit: source=" << this
+                      << " size=" << packets_.size();
   condition_.notify_one();
   return ave::OK;
 }
@@ -77,7 +77,7 @@ status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaFrame>& packet)
   std::unique_lock<std::mutex> l(lock_);
 
   if (packets_.empty() && eos_result_ == ave::OK) {
-    AVE_LOG(LS_INFO) << "PacketSource::DequeueAccessUnit: waiting...";
+    AVE_LOG(LS_VERBOSE) << "PacketSource::DequeueAccessUnit: waiting...";
   }
 
   while (packets_.empty() && eos_result_ == ave::OK) {
@@ -87,8 +87,9 @@ status_t PacketSource::DequeueAccessUnit(std::shared_ptr<MediaFrame>& packet)
   if (!packets_.empty()) {
     packet = packets_.front();
     packets_.pop();
-    AVE_LOG(LS_INFO) << "PacketSource::DequeueAccessUnit: dequeued, size left="
-                     << packets_.size();
+    AVE_LOG(LS_VERBOSE)
+        << "PacketSource::DequeueAccessUnit: dequeued, size left="
+        << packets_.size();
     return ave::OK;
   }
 

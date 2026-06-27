@@ -244,12 +244,12 @@ void AVPAudioRender::Flush() {
 uint64_t AVPAudioRender::RenderFrameInternal(
     std::shared_ptr<media::MediaFrame>& frame,
     bool& consumed) {
-  AVE_LOG(LS_INFO) << "RenderFrameInternal[AUDIO]: enter, "
-                   << "frame_size=" << (frame ? frame->size() : 0)
-                   << ", format_initialized=" << format_initialized_
-                   << ", audio_sink_ready=" << audio_sink_ready_
-                   << ", has_audio_track=" << (audio_track_ != nullptr)
-                   << ", has_cached=" << (cached_frame_ != nullptr);
+  AVE_LOG(LS_VERBOSE) << "RenderFrameInternal[AUDIO]: enter, "
+                      << "frame_size=" << (frame ? frame->size() : 0)
+                      << ", format_initialized=" << format_initialized_
+                      << ", audio_sink_ready=" << audio_sink_ready_
+                      << ", has_audio_track=" << (audio_track_ != nullptr)
+                      << ", has_cached=" << (cached_frame_ != nullptr);
 
   if (!frame || frame->stream_type() != media::MediaType::AUDIO) {
     AVE_LOG(LS_WARNING) << "Invalid audio frame";
@@ -322,12 +322,12 @@ uint64_t AVPAudioRender::RenderFrameInternal(
     cached_frame_ = frame;
     consumed = true;
     consumed_frame_this_call = true;
-    AVE_LOG(LS_INFO) << "RenderFrameInternal[AUDIO]: consumed new frame, "
-                     << "size=" << cached_frame_->size();
+    AVE_LOG(LS_VERBOSE) << "RenderFrameInternal[AUDIO]: consumed new frame, "
+                        << "size=" << cached_frame_->size();
   } else {
     consumed = false;
-    AVE_LOG(LS_INFO) << "RenderFrameInternal[AUDIO]: retrying cached frame, "
-                     << "remaining=" << cached_frame_->size();
+    AVE_LOG(LS_VERBOSE) << "RenderFrameInternal[AUDIO]: retrying cached frame, "
+                        << "remaining=" << cached_frame_->size();
   }
 
   auto frame_to_write = cached_frame_;
@@ -362,9 +362,9 @@ uint64_t AVPAudioRender::RenderFrameInternal(
           ++nonzero_bytes;
         }
       }
-      AVE_LOG(LS_INFO) << "RenderFrameInternal[AUDIO]: pcm probe bytes="
-                       << inspect_bytes << " nonzero=" << nonzero_bytes
-                       << " abs_sum=" << sample_sum;
+      AVE_LOG(LS_VERBOSE) << "RenderFrameInternal[AUDIO]: pcm probe bytes="
+                          << inspect_bytes << " nonzero=" << nonzero_bytes
+                          << " abs_sum=" << sample_sum;
       ++s_pcm_debug_frames;
     }
   }
@@ -433,9 +433,9 @@ uint64_t AVPAudioRender::RenderFrameInternal(
     return 0;
   }
 
-  AVE_LOG(LS_INFO) << "RenderFrameInternal[AUDIO]: wrote " << bytes_written
-                   << " bytes, total=" << total_bytes_written_
-                   << ", cached=" << (cached_frame_ ? "partial" : "done");
+  AVE_LOG(LS_VERBOSE) << "RenderFrameInternal[AUDIO]: wrote " << bytes_written
+                      << " bytes, total=" << total_bytes_written_
+                      << ", cached=" << (cached_frame_ ? "partial" : "done");
   if (!is_compressed && written_audio_info &&
       written_audio_info->pts.IsFinite()) {
     last_audio_pts_us_ = written_audio_info->pts.us();
@@ -753,8 +753,8 @@ ssize_t AVPAudioRender::WriteAudioData(
   ssize_t bytes_written = track->Write(data, size, true);
   mutex_.lock();
 
-  AVE_LOG(LS_INFO) << "WriteAudioData: requested=" << size
-                   << " written=" << bytes_written;
+  AVE_LOG(LS_VERBOSE) << "WriteAudioData: requested=" << size
+                      << " written=" << bytes_written;
 
   if (bytes_written < 0) {
     AVE_LOG(LS_WARNING) << "Audio track write failed: " << bytes_written;

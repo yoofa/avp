@@ -185,8 +185,8 @@ void AVPDecoder::OnShutdown() {
 /////////////////////
 
 bool AVPDecoder::DoRequestInputBuffers() {
-  AVE_LOG(LS_INFO) << "DoRequestInputBuffers: is_audio=" << is_audio_
-                   << ", current_queue_size=" << input_packet_queue_.size();
+  AVE_LOG(LS_VERBOSE) << "DoRequestInputBuffers: is_audio=" << is_audio_
+                      << ", current_queue_size=" << input_packet_queue_.size();
   status_t err = OK;
   while (err == OK) {
     std::shared_ptr<MediaFrame> packet;
@@ -198,8 +198,10 @@ bool AVPDecoder::DoRequestInputBuffers() {
 
     if (err != OK) {
       if (err == media::ERROR_END_OF_STREAM) {
+        if (!eos_reached_) {
+          AVE_LOG(LS_INFO) << "End of stream reached";
+        }
         eos_reached_ = true;
-        AVE_LOG(LS_INFO) << "End of stream reached";
       } else {
         ReportError(err);
       }
@@ -208,9 +210,9 @@ bool AVPDecoder::DoRequestInputBuffers() {
     input_packet_queue_.push_back(packet);
   }
   bool should_retry = (err == WOULD_BLOCK) && (source_->FeedMoreESData() == OK);
-  AVE_LOG(LS_INFO) << "DoRequestInputBuffers done: queued="
-                   << input_packet_queue_.size()
-                   << ", should_retry=" << should_retry;
+  AVE_LOG(LS_VERBOSE) << "DoRequestInputBuffers done: queued="
+                      << input_packet_queue_.size()
+                      << ", should_retry=" << should_retry;
   return should_retry;
 }
 
@@ -253,10 +255,10 @@ void AVPDecoder::FillCodecBuffer(std::shared_ptr<CodecBuffer>& buffer) {
 
 /************* CodecCallback event handler *************/
 void AVPDecoder::HandleAnInputBuffer(size_t index) {
-  AVE_LOG(LS_INFO) << "HandleAnInputBuffer: index=" << index
-                   << ", queue_size=" << input_packet_queue_.size()
-                   << ", eos_reached=" << eos_reached_
-                   << ", eos_sent=" << eos_sent_;
+  AVE_LOG(LS_VERBOSE) << "HandleAnInputBuffer: index=" << index
+                      << ", queue_size=" << input_packet_queue_.size()
+                      << ", eos_reached=" << eos_reached_
+                      << ", eos_sent=" << eos_sent_;
   if (decoder_ == nullptr) {
     AVE_LOG(LS_ERROR) << "HandleAnInputBuffer: decoder is nullptr";
     ReportError(ave::NO_INIT);
@@ -304,8 +306,8 @@ void AVPDecoder::HandleAnInputBuffer(size_t index) {
 
   FillCodecBuffer(codec_buffer);
 
-  AVE_LOG(LS_INFO) << "HandleAnInputBuffer: queuing buffer index=" << index
-                   << ", size=" << codec_buffer->size();
+  AVE_LOG(LS_VERBOSE) << "HandleAnInputBuffer: queuing buffer index=" << index
+                      << ", size=" << codec_buffer->size();
   status_t err = decoder_->QueueInputBuffer(index);
   if (err != OK) {
     AVE_LOG(LS_ERROR) << "QueueInputBuffer failed: " << err;
@@ -315,7 +317,7 @@ void AVPDecoder::HandleAnInputBuffer(size_t index) {
 }
 
 void AVPDecoder::HandleAnOutputBuffer(size_t index) {
-  AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: index=" << index;
+  AVE_LOG(LS_VERBOSE) << "HandleAnOutputBuffer: index=" << index;
   if (decoder_ == nullptr) {
     AVE_LOG(LS_ERROR) << "HandleAnOutputBuffer: decoder is nullptr";
     ReportError(ave::NO_INIT);
@@ -342,21 +344,21 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
   bool already_released = false;
 
   if (is_audio_) {
-    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer[AUDIO]: copying buffer, "
-                     << "data=" << reinterpret_cast<void*>(buffer->data())
-                     << ", size=" << buffer->size();
+    AVE_LOG(LS_VERBOSE) << "HandleAnOutputBuffer[AUDIO]: copying buffer, "
+                        << "data=" << reinterpret_cast<void*>(buffer->data())
+                        << ", size=" << buffer->size();
     frame = media::MediaFrame::CreateSharedAsCopy(
         buffer->data(), buffer->size(), MediaType::AUDIO);
-    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer[AUDIO]: frame created, "
-                     << "frame=" << frame.get()
-                     << ", frame_size=" << (frame ? frame->size() : 0);
+    AVE_LOG(LS_VERBOSE) << "HandleAnOutputBuffer[AUDIO]: frame created, "
+                        << "frame=" << frame.get()
+                        << ", frame_size=" << (frame ? frame->size() : 0);
     // Copy audio format metadata (sample rate, channels, PTS, etc.)
     if (buffer->format() && buffer->format()->sample_info()) {
       *frame->audio_info() = buffer->format()->sample_info()->audio();
       auto* ai = frame->audio_info();
-      AVE_LOG(LS_INFO) << "HandleAnOutputBuffer[AUDIO]: metadata copied, "
-                       << "sr=" << (ai ? ai->sample_rate_hz : -1)
-                       << ", pts=" << (ai ? ai->pts.us_or(-1) : -1);
+      AVE_LOG(LS_VERBOSE) << "HandleAnOutputBuffer[AUDIO]: metadata copied, "
+                          << "sr=" << (ai ? ai->sample_rate_hz : -1)
+                          << ", pts=" << (ai ? ai->pts.us_or(-1) : -1);
     } else {
       AVE_LOG(LS_WARNING) << "HandleAnOutputBuffer[AUDIO]: no metadata in "
                           << "codec buffer, format=" << buffer->format().get();
@@ -367,9 +369,9 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
     decoder_->ReleaseOutputBuffer(index, false);
     already_released = true;
     auto* ai = frame ? frame->audio_info() : nullptr;
-    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer[AUDIO]: copied+released, "
-                     << "pts=" << (ai ? ai->pts.us_or(-1) : -1)
-                     << ", size=" << (frame ? frame->size() : 0);
+    AVE_LOG(LS_VERBOSE) << "HandleAnOutputBuffer[AUDIO]: copied+released, "
+                        << "pts=" << (ai ? ai->pts.us_or(-1) : -1)
+                        << ", size=" << (frame ? frame->size() : 0);
   } else if (is_surface_mode) {
     // Surface mode: create a metadata-only frame for AV sync timing.
     // The actual rendering is done by ReleaseOutputBuffer(index, true).
@@ -382,8 +384,9 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
         frame->SetPts(vinfo.pts);
       }
     }
-    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: surface mode video frame, pts="
-                     << (frame ? frame->pts().us_or(-1) : -1);
+    AVE_LOG(LS_VERBOSE)
+        << "HandleAnOutputBuffer: surface mode video frame, pts="
+        << (frame ? frame->pts().us_or(-1) : -1);
   } else {
     // Buffer mode: copy the YUV pixel data from the codec buffer, then
     // immediately release the codec buffer so the OutputThread is unblocked.
@@ -403,9 +406,9 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
     // The render callback below will release it when the frame is consumed or
     // dropped.
     already_released = false;
-    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: buffer mode video frame, pts="
-                     << (frame ? frame->pts().us_or(-1) : -1)
-                     << ", size=" << (frame ? frame->size() : 0);
+    AVE_LOG(LS_VERBOSE) << "HandleAnOutputBuffer: buffer mode video frame, pts="
+                        << (frame ? frame->pts().us_or(-1) : -1)
+                        << ", size=" << (frame ? frame->size() : 0);
   }
 
   if (frame && buffer->format() && buffer->format()->eos()) {
@@ -415,10 +418,10 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
   }
 
   if (avp_render_) {
-    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: calling RenderFrame, "
-                     << "is_audio=" << is_audio_
-                     << ", surface_mode=" << is_surface_mode
-                     << ", already_released=" << already_released;
+    AVE_LOG(LS_VERBOSE) << "HandleAnOutputBuffer: calling RenderFrame, "
+                        << "is_audio=" << is_audio_
+                        << ", surface_mode=" << is_surface_mode
+                        << ", already_released=" << already_released;
     auto decoder = decoder_;
     bool is_eos = frame ? frame->eos() : false;
     auto notify = notify_->dup();
@@ -440,9 +443,9 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
         notify->post();
       }
     });
-    AVE_LOG(LS_INFO) << "HandleAnOutputBuffer: queuing frame to render, "
-                     << "surface_mode=" << is_surface_mode
-                     << ", pts=" << (frame ? frame->pts().us_or(-1) : -1);
+    AVE_LOG(LS_VERBOSE) << "HandleAnOutputBuffer: queuing frame to render, "
+                        << "surface_mode=" << is_surface_mode
+                        << ", pts=" << (frame ? frame->pts().us_or(-1) : -1);
   } else {
     if (!already_released) {
       decoder_->ReleaseOutputBuffer(index, false);
