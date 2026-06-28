@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "base/ave_config.h"
 #include "base/logging.h"
 #include "media/audio/channel_layout.h"
 #include "media/codec/codec_id.h"
@@ -175,7 +176,8 @@ status_t MkvSource::Read(std::shared_ptr<MediaFrame>& frame,
 // ========== MkvDemuxer ==========
 
 MkvDemuxer::MkvDemuxer(std::shared_ptr<DataSource> data_source)
-    : Demuxer(std::move(data_source)) {
+    : Demuxer(std::move(data_source)),
+      en_debug_log_(base::AveConfig::GetInstance().demuxer_logs_enabled()) {
   AVE_LOG(LS_INFO) << "MkvDemuxer created";
 }
 
@@ -668,6 +670,10 @@ status_t MkvDemuxer::ReadFrame(size_t track_index,
 
   frame = track.packet_queue.front();
   track.packet_queue.pop_front();
+  AVE_LOG_IF(LS_VERBOSE, en_debug_log_)
+      << "MkvDemuxer frame: track=" << track_index
+      << " pts_us=" << frame->pts().us() << " dts_us=" << frame->dts().us()
+      << " size=" << frame->size() << " queued=" << track.packet_queue.size();
   return OK;
 }
 

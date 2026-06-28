@@ -12,6 +12,7 @@ source_set("mpeg2_demuxers") {
 
   deps = [
     "../../api:player_interface",
+    "//base:ave_config",
     "//base:logging",
     "//media/foundation:bit_reader",
     "//media/foundation:media_buffer",

@@ -12,6 +12,7 @@
 #include <cstring>
 #include <utility>
 
+#include "base/ave_config.h"
 #include "base/logging.h"
 #include "demuxer/mpeg2/mpeg2_common.h"
 #include "media/foundation/bit_reader.h"
@@ -42,7 +43,8 @@ ssize_t FindStartCodeOffset(const uint8_t* data, size_t size) {
 }  // namespace
 
 Mpeg2PsDemuxer::Mpeg2PsDemuxer(std::shared_ptr<DataSource> data_source)
-    : Demuxer(std::move(data_source)) {}
+    : Demuxer(std::move(data_source)),
+      en_debug_log_(base::AveConfig::GetInstance().demuxer_logs_enabled()) {}
 
 Mpeg2PsDemuxer::~Mpeg2PsDemuxer() = default;
 
@@ -132,9 +134,11 @@ std::shared_ptr<media::MediaSource> Mpeg2PsDemuxer::GetTrack(
   auto packet_source = it->second->source;
   auto self = shared_from_this();
   return std::make_shared<mpeg2::PacketSourceTrack>(
-      packet_source, [self, packet_source]() {
+      packet_source,
+      [self, packet_source]() {
         return self->FeedUntilBufferAvailable(packet_source);
-      });
+      },
+      en_debug_log_);
 }
 
 bool Mpeg2PsDemuxer::HasMediaType(media::MediaType type) const {

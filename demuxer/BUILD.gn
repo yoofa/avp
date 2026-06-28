@@ -20,6 +20,7 @@ ave_library("ffmpeg_demuxer_factory") {
   ]
   deps = [
     "../api:player_interface",
+    "//base:ave_config",
     "//base:logging",
     "//base:utils",
     "//media/modules/ffmpeg:ffmpeg_utils",
@@ -39,6 +40,7 @@ ave_library("internal_demuxer_factory") {
     "isobmff",
     "matroska",
     "mpeg2:mpeg2_demuxers",
+    "//base:ave_config",
     "//base:logging",
     "//base:utils",
     "//media/audio:audio_channel_layout",

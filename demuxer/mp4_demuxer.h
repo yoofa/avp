@@ -90,6 +90,7 @@ class Mp4Demuxer : public Demuxer {
   std::shared_ptr<MediaMeta> source_format_;
   std::vector<Track> tracks_;
   std::mutex mutex_;
+  const bool en_debug_log_;
   bool initialized_ = false;
 };
 

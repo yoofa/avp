@@ -45,8 +45,11 @@ bool HasSyncPattern(const uint8_t* data,
 
 PacketSourceTrack::PacketSourceTrack(
     std::shared_ptr<media::mpeg2ts::PacketSource> source,
-    EnsureDataFn ensure_data_fn)
-    : source_(std::move(source)), ensure_data_fn_(std::move(ensure_data_fn)) {}
+    EnsureDataFn ensure_data_fn,
+    bool en_debug_log)
+    : source_(std::move(source)),
+      ensure_data_fn_(std::move(ensure_data_fn)),
+      en_debug_log_(en_debug_log) {}
 
 status_t PacketSourceTrack::Start(std::shared_ptr<media::Message> params) {
   started_ = true;
@@ -91,7 +94,17 @@ status_t PacketSourceTrack::Read(std::shared_ptr<media::MediaFrame>& frame,
       return err;
     }
 
-    if (frame == nullptr || frame->stream_type() != media::MediaType::VIDEO) {
+    if (frame == nullptr) {
+      return OK;
+    }
+
+    AVE_LOG_IF(LS_VERBOSE, en_debug_log_)
+        << "Mpeg2Demuxer frame: type="
+        << static_cast<uint32_t>(frame->stream_type())
+        << " pts_us=" << frame->pts().us() << " dts_us=" << frame->dts().us()
+        << " size=" << frame->size();
+
+    if (frame->stream_type() != media::MediaType::VIDEO) {
       return OK;
     }
     waiting_for_video_sync_ = false;

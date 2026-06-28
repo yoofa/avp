@@ -10,6 +10,7 @@
 #include <iostream>
 #include <utility>
 
+#include "base/ave_config.h"
 #include "base/checks.h"
 #include "base/hexdump.h"
 #include "base/logging.h"
@@ -212,7 +213,8 @@ status_t FFmpegDemuxer::TrackInfo::DequeuePacket(
 ////////////////////////////////////
 
 FFmpegDemuxer::FFmpegDemuxer(std::shared_ptr<DataSource> data_source)
-    : Demuxer(data_source) {
+    : Demuxer(data_source),
+      en_debug_log_(base::AveConfig::GetInstance().demuxer_logs_enabled()) {
   av_log_set_level(AV_LOG_QUIET);
   av_format_context_ = avformat_alloc_context();
   av_io_context_ = avio_alloc_context(
@@ -413,6 +415,10 @@ status_t FFmpegDemuxer::ReadAvFrame(
   if (st != ave::OK) {
     return st;
   }
+  AVE_LOG_IF(LS_VERBOSE, en_debug_log_)
+      << "FFmpegDemuxer frame: track=" << index
+      << " pts_us=" << packet->pts().us() << " dts_us=" << packet->dts().us()
+      << " size=" << packet->size();
   return ave::OK;
 }
 

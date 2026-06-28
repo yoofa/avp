@@ -8,6 +8,7 @@ source_set("matroska") {
 
   deps = [
     "../../api:player_interface",
+    "//base:ave_config",
     "//base:logging",
     "//media/codec:codec_id",
     "//media/foundation:media_frame",

@@ -10,6 +10,7 @@
 #include <array>
 #include <utility>
 
+#include "base/ave_config.h"
 #include "base/logging.h"
 #include "demuxer/mpeg2/mpeg2_common.h"
 #include "media/foundation/media_errors.h"
@@ -66,7 +67,8 @@ bool IsTrackFormatReady(const std::shared_ptr<media::MediaMeta>& format) {
 }  // namespace
 
 Mpeg2TsDemuxer::Mpeg2TsDemuxer(std::shared_ptr<DataSource> data_source)
-    : Demuxer(std::move(data_source)) {}
+    : Demuxer(std::move(data_source)),
+      en_debug_log_(base::AveConfig::GetInstance().demuxer_logs_enabled()) {}
 
 Mpeg2TsDemuxer::~Mpeg2TsDemuxer() = default;
 
@@ -154,9 +156,11 @@ std::shared_ptr<media::MediaSource> Mpeg2TsDemuxer::GetTrack(
   auto packet_source = tracks_[track_index].packet_source;
   auto self = shared_from_this();
   return std::make_shared<mpeg2::PacketSourceTrack>(
-      packet_source, [self, packet_source]() {
+      packet_source,
+      [self, packet_source]() {
         return self->FeedUntilBufferAvailable(packet_source);
-      });
+      },
+      en_debug_log_);
 }
 
 bool Mpeg2TsDemuxer::HasTrack(unsigned type) const {

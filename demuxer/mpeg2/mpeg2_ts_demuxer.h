@@ -61,6 +61,7 @@ class Mpeg2TsDemuxer : public Demuxer,
   off64_t size_ = 0;
   size_t sync_offset_ = 0;
   size_t packet_stride_ = 188;
+  const bool en_debug_log_;
   bool initialized_ = false;
   bool eos_signaled_ = false;
 };

@@ -31,7 +31,8 @@ class PacketSourceTrack : public media::MediaSource {
   using EnsureDataFn = std::function<status_t()>;
 
   PacketSourceTrack(std::shared_ptr<media::mpeg2ts::PacketSource> source,
-                    EnsureDataFn ensure_data_fn);
+                    EnsureDataFn ensure_data_fn,
+                    bool en_debug_log);
   ~PacketSourceTrack() override = default;
 
   status_t Start(std::shared_ptr<media::Message> params) override;
@@ -43,6 +44,7 @@ class PacketSourceTrack : public media::MediaSource {
  private:
   std::shared_ptr<media::mpeg2ts::PacketSource> source_;
   EnsureDataFn ensure_data_fn_;
+  const bool en_debug_log_;
   bool started_ = false;
   bool waiting_for_video_sync_ = false;
 };

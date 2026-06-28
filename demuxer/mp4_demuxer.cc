@@ -12,6 +12,7 @@
 #include <cstring>
 #include <utility>
 
+#include "base/ave_config.h"
 #include "base/logging.h"
 #include "base/units/time_delta.h"
 #include "base/units/timestamp.h"
@@ -146,7 +147,8 @@ status_t Mp4Source::Read(std::shared_ptr<MediaFrame>& frame,
 // ========== Mp4Demuxer ==========
 
 Mp4Demuxer::Mp4Demuxer(std::shared_ptr<DataSource> data_source)
-    : Demuxer(std::move(data_source)) {
+    : Demuxer(std::move(data_source)),
+      en_debug_log_(base::AveConfig::GetInstance().demuxer_logs_enabled()) {
   AVE_LOG(LS_INFO) << "Mp4Demuxer created";
 }
 
@@ -1165,6 +1167,12 @@ status_t Mp4Demuxer::ReadSample(size_t track_index,
   frame->SetDuration(base::TimeDelta::Micros(info.duration_us));
   frame->SetCodec(track.meta->codec());
   frame->SetStreamType(track.media_type);
+
+  AVE_LOG_IF(LS_VERBOSE, en_debug_log_)
+      << "Mp4Demuxer frame: track=" << track_index
+      << " sample=" << track.current_sample << " pts_us=" << info.pts_us
+      << " dts_us=" << info.dts_us << " size=" << info.size
+      << " sync=" << info.is_sync;
 
   track.current_sample++;
 

@@ -82,6 +82,7 @@ class Mpeg2PsDemuxer : public Demuxer,
   std::shared_ptr<media::Buffer> buffer_;
   off64_t offset_ = 0;
   status_t final_result_ = OK;
+  const bool en_debug_log_;
   bool scanning_ = true;
   bool initialized_ = false;
   bool eos_signaled_ = false;

@@ -126,6 +126,7 @@ class MkvDemuxer : public Demuxer {
   libmatroska::KaxCluster* current_cluster_ = nullptr;
 
   std::mutex mutex_;
+  const bool en_debug_log_;
 };
 
 }  // namespace player

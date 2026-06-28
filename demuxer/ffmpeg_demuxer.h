@@ -78,6 +78,7 @@ class FFmpegDemuxer : public Demuxer {
   std::shared_ptr<ave::media::MediaMeta> source_format_;
 
   std::vector<TrackInfo> tracks_;
+  const bool en_debug_log_;
 };
 
 }  // namespace player
