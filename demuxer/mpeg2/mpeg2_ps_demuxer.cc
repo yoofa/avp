@@ -48,6 +48,18 @@ Mpeg2PsDemuxer::Mpeg2PsDemuxer(std::shared_ptr<DataSource> data_source)
 
 Mpeg2PsDemuxer::~Mpeg2PsDemuxer() = default;
 
+std::optional<DemuxerSniffResult> Mpeg2PsDemuxer::Sniff(
+    const std::shared_ptr<DataSource>& data_source) {
+  if (!data_source || !mpeg2::SniffMpeg2Ps(data_source)) {
+    return std::nullopt;
+  }
+  return DemuxerSniffResult{media::MEDIA_MIMETYPE_CONTAINER_MPEG2PS};
+}
+
+std::vector<std::string> Mpeg2PsDemuxer::SupportedContainerMimeTypes() {
+  return {media::MEDIA_MIMETYPE_CONTAINER_MPEG2PS, "video/mpeg"};
+}
+
 const char* Mpeg2PsDemuxer::name() {
   return "Mpeg2PsDemuxer";
 }
@@ -57,7 +69,7 @@ status_t Mpeg2PsDemuxer::Init() {
     return OK;
   }
 
-  if (!mpeg2::SniffMpeg2Ps(data_source_)) {
+  if (!Sniff(data_source_)) {
     return media::ERROR_UNSUPPORTED;
   }
 

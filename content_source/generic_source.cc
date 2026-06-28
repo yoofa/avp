@@ -383,8 +383,8 @@ status_t GenericSource::InitFromDataSource() {
   AVE_CHECK(datasource != nullptr);
 
   lock_.unlock();
-  demuxer_ =
-      demuxer_factory_ ? demuxer_factory_->CreateDemuxer(datasource) : nullptr;
+  demuxer_ = demuxer_factory_ ? demuxer_factory_->CreateDemuxer(datasource, {})
+                              : nullptr;
 
   if (demuxer_ == nullptr) {
     AVE_LOG(LS_ERROR) << "Failed to create demuxer";

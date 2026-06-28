@@ -10,6 +10,7 @@
 
 #include <map>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "api/demuxer/demuxer.h"
@@ -34,6 +35,10 @@ class Mpeg2PsDemuxer : public Demuxer,
  public:
   explicit Mpeg2PsDemuxer(std::shared_ptr<DataSource> data_source);
   ~Mpeg2PsDemuxer() override;
+
+  static std::optional<DemuxerSniffResult> Sniff(
+      const std::shared_ptr<DataSource>& data_source);
+  static std::vector<std::string> SupportedContainerMimeTypes();
 
   status_t Init();
 

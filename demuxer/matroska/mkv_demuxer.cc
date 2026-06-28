@@ -8,8 +8,10 @@
 #include "mkv_demuxer.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstring>
+#include <string_view>
 
 #include "base/ave_config.h"
 #include "base/logging.h"
@@ -185,6 +187,34 @@ MkvDemuxer::~MkvDemuxer() {
   delete current_element_;
   delete segment_;
   AVE_LOG(LS_INFO) << "MkvDemuxer destroyed";
+}
+
+std::optional<DemuxerSniffResult> MkvDemuxer::Sniff(
+    const std::shared_ptr<DataSource>& data_source) {
+  constexpr size_t kProbeSize = 4096;
+  std::array<uint8_t, kProbeSize> probe = {};
+  if (!data_source || data_source->ReadAt(0, probe.data(), probe.size()) < 4) {
+    return std::nullopt;
+  }
+  if (probe[0] != 0x1a || probe[1] != 0x45 || probe[2] != 0xdf ||
+      probe[3] != 0xa3) {
+    return std::nullopt;
+  }
+
+  const std::string_view header(reinterpret_cast<const char*>(probe.data()),
+                                probe.size());
+  if (header.find("webm") != std::string_view::npos) {
+    return DemuxerSniffResult{"video/webm"};
+  }
+  if (header.find("matroska") != std::string_view::npos) {
+    return DemuxerSniffResult{media::MEDIA_MIMETYPE_CONTAINER_MATROSKA};
+  }
+  return std::nullopt;
+}
+
+std::vector<std::string> MkvDemuxer::SupportedContainerMimeTypes() {
+  return {media::MEDIA_MIMETYPE_CONTAINER_MATROSKA, "audio/x-matroska",
+          "video/webm", "audio/webm"};
 }
 
 const char* MkvDemuxer::name() {

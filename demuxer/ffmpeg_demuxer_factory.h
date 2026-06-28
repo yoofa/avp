@@ -26,6 +26,9 @@ class FFmpegDemuxerFactory : public DemuxerFactory {
 
   std::shared_ptr<Demuxer> CreateDemuxer(
       std::shared_ptr<DataSource> dataSource) override;
+  std::shared_ptr<Demuxer> CreateDemuxer(
+      std::shared_ptr<DataSource> data_source,
+      const std::vector<std::string>& preferred_container_mime_types) override;
 };
 
 }  // namespace player

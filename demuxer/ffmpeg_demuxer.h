@@ -9,6 +9,7 @@
 #define FFMPEG_DEMUXER_H
 
 #include <list>
+#include <string>
 #include <vector>
 #include "api/demuxer/demuxer.h"
 #include "base/data_source/data_source.h"
@@ -33,6 +34,10 @@ class FFmpegDemuxer : public Demuxer {
  public:
   explicit FFmpegDemuxer(std::shared_ptr<DataSource> data_source);
   ~FFmpegDemuxer() override;
+
+  static std::optional<DemuxerSniffResult> Sniff(
+      const std::shared_ptr<DataSource>& data_source);
+  static std::vector<std::string> SupportedContainerMimeTypes();
 
   // Demuxer API
   status_t GetFormat(std::shared_ptr<ave::media::MediaMeta>& format) override;

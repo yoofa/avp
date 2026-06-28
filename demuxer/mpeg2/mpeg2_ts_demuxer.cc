@@ -72,6 +72,19 @@ Mpeg2TsDemuxer::Mpeg2TsDemuxer(std::shared_ptr<DataSource> data_source)
 
 Mpeg2TsDemuxer::~Mpeg2TsDemuxer() = default;
 
+std::optional<DemuxerSniffResult> Mpeg2TsDemuxer::Sniff(
+    const std::shared_ptr<DataSource>& data_source) {
+  mpeg2::TsPacketLayout layout;
+  if (!data_source || !mpeg2::SniffMpeg2Ts(data_source, &layout)) {
+    return std::nullopt;
+  }
+  return DemuxerSniffResult{media::MEDIA_MIMETYPE_CONTAINER_MPEG2TS};
+}
+
+std::vector<std::string> Mpeg2TsDemuxer::SupportedContainerMimeTypes() {
+  return {media::MEDIA_MIMETYPE_CONTAINER_MPEG2TS, "video/mp2t"};
+}
+
 const char* Mpeg2TsDemuxer::name() {
   return "Mpeg2TsDemuxer";
 }

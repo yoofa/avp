@@ -9,6 +9,8 @@
 #define DEMUXER_H
 
 #include <memory>
+#include <optional>
+#include <string>
 
 #include "base/data_source/data_source.h"
 #include "media/foundation/media_meta.h"
@@ -20,6 +22,10 @@ namespace player {
 using ave::base::DataSource;
 using ave::media::MediaMeta;
 using ave::media::MediaSource;
+
+struct DemuxerSniffResult {
+  std::string container_mime_type;
+};
 
 class Demuxer {
  public:

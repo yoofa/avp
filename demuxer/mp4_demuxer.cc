@@ -156,6 +156,29 @@ Mp4Demuxer::~Mp4Demuxer() {
   AVE_LOG(LS_INFO) << "Mp4Demuxer destroyed";
 }
 
+std::optional<DemuxerSniffResult> Mp4Demuxer::Sniff(
+    const std::shared_ptr<DataSource>& data_source) {
+  std::array<uint8_t, 12> header = {};
+  if (!data_source || data_source->ReadAt(0, header.data(), header.size()) !=
+                          static_cast<ssize_t>(header.size())) {
+    return std::nullopt;
+  }
+
+  const uint32_t box_size = (static_cast<uint32_t>(header[0]) << 24) |
+                            (static_cast<uint32_t>(header[1]) << 16) |
+                            (static_cast<uint32_t>(header[2]) << 8) | header[3];
+  if (box_size < 8 || header[4] != 'f' || header[5] != 't' ||
+      header[6] != 'y' || header[7] != 'p') {
+    return std::nullopt;
+  }
+  return DemuxerSniffResult{media::MEDIA_MIMETYPE_CONTAINER_MPEG4};
+}
+
+std::vector<std::string> Mp4Demuxer::SupportedContainerMimeTypes() {
+  return {media::MEDIA_MIMETYPE_CONTAINER_MPEG4, "audio/mp4", "application/mp4",
+          "video/quicktime"};
+}
+
 const char* Mp4Demuxer::name() {
   return "Mp4Demuxer";
 }

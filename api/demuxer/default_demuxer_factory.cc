@@ -19,10 +19,17 @@ DefaultDemuxerFactory::DefaultDemuxerFactory(
       ffmpeg_factory_(std::move(ffmpeg_factory)) {}
 
 std::shared_ptr<Demuxer> DefaultDemuxerFactory::CreateDemuxer(
-    std::shared_ptr<DataSource> dataSource) {
+    std::shared_ptr<DataSource> data_source) {
+  return CreateDemuxer(std::move(data_source), {});
+}
+
+std::shared_ptr<Demuxer> DefaultDemuxerFactory::CreateDemuxer(
+    std::shared_ptr<DataSource> data_source,
+    const std::vector<std::string>& preferred_container_mime_types) {
   // Try internal (native) demuxers first
   if (internal_factory_) {
-    auto demuxer = internal_factory_->CreateDemuxer(dataSource);
+    auto demuxer = internal_factory_->CreateDemuxer(
+        data_source, preferred_container_mime_types);
     if (demuxer) {
       AVE_LOG(LS_INFO) << "DefaultDemuxerFactory: using internal demuxer ("
                        << demuxer->name() << ")";
@@ -32,7 +39,8 @@ std::shared_ptr<Demuxer> DefaultDemuxerFactory::CreateDemuxer(
 
   // Fall back to FFmpeg
   if (ffmpeg_factory_) {
-    auto demuxer = ffmpeg_factory_->CreateDemuxer(std::move(dataSource));
+    auto demuxer = ffmpeg_factory_->CreateDemuxer(
+        std::move(data_source), preferred_container_mime_types);
     if (demuxer) {
       AVE_LOG(LS_INFO) << "DefaultDemuxerFactory: using ffmpeg demuxer ("
                        << demuxer->name() << ")";

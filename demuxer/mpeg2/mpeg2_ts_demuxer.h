@@ -9,6 +9,7 @@
 #define DEMUXER_MPEG2_MPEG2_TS_DEMUXER_H_
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "api/demuxer/demuxer.h"
@@ -32,6 +33,10 @@ class Mpeg2TsDemuxer : public Demuxer,
  public:
   explicit Mpeg2TsDemuxer(std::shared_ptr<DataSource> data_source);
   ~Mpeg2TsDemuxer() override;
+
+  static std::optional<DemuxerSniffResult> Sniff(
+      const std::shared_ptr<DataSource>& data_source);
+  static std::vector<std::string> SupportedContainerMimeTypes();
 
   status_t Init();
 

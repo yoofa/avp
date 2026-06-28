@@ -69,6 +69,10 @@ class MkvDemuxer : public Demuxer {
   explicit MkvDemuxer(std::shared_ptr<DataSource> data_source);
   ~MkvDemuxer() override;
 
+  static std::optional<DemuxerSniffResult> Sniff(
+      const std::shared_ptr<DataSource>& data_source);
+  static std::vector<std::string> SupportedContainerMimeTypes();
+
   // Demuxer API
   status_t GetFormat(std::shared_ptr<MediaMeta>& format) override;
   size_t GetTrackCount() override;

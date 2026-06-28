@@ -920,8 +920,9 @@ status_t HttpLiveSource::LoadTsSegmentLocked(
 status_t HttpLiveSource::LoadDemuxedSegmentLocked(
     const std::shared_ptr<DataSource>& data_source,
     int64_t segment_start_time_us) {
-  auto demuxer =
-      demuxer_factory_ ? demuxer_factory_->CreateDemuxer(data_source) : nullptr;
+  auto demuxer = demuxer_factory_
+                     ? demuxer_factory_->CreateDemuxer(data_source, {})
+                     : nullptr;
   if (!demuxer) {
     return media::ERROR_UNSUPPORTED;
   }

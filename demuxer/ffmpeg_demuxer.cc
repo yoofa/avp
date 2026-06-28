@@ -7,7 +7,9 @@
 
 #include "ffmpeg_demuxer.h"
 
+#include <algorithm>
 #include <iostream>
+#include <string_view>
 #include <utility>
 
 #include "base/ave_config.h"
@@ -231,8 +233,77 @@ FFmpegDemuxer::FFmpegDemuxer(std::shared_ptr<DataSource> data_source)
 
 FFmpegDemuxer::~FFmpegDemuxer() = default;
 
+std::optional<DemuxerSniffResult> FFmpegDemuxer::Sniff(
+    const std::shared_ptr<DataSource>& data_source) {
+  constexpr size_t kProbeSize = 64 * 1024;
+  std::vector<uint8_t> buffer(kProbeSize + AVPROBE_PADDING_SIZE, 0);
+  if (!data_source) {
+    return std::nullopt;
+  }
+
+  const ssize_t bytes_read = data_source->ReadAt(0, buffer.data(), kProbeSize);
+  if (bytes_read <= 0) {
+    return std::nullopt;
+  }
+
+  const std::string uri = data_source->GetUri();
+  AVProbeData probe = {};
+  probe.filename = uri.c_str();
+  probe.buf = buffer.data();
+  probe.buf_size = static_cast<int>(bytes_read);
+  int score = 0;
+  const AVInputFormat* input_format = av_probe_input_format3(&probe, 0, &score);
+  if (!input_format) {
+    return std::nullopt;
+  }
+
+  std::string_view mime_types = input_format->mime_type
+                                    ? std::string_view(input_format->mime_type)
+                                    : std::string_view();
+  const size_t separator = mime_types.find(',');
+  if (separator != std::string_view::npos) {
+    mime_types = mime_types.substr(0, separator);
+  }
+  return DemuxerSniffResult{mime_types.empty() ? "application/octet-stream"
+                                               : std::string(mime_types)};
+}
+
+std::vector<std::string> FFmpegDemuxer::SupportedContainerMimeTypes() {
+  std::vector<std::string> mime_types;
+  void* iterator = nullptr;
+  const AVInputFormat* input_format = nullptr;
+  while ((input_format = av_demuxer_iterate(&iterator)) != nullptr) {
+    if (!input_format->mime_type) {
+      continue;
+    }
+
+    std::string_view remaining(input_format->mime_type);
+    while (!remaining.empty()) {
+      const size_t separator = remaining.find(',');
+      const std::string_view mime_type = remaining.substr(0, separator);
+      if (!mime_type.empty()) {
+        mime_types.emplace_back(mime_type);
+      }
+      if (separator == std::string_view::npos) {
+        break;
+      }
+      remaining.remove_prefix(separator + 1);
+    }
+  }
+
+  std::sort(mime_types.begin(), mime_types.end());
+  mime_types.erase(std::unique(mime_types.begin(), mime_types.end()),
+                   mime_types.end());
+  return mime_types;
+}
+
 status_t FFmpegDemuxer::Init() {
   AVE_LOG(LS_INFO) << "Init FFmpegDemuxer";
+  if ((data_source_->Flags() & DataSource::kSeekable) &&
+      data_source_->Seek(0, SEEK_SET) < 0) {
+    AVE_LOG(LS_ERROR) << "FFmpegDemuxer: failed to seek to file start";
+    return media::ERROR_IO;
+  }
   AVIOSeekOperation(av_io_context_->opaque, 0, SEEK_CUR);
   int ret = OK;
   ret = avformat_open_input(&av_format_context_, nullptr, nullptr, nullptr);

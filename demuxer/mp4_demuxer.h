@@ -10,6 +10,7 @@
 
 #include <memory>
 #include <mutex>
+#include <string>
 #include <vector>
 
 #include "api/demuxer/demuxer.h"
@@ -31,6 +32,10 @@ class Mp4Demuxer : public Demuxer {
  public:
   explicit Mp4Demuxer(std::shared_ptr<DataSource> data_source);
   ~Mp4Demuxer() override;
+
+  static std::optional<DemuxerSniffResult> Sniff(
+      const std::shared_ptr<DataSource>& data_source);
+  static std::vector<std::string> SupportedContainerMimeTypes();
 
   // Demuxer interface
   status_t GetFormat(std::shared_ptr<MediaMeta>& format) override;
