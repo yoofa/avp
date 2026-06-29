@@ -699,6 +699,10 @@ void AvPlayer::OnPause() {
     AVE_LOG(LS_WARNING) << "pause called when source is gone or not set";
   }
 
+  if (sync_controller_) {
+    sync_controller_->Pause();
+  }
+
   if (audio_decoder_) {
     audio_decoder_->Pause();
   }
@@ -718,6 +722,12 @@ void AvPlayer::OnResume() {
     return;
   }
   state_ = State::kStarted;
+  if (source_) {
+    source_->Resume();
+  }
+  if (sync_controller_) {
+    sync_controller_->Resume();
+  }
   if (audio_decoder_) {
     audio_decoder_->Resume();
   }

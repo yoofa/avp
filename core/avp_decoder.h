@@ -9,6 +9,7 @@
 #define AVP_DECODER_H
 
 #include <list>
+#include <vector>
 
 #include "media/codec/codec.h"
 #include "media/codec/codec_factory.h"
@@ -59,6 +60,15 @@ class AVPDecoder : public AVPDecoderBase, public CodecCallback {
   void onMessageReceived(const std::shared_ptr<Message>& msg) override;
 
  private:
+  enum class CodecState {
+    kUnconfigured,
+    kConfigured,
+    kRunning,
+    kPaused,
+    kStopping,
+    kStopped,
+  };
+
   enum {
     // internal event for codec notify
     kWhatInputBufferAvailable = 'inAv',
@@ -101,7 +111,13 @@ class AVPDecoder : public AVPDecoderBase, public CodecCallback {
   std::string codec_name_;
 
   bool is_audio_;
+  CodecState codec_state_ = CodecState::kUnconfigured;
   std::list<std::shared_ptr<MediaFrame>> input_packet_queue_;
+  // The codec owns these buffers while paused. Retain their indices and
+  // consume them only after resume; dropping the callback would permanently
+  // starve the codec of that buffer.
+  std::vector<size_t> pending_input_buffer_indices_;
+  std::vector<size_t> pending_output_buffer_indices_;
   bool eos_reached_ = false;
   bool eos_sent_ = false;
 };

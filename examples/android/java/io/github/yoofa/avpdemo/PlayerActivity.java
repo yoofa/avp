@@ -39,6 +39,10 @@ public class PlayerActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean isSeeking;
     private boolean audioOnly;
+    // Keep the UI state locally. Native pause/resume is asynchronous, so
+    // querying isPlaying() immediately after a click can observe the old state.
+    private volatile boolean playbackPaused = true;
+    private volatile boolean pausedByLifecycle;
     private int duration;
 
     @Override
@@ -130,6 +134,8 @@ public class PlayerActivity extends Activity {
                                     updatePlayPauseButton(true);
                                 });
                         p.start();
+                        playbackPaused = false;
+                        pausedByLifecycle = false;
                         startPositionUpdates();
                     });
 
@@ -139,6 +145,7 @@ public class PlayerActivity extends Activity {
                         stopPositionUpdates();
                         runOnUiThread(
                                 () -> {
+                                    playbackPaused = true;
                                     updatePlayPauseButton(false);
                                     seekBar.setProgress(0);
                                     tvPosition.setText(formatDuration(0));
@@ -148,6 +155,7 @@ public class PlayerActivity extends Activity {
             player.setOnErrorListener(
                     (p, errorCode) -> {
                         Log.e(TAG, "Player error: " + errorCode);
+                        playbackPaused = true;
                         runOnUiThread(
                                 () ->
                                         Toast.makeText(
@@ -196,14 +204,18 @@ public class PlayerActivity extends Activity {
         btnPlayPause.setOnClickListener(
                 v -> {
                     if (player == null) return;
-                    if (player.isPlaying()) {
-                        player.pause();
-                        stopPositionUpdates();
-                        updatePlayPauseButton(false);
-                    } else {
+                    if (playbackPaused) {
                         player.resume();
+                        playbackPaused = false;
+                        pausedByLifecycle = false;
                         startPositionUpdates();
                         updatePlayPauseButton(true);
+                    } else {
+                        player.pause();
+                        playbackPaused = true;
+                        pausedByLifecycle = false;
+                        stopPositionUpdates();
+                        updatePlayPauseButton(false);
                     }
                     showControls();
                 });
@@ -237,7 +249,7 @@ public class PlayerActivity extends Activity {
             new Runnable() {
                 @Override
                 public void run() {
-                    if (player != null && player.isPlaying() && !isSeeking) {
+                    if (player != null && !playbackPaused && !isSeeking) {
                         int pos = player.getCurrentPosition();
                         seekBar.setProgress(pos);
                         tvPosition.setText(formatDuration(pos));
@@ -284,6 +296,8 @@ public class PlayerActivity extends Activity {
     private void releasePlayer() {
         stopPositionUpdates();
         handler.removeCallbacksAndMessages(null);
+        playbackPaused = true;
+        pausedByLifecycle = false;
         if (player != null) {
             player.stop();
             player.release();
@@ -294,18 +308,24 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        if (player != null) {
-            if (isFinishing()) {
-                // Activity is being destroyed; release is handled by surfaceDestroyed/onDestroy.
-                if (player.isPlaying()) {
-                    player.pause();
-                }
-                stopPositionUpdates();
-            } else if (player.isPlaying()) {
-                player.pause();
-                stopPositionUpdates();
-                updatePlayPauseButton(false);
-            }
+        if (player != null && !playbackPaused) {
+            player.pause();
+            playbackPaused = true;
+            pausedByLifecycle = !isFinishing();
+            stopPositionUpdates();
+            updatePlayPauseButton(false);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (player != null && pausedByLifecycle && !isFinishing()) {
+            player.resume();
+            playbackPaused = false;
+            pausedByLifecycle = false;
+            startPositionUpdates();
+            updatePlayPauseButton(true);
         }
     }
 

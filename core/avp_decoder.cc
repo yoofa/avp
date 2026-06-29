@@ -102,6 +102,7 @@ void AVPDecoder::OnConfigure(const std::shared_ptr<MediaMeta>& format) {
 
   AVE_LOG(LS_INFO) << "AVPDecoder::OnConfigure: setting callback";
   decoder_->SetCallback(this);
+  codec_state_ = CodecState::kConfigured;
   AVE_LOG(LS_INFO) << "AVPDecoder::OnConfigure: complete";
 }
 
@@ -130,6 +131,13 @@ void AVPDecoder::OnStart() {
     return;
   }
 
+  if (codec_state_ != CodecState::kConfigured) {
+    AVE_LOG(LS_ERROR) << "AVPDecoder::OnStart: invalid codec state="
+                      << static_cast<int32_t>(codec_state_);
+    ReportError(ave::INVALID_OPERATION);
+    return;
+  }
+
   status_t err = decoder_->Start();
 
   if (err != ave::OK) {
@@ -139,27 +147,44 @@ void AVPDecoder::OnStart() {
     return;
   }
 
+  codec_state_ = CodecState::kRunning;
   AVE_LOG(LS_INFO) << "AVPDecoder::OnStart: codec started, requesting input";
   OnRequestInputBuffers();
 }
 
 void AVPDecoder::OnPause() {
-  AVE_LOG(LS_VERBOSE) << "onPause";
-  if (decoder_) {
-    decoder_->Stop();
+  if (codec_state_ != CodecState::kRunning) {
+    return;
   }
+  // MediaCodec::stop() tears down its configured state. Pause must keep the
+  // codec started so Resume can continue using its outstanding buffers.
+  codec_state_ = CodecState::kPaused;
+  AVE_LOG(LS_INFO) << "AVPDecoder::OnPause: codec kept running";
 }
 
 void AVPDecoder::OnResume() {
-  AVE_LOG(LS_VERBOSE) << "onResume";
-  if (decoder_) {
-    status_t err = decoder_->Start();
-    if (err != ave::OK) {
-      ReportError(err);
-      return;
-    }
-    OnRequestInputBuffers();
+  if (codec_state_ != CodecState::kPaused) {
+    return;
   }
+
+  codec_state_ = CodecState::kRunning;
+  AVE_LOG(LS_INFO) << "AVPDecoder::OnResume: resuming queued codec buffers"
+                   << ", input=" << pending_input_buffer_indices_.size()
+                   << ", output=" << pending_output_buffer_indices_.size();
+
+  auto pending_output_buffer_indices =
+      std::move(pending_output_buffer_indices_);
+  pending_output_buffer_indices_.clear();
+  for (size_t index : pending_output_buffer_indices) {
+    HandleAnOutputBuffer(index);
+  }
+
+  auto pending_input_buffer_indices = std::move(pending_input_buffer_indices_);
+  pending_input_buffer_indices_.clear();
+  for (size_t index : pending_input_buffer_indices) {
+    HandleAnInputBuffer(index);
+  }
+  OnRequestInputBuffers();
 }
 
 void AVPDecoder::OnFlush() {
@@ -168,23 +193,36 @@ void AVPDecoder::OnFlush() {
     decoder_->Flush();
   }
   input_packet_queue_.clear();
+  pending_input_buffer_indices_.clear();
+  pending_output_buffer_indices_.clear();
   eos_reached_ = false;
   eos_sent_ = false;
 }
 
 void AVPDecoder::OnShutdown() {
-  AVE_LOG(LS_VERBOSE) << "onShutdown";
+  AVE_LOG(LS_INFO) << "AVPDecoder::OnShutdown";
+  codec_state_ = CodecState::kStopping;
   if (decoder_) {
+    // Suppress new NDK callback posts before the codec transitions out of
+    // executing state. A callback already in flight is harmless: its queued
+    // message observes kStopping and is ignored below.
+    decoder_->SetCallback(nullptr);
     decoder_->Stop();
     decoder_->Release();
     decoder_.reset();
   }
   input_packet_queue_.clear();
+  pending_input_buffer_indices_.clear();
+  pending_output_buffer_indices_.clear();
+  codec_state_ = CodecState::kStopped;
 }
 
 /////////////////////
 
 bool AVPDecoder::DoRequestInputBuffers() {
+  if (codec_state_ != CodecState::kRunning) {
+    return false;
+  }
   AVE_LOG(LS_VERBOSE) << "DoRequestInputBuffers: is_audio=" << is_audio_
                       << ", current_queue_size=" << input_packet_queue_.size();
   status_t err = OK;
@@ -259,6 +297,14 @@ void AVPDecoder::HandleAnInputBuffer(size_t index) {
                       << ", queue_size=" << input_packet_queue_.size()
                       << ", eos_reached=" << eos_reached_
                       << ", eos_sent=" << eos_sent_;
+  if (codec_state_ == CodecState::kPaused) {
+    pending_input_buffer_indices_.push_back(index);
+    return;
+  }
+  if (codec_state_ != CodecState::kRunning) {
+    AVE_LOG(LS_VERBOSE) << "HandleAnInputBuffer: ignoring stale callback";
+    return;
+  }
   if (decoder_ == nullptr) {
     AVE_LOG(LS_ERROR) << "HandleAnInputBuffer: decoder is nullptr";
     ReportError(ave::NO_INIT);
@@ -318,6 +364,14 @@ void AVPDecoder::HandleAnInputBuffer(size_t index) {
 
 void AVPDecoder::HandleAnOutputBuffer(size_t index) {
   AVE_LOG(LS_VERBOSE) << "HandleAnOutputBuffer: index=" << index;
+  if (codec_state_ == CodecState::kPaused) {
+    pending_output_buffer_indices_.push_back(index);
+    return;
+  }
+  if (codec_state_ != CodecState::kRunning) {
+    AVE_LOG(LS_VERBOSE) << "HandleAnOutputBuffer: ignoring stale callback";
+    return;
+  }
   if (decoder_ == nullptr) {
     AVE_LOG(LS_ERROR) << "HandleAnOutputBuffer: decoder is nullptr";
     ReportError(ave::NO_INIT);
@@ -455,6 +509,10 @@ void AVPDecoder::HandleAnOutputBuffer(size_t index) {
 
 void AVPDecoder::HandleAnOutputFormatChanged(
     const std::shared_ptr<MediaMeta>& /*format*/) {
+  if (codec_state_ != CodecState::kRunning &&
+      codec_state_ != CodecState::kPaused) {
+    return;
+  }
   if (is_audio_) {
     auto notify = notify_->dup();
     notify->setInt32(kWhat, kWhatAudioOutputFormatChanged);
@@ -469,6 +527,12 @@ void AVPDecoder::HandleAnOutputFormatChanged(
 }
 
 void AVPDecoder::HandleAnCodecError(status_t err) {
+  if (codec_state_ == CodecState::kStopping ||
+      codec_state_ == CodecState::kStopped) {
+    AVE_LOG(LS_VERBOSE) << "HandleAnCodecError: ignoring teardown error="
+                        << err;
+    return;
+  }
   ReportError(err);
 }
 
