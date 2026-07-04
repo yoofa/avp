@@ -44,6 +44,9 @@ class PacketSource {
 
   bool HasBufferAvailable(status_t* result);
   size_t GetAvailableBufferCount(status_t* result);
+  // Returns the timestamp span currently queued, in microseconds.
+  // A queue with fewer than two timestamped access units returns zero.
+  int64_t GetBufferedDurationUs() const;
 
   status_t QueueAccessunit(std::shared_ptr<MediaFrame> packet);
   status_t DequeueAccessUnit(std::shared_ptr<MediaFrame>& packet)

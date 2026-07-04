@@ -36,3 +36,24 @@ ave_library("http_live_content_source") {
     "//media/modules/mpeg2ts:mpeg2ts",
   ]
 }
+
+ave_library("rtsp_content_source") {
+  sources = [
+    "rtsp/rtsp_source.cc",
+    "rtsp/rtsp_source.h",
+  ]
+  deps = [
+    "../core:packet_source",
+    "//api:api_content_source",
+    "//base:logging",
+    "//base:task_util",
+    "//base/net:async_socket",
+    "//media/audio:audio_channel_layout",
+    "//media/codec:codec_id",
+    "//media/foundation:media_meta",
+    "//media/foundation:media_mimes",
+    "//media/modules/rtp_rtcp:rtp_packet_received",
+    "//media/modules/rtp_rtcp:video_rtp_depacketizer_h264",
+    "//media/modules/rtp_rtcp:video_rtp_depacketizer_h265",
+  ]
+}

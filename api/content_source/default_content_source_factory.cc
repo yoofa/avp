@@ -16,6 +16,7 @@
 #include "content_source/generic_source.h"
 #include "content_source/http_live/http_live_source.h"
 #include "content_source/http_live/playlist_parser.h"
+#include "content_source/rtsp/rtsp_source.h"
 
 namespace ave {
 namespace player {
@@ -33,6 +34,10 @@ std::string ToLower(std::string value) {
 bool IsHttpUrl(const std::string& url) {
   const std::string lower = ToLower(url);
   return lower.starts_with("http://") || lower.starts_with("https://");
+}
+
+bool IsRtspUrl(const std::string& url) {
+  return ToLower(url).starts_with("rtsp://");
 }
 
 std::shared_ptr<DataSource> CreateHttpDataSource(
@@ -58,6 +63,14 @@ std::shared_ptr<DataSource> CreateHttpDataSource(
 std::shared_ptr<ContentSource> DefaultContentSourceFactory::CreateContentSource(
     const char* url,
     const std::unordered_map<std::string, std::string>& headers) {
+  if (url && IsRtspUrl(url)) {
+    auto source = std::make_shared<RTSPSource>();
+    if (source->SetDataSource(url, headers) != OK) {
+      return nullptr;
+    }
+    return source;
+  }
+
   if (url && IsHttpUrl(url) && http_live::LooksLikeHlsUrl(url)) {
     auto source = std::make_shared<HttpLiveSource>(http_provider_);
     if (source->SetDataSource(url, headers) != OK) {

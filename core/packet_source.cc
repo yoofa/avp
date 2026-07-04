@@ -62,6 +62,19 @@ size_t PacketSource::GetAvailableBufferCount(status_t* result) {
   return 0;
 }
 
+int64_t PacketSource::GetBufferedDurationUs() const {
+  std::scoped_lock lock(lock_);
+  if (packets_.size() < 2U || !packets_.front() || !packets_.back()) {
+    return 0;
+  }
+  const auto first_pts = packets_.front()->pts();
+  const auto last_pts = packets_.back()->pts();
+  if (!first_pts.IsFinite() || !last_pts.IsFinite() || last_pts < first_pts) {
+    return 0;
+  }
+  return (last_pts - first_pts).us();
+}
+
 status_t PacketSource::QueueAccessunit(std::shared_ptr<MediaFrame> packet) {
   std::scoped_lock l(lock_);
   packets_.push(std::move(packet));

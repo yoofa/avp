@@ -27,6 +27,7 @@ ave_library("default_content_source_factory") {
     "//base/net:http_api",
     "//content_source:generic_content_source",
     "//content_source:http_live_content_source",
+    "//content_source:rtsp_content_source",
   ]
 }
 
