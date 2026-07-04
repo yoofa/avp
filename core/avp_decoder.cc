@@ -11,6 +11,7 @@
 #include <cstring>
 #include <memory>
 
+#include "base/ave_config.h"
 #include "base/checks.h"
 #include "base/logging.h"
 #include "media/codec/codec_id.h"
@@ -25,6 +26,15 @@ namespace ave {
 namespace player {
 
 using ave::media::CodecId;
+
+namespace {
+
+// Keep several seconds of compressed input available to absorb HLS segment
+// fetch latency, without draining every available segment into MediaCodec.
+constexpr size_t kMaxQueuedVideoAccessUnits = 120;
+constexpr size_t kMaxQueuedAudioAccessUnits = 96;
+
+}  // namespace
 
 AVPDecoder::AVPDecoder(std::shared_ptr<CodecFactory> codec_factory,
                        std::shared_ptr<Message> notify,
@@ -225,8 +235,10 @@ bool AVPDecoder::DoRequestInputBuffers() {
   }
   AVE_LOG(LS_VERBOSE) << "DoRequestInputBuffers: is_audio=" << is_audio_
                       << ", current_queue_size=" << input_packet_queue_.size();
+  const size_t max_queued_access_units =
+      is_audio_ ? kMaxQueuedAudioAccessUnits : kMaxQueuedVideoAccessUnits;
   status_t err = OK;
-  while (err == OK) {
+  while (err == OK && input_packet_queue_.size() < max_queued_access_units) {
     std::shared_ptr<MediaFrame> packet;
     err = source_->DequeueAccessUnit(
         is_audio_ ? MediaType::AUDIO : MediaType::VIDEO, packet);
@@ -247,19 +259,26 @@ bool AVPDecoder::DoRequestInputBuffers() {
     }
     input_packet_queue_.push_back(packet);
   }
-  bool should_retry = (err == WOULD_BLOCK) && (source_->FeedMoreESData() == OK);
+  // Refill HLS before its packet sources run dry. FeedMoreESData() applies
+  // its own duration-based high watermark, so this is cheap while buffered
+  // data is sufficient and starts the next segment early when it is not.
+  const status_t feed_err =
+      eos_reached_ ? media::ERROR_END_OF_STREAM : source_->FeedMoreESData();
+  const bool should_retry =
+      err == WOULD_BLOCK &&
+      input_packet_queue_.size() < max_queued_access_units && feed_err == OK;
   AVE_LOG(LS_VERBOSE) << "DoRequestInputBuffers done: queued="
                       << input_packet_queue_.size()
                       << ", should_retry=" << should_retry;
   return should_retry;
 }
 
-void AVPDecoder::FillCodecBuffer(std::shared_ptr<CodecBuffer>& buffer) {
+status_t AVPDecoder::FillCodecBuffer(
+    const std::shared_ptr<CodecBuffer>& buffer) {
   if (input_packet_queue_.empty()) {
-    return;
+    return ave::OK;
   }
   auto packet = input_packet_queue_.front();
-  input_packet_queue_.pop_front();
 
   const uint8_t* packet_data = packet->data();
   size_t packet_size = packet->size();
@@ -272,13 +291,21 @@ void AVPDecoder::FillCodecBuffer(std::shared_ptr<CodecBuffer>& buffer) {
       if (packet_size > adts_header_size) {
         packet_data += adts_header_size;
         packet_size -= adts_header_size;
-        AVE_LOG(LS_INFO)
+        AVE_LOG(LS_VERBOSE)
             << "FillCodecBuffer: stripped ADTS header, payload_size="
             << packet_size;
       }
     }
   }
 
+  if (packet_size > buffer->capacity()) {
+    AVE_LOG(LS_ERROR) << "FillCodecBuffer: access unit is too large, size="
+                      << packet_size
+                      << ", codec_buffer_capacity=" << buffer->capacity();
+    return media::ERROR_BUFFER_TOO_SMALL;
+  }
+
+  input_packet_queue_.pop_front();
   buffer->SetRange(0, packet_size);
   memcpy(buffer->data(), packet_data, packet_size);
 
@@ -288,7 +315,11 @@ void AVPDecoder::FillCodecBuffer(std::shared_ptr<CodecBuffer>& buffer) {
       media::MediaMeta::FormatType::kSample);
   auto pkt_pts = packet->pts();
   meta->SetPts(pkt_pts);
+  AVE_LOG_IF(LS_INFO, base::AveConfig::GetInstance().demuxer_logs_enabled())
+      << "AVPDecoder input AU: type=" << static_cast<int32_t>(is_audio_)
+      << " pts_us=" << pkt_pts.us_or(-1) << " size=" << packet_size;
   buffer->format() = meta;
+  return ave::OK;
 }
 
 /************* CodecCallback event handler *************/
@@ -350,7 +381,11 @@ void AVPDecoder::HandleAnInputBuffer(size_t index) {
     return;
   }
 
-  FillCodecBuffer(codec_buffer);
+  status_t fill_err = FillCodecBuffer(codec_buffer);
+  if (fill_err != ave::OK) {
+    ReportError(fill_err);
+    return;
+  }
 
   AVE_LOG(LS_VERBOSE) << "HandleAnInputBuffer: queuing buffer index=" << index
                       << ", size=" << codec_buffer->size();

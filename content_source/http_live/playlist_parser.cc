@@ -434,6 +434,15 @@ const VariantPlaylistItem* SelectPrimaryVariant(const Playlist& playlist) {
   auto score_variant = [](const VariantPlaylistItem& variant) {
     const std::string codecs = ToLower(variant.codecs);
     int score = 0;
+    if (codecs.find("avc") != std::string::npos ||
+        codecs.find("hvc") != std::string::npos ||
+        codecs.find("hev") != std::string::npos ||
+        codecs.find("vp0") != std::string::npos ||
+        codecs.find("av01") != std::string::npos) {
+      // An audio-only rendition is not a suitable primary stream when a
+      // video variant is available.
+      score += 1000;
+    }
     if (codecs.find("mp4a.") != std::string::npos) {
       score += 100;
     }
@@ -448,6 +457,9 @@ const VariantPlaylistItem* SelectPrimaryVariant(const Playlist& playlist) {
   for (const auto& variant : playlist.variants) {
     const int variant_score = score_variant(variant);
     const int best_score = score_variant(*best);
+    // There is no adaptive bandwidth estimator yet. After preferring a video
+    // rendition, keep the original highest-bandwidth policy so a low-frame-
+    // rate fallback rendition is not mistaken for playback stutter.
     if (variant_score > best_score ||
         (variant_score == best_score &&
          variant.bandwidth_bps > best->bandwidth_bps)) {

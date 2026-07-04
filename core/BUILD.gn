@@ -82,8 +82,10 @@ ave_library("avp_render") {
   ]
   deps = [
     "//api:player_interface",
+    "//base:ave_config",
     "//base:logging",
     "//base:task_util",
+    "//media/foundation:media_frame",
   ]
 }
 
@@ -94,6 +96,7 @@ ave_library("avp_audio_render") {
   ]
   deps = [
     ":avp_render",
+    "//base:ave_config",
     "//base:checks",
     "//base:logging",
     "//base:timeutils",
@@ -130,6 +133,7 @@ ave_library("avp_decoder") {
     "avp_tunnel_decoder.h",
   ]
   deps = [
+    "//base:ave_config",
     "//base:buffers",
     "//base:logging",
     "//media/audio:audio",

@@ -5,11 +5,14 @@ ave_library("isobmff") {
     "box_reader.cc",
     "box_reader.h",
     "box_types.h",
+    "fragmented_mp4_parser.cc",
+    "fragmented_mp4_parser.h",
     "sample_table.cc",
     "sample_table.h",
   ]
   deps = [
     "//base:logging",
     "//base:utils",
+    "//media/foundation:media_meta",
   ]
 }

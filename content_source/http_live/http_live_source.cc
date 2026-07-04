@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/ave_config.h"
 #include "base/data_source/data_source.h"
 #include "base/logging.h"
 #include "base/time_utils.h"
@@ -26,6 +27,12 @@ namespace ave {
 namespace player {
 
 namespace {
+
+// Keep enough decoded access units in the content source to absorb one HLS
+// segment fetch and parser burst. This is deliberately expressed in media
+// time, not frame count, because AAC and video have very different AU rates.
+constexpr int64_t kMinBufferedDurationUs = 4'000'000;
+constexpr int64_t kDefaultVideoFrameDurationUs = 33'333;
 
 struct TsPacketLayout {
   size_t sync_offset = 0;
@@ -359,10 +366,8 @@ class TsSegmentExtractor {
 
 }  // namespace
 
-HttpLiveSource::HttpLiveSource(std::shared_ptr<DemuxerFactory> demuxer_factory,
-                               std::shared_ptr<HTTPProvider> http_provider)
-    : demuxer_factory_(std::move(demuxer_factory)),
-      http_provider_(std::move(http_provider)) {}
+HttpLiveSource::HttpLiveSource(std::shared_ptr<HTTPProvider> http_provider)
+    : http_provider_(std::move(http_provider)) {}
 
 HttpLiveSource::~HttpLiveSource() = default;
 
@@ -422,45 +427,56 @@ void HttpLiveSource::Prepare() {
 void HttpLiveSource::Start() {
   std::scoped_lock lock(lock_);
   started_ = true;
+  dequeue_ready_.store(true, std::memory_order_release);
 }
 
 void HttpLiveSource::Stop() {
   std::scoped_lock lock(lock_);
   started_ = false;
+  dequeue_ready_.store(false, std::memory_order_release);
 }
 
 void HttpLiveSource::Pause() {
   std::scoped_lock lock(lock_);
   started_ = false;
+  dequeue_ready_.store(false, std::memory_order_release);
 }
 
 void HttpLiveSource::Resume() {
   std::scoped_lock lock(lock_);
   started_ = true;
+  dequeue_ready_.store(true, std::memory_order_release);
 }
 
 status_t HttpLiveSource::DequeueAccessUnit(
     MediaType track_type,
     std::shared_ptr<media::MediaFrame>& access_unit) {
-  std::scoped_lock lock(lock_);
   access_unit.reset();
 
-  if (!prepared_ || !started_) {
+  if (!dequeue_ready_.load(std::memory_order_acquire)) {
     return WOULD_BLOCK;
   }
 
-  TrackState* track = FindTrackLocked(track_type);
-  if (!track || !track->packet_source) {
+  std::shared_ptr<PacketSource> packet_source;
+  if (track_type == MediaType::AUDIO) {
+    packet_source = std::atomic_load_explicit(&audio_packet_source_,
+                                              std::memory_order_acquire);
+  } else if (track_type == MediaType::VIDEO) {
+    packet_source = std::atomic_load_explicit(&video_packet_source_,
+                                              std::memory_order_acquire);
+  }
+  if (!packet_source) {
     return WOULD_BLOCK;
   }
 
   status_t result = OK;
-  if (!track->packet_source->HasBufferAvailable(&result)) {
-    return end_of_stream_ ? static_cast<status_t>(media::ERROR_END_OF_STREAM)
-                          : static_cast<status_t>(WOULD_BLOCK);
+  if (!packet_source->HasBufferAvailable(&result)) {
+    return dequeue_eos_.load(std::memory_order_acquire)
+               ? static_cast<status_t>(media::ERROR_END_OF_STREAM)
+               : static_cast<status_t>(WOULD_BLOCK);
   }
 
-  return track->packet_source->DequeueAccessUnit(access_unit);
+  return packet_source->DequeueAccessUnit(access_unit);
 }
 
 std::shared_ptr<media::MediaMeta> HttpLiveSource::GetFormat() {
@@ -520,9 +536,13 @@ status_t HttpLiveSource::SeekTo(int64_t seek_time_us, SeekMode /* mode */) {
       if (track.packet_source) {
         track.packet_source->Clear();
       }
+      track.next_timestamp_us = -1;
+      track.timestamp_segment_start_us = -1;
+      track.timestamp_offset_us = 0;
     }
 
     end_of_stream_ = false;
+    dequeue_eos_.store(false, std::memory_order_release);
     bool found_segment = false;
     for (StreamState* stream : {&primary_stream_, &audio_stream_}) {
       if (!stream->active()) {
@@ -555,6 +575,7 @@ status_t HttpLiveSource::SeekTo(int64_t seek_time_us, SeekMode /* mode */) {
 
     if (!found_segment) {
       end_of_stream_ = true;
+      dequeue_eos_.store(true, std::memory_order_release);
       return media::ERROR_END_OF_STREAM;
     }
   }
@@ -568,6 +589,12 @@ bool HttpLiveSource::IsStreaming() const {
 }
 
 status_t HttpLiveSource::FeedMoreESData() {
+  // The decoder calls this from its input-buffer callback. Avoid waiting on
+  // lock_ when the loader is fetching/parsing a segment under that lock.
+  if (segment_load_in_progress_.load(std::memory_order_acquire)) {
+    return OK;
+  }
+
   std::scoped_lock lock(lock_);
   if (!prepared_) {
     return INVALID_OPERATION;
@@ -576,6 +603,39 @@ status_t HttpLiveSource::FeedMoreESData() {
     return media::ERROR_END_OF_STREAM;
   }
 
+  if (HasSufficientBufferedDataLocked()) {
+    return OK;
+  }
+
+  // Loading a segment performs network I/O and complete TS parsing. Never do
+  // that from a MediaCodec callback: once its small input/output buffer pool
+  // empties, video falls behind the audio clock by the download duration.
+  // The published PacketSources remain independently consumable while this
+  // worker owns lock_ to append the next segment.
+  if (segment_load_in_progress_.load(std::memory_order_relaxed)) {
+    return OK;
+  }
+  segment_load_in_progress_.store(true, std::memory_order_release);
+  segment_loader_ = std::jthread([this] { LoadMoreInBackground(); });
+  return OK;
+}
+
+void HttpLiveSource::LoadMoreInBackground() {
+  std::scoped_lock lock(lock_);
+  if (!prepared_ || end_of_stream_) {
+    segment_load_in_progress_.store(false, std::memory_order_release);
+    return;
+  }
+
+  const status_t err = LoadMoreLocked();
+  if (err != OK && err != WOULD_BLOCK && err != media::ERROR_END_OF_STREAM) {
+    AVE_LOG(LS_ERROR) << "HttpLiveSource background segment load failed: "
+                      << err;
+  }
+  segment_load_in_progress_.store(false, std::memory_order_release);
+}
+
+status_t HttpLiveSource::LoadMoreLocked() {
   bool any_active = false;
   bool all_eos = true;
   for (StreamState* stream : {&primary_stream_, &audio_stream_}) {
@@ -595,6 +655,7 @@ status_t HttpLiveSource::FeedMoreESData() {
 
   if (!any_active || all_eos) {
     end_of_stream_ = true;
+    dequeue_eos_.store(true, std::memory_order_release);
     return media::ERROR_END_OF_STREAM;
   }
   return OK;
@@ -725,10 +786,6 @@ status_t HttpLiveSource::RefreshStreamPlaylistLocked(StreamState& stream,
   if (parsed.is_master || parsed.is_encrypted) {
     return media::ERROR_UNSUPPORTED;
   }
-  if (UsesFragmentedMp4(parsed) && !demuxer_factory_) {
-    return media::ERROR_UNSUPPORTED;
-  }
-
   if (initial) {
     stream.next_segment_sequence = parsed.media_sequence;
     stream.next_segment_start_time_us = 0;
@@ -738,6 +795,7 @@ status_t HttpLiveSource::RefreshStreamPlaylistLocked(StreamState& stream,
 
   if (stream.init_segment_cache_key != parsed.init_segment.uri) {
     stream.init_segment_bytes.clear();
+    stream.fragmented_mp4_tracks.clear();
   }
   stream.init_segment_cache_key = parsed.init_segment.uri;
   stream.playlist = std::move(parsed);
@@ -793,10 +851,10 @@ status_t HttpLiveSource::LoadNextSegmentLocked(StreamState& stream) {
   }
 
   const auto& segment = stream.playlist.segments[index];
-  AVE_LOG(LS_INFO) << "HttpLiveSource loading segment: sequence="
-                   << segment.sequence << " uri=" << segment.uri
-                   << " start_us=" << stream.next_segment_start_time_us
-                   << " duration_us=" << segment.duration_us;
+  AVE_LOG(LS_VERBOSE) << "HttpLiveSource loading segment: sequence="
+                      << segment.sequence << " uri=" << segment.uri
+                      << " start_us=" << stream.next_segment_start_time_us
+                      << " duration_us=" << segment.duration_us;
   const int32_t next_segment_sequence = stream.next_segment_sequence;
   const int64_t next_segment_start_time_us = stream.next_segment_start_time_us;
   stream.next_segment_sequence = segment.sequence + 1;
@@ -839,9 +897,6 @@ status_t HttpLiveSource::LoadFragmentedSegmentLocked(
     StreamState& stream,
     const http_live::MediaPlaylistSegment& segment,
     int64_t segment_start_time_us) {
-  if (!demuxer_factory_) {
-    return media::ERROR_UNSUPPORTED;
-  }
   if (stream.playlist.init_segment.uri.empty()) {
     return media::ERROR_UNSUPPORTED;
   }
@@ -859,6 +914,11 @@ status_t HttpLiveSource::LoadFragmentedSegmentLocked(
     if (err != OK) {
       return err;
     }
+    err = isobmff::FragmentedMp4Parser::ParseInitSegment(
+        stream.init_segment_bytes, &stream.fragmented_mp4_tracks);
+    if (err != OK) {
+      return err;
+    }
   }
 
   std::vector<uint8_t> fragment_bytes;
@@ -872,15 +932,14 @@ status_t HttpLiveSource::LoadFragmentedSegmentLocked(
     return err;
   }
 
-  std::vector<uint8_t> bytes;
-  bytes.reserve(stream.init_segment_bytes.size() + fragment_bytes.size());
-  bytes.insert(bytes.end(), stream.init_segment_bytes.begin(),
-               stream.init_segment_bytes.end());
-  bytes.insert(bytes.end(), fragment_bytes.begin(), fragment_bytes.end());
-
-  auto data_source =
-      std::make_shared<MemoryDataSource>(segment.uri, std::move(bytes));
-  return LoadDemuxedSegmentLocked(data_source, segment_start_time_us);
+  std::vector<std::shared_ptr<media::MediaFrame>> samples;
+  err = isobmff::FragmentedMp4Parser::ParseMediaSegment(
+      fragment_bytes, stream.fragmented_mp4_tracks, &samples);
+  if (err != OK) {
+    return err;
+  }
+  return QueueFragmentedMp4SamplesLocked(
+      stream.fragmented_mp4_tracks, std::move(samples), segment_start_time_us);
 }
 
 status_t HttpLiveSource::LoadTsSegmentLocked(
@@ -915,59 +974,6 @@ status_t HttpLiveSource::LoadTsSegmentLocked(
   }
 
   return OK;
-}
-
-status_t HttpLiveSource::LoadDemuxedSegmentLocked(
-    const std::shared_ptr<DataSource>& data_source,
-    int64_t segment_start_time_us) {
-  auto demuxer = demuxer_factory_
-                     ? demuxer_factory_->CreateDemuxer(data_source, {})
-                     : nullptr;
-  if (!demuxer) {
-    return media::ERROR_UNSUPPORTED;
-  }
-
-  bool queued_track = false;
-  const size_t track_count = demuxer->GetTrackCount();
-  for (size_t i = 0; i < track_count; ++i) {
-    auto source = demuxer->GetTrack(i);
-    if (!source) {
-      continue;
-    }
-
-    std::shared_ptr<media::MediaMeta> format = source->GetFormat();
-    if (!format) {
-      demuxer->GetTrackFormat(format, i);
-    }
-    if (!format) {
-      continue;
-    }
-
-    const MediaType media_type = format->stream_type();
-    if (media_type != MediaType::AUDIO && media_type != MediaType::VIDEO) {
-      continue;
-    }
-
-    status_t err = source->Start(nullptr);
-    if (err != OK) {
-      return err;
-    }
-
-    err = EnsureTrackStateLocked(media_type, format);
-    if (err == OK) {
-      err =
-          QueueDemuxedPacketsLocked(media_type, source, segment_start_time_us);
-    }
-
-    source->Stop();
-    if (err != OK) {
-      return err;
-    }
-    queued_track = true;
-  }
-
-  return queued_track ? static_cast<status_t>(OK)
-                      : static_cast<status_t>(media::ERROR_UNSUPPORTED);
 }
 
 status_t HttpLiveSource::FetchUrlLocked(const std::string& url,
@@ -1064,10 +1070,11 @@ status_t HttpLiveSource::QueueTsPacketsLocked(
       continue;
     }
     if (err == media::ERROR_END_OF_STREAM) {
-      AVE_LOG(LS_INFO) << "HttpLiveSource queued " << packet_count
-                       << " packets for "
-                       << (media_type == MediaType::AUDIO ? "audio" : "video")
-                       << " at segment_start_us=" << segment_start_time_us;
+      AVE_LOG(LS_VERBOSE) << "HttpLiveSource queued " << packet_count
+                          << " packets for "
+                          << (media_type == MediaType::AUDIO ? "audio"
+                                                             : "video")
+                          << " at segment_start_us=" << segment_start_time_us;
       return OK;
     }
     if (err != OK) {
@@ -1078,58 +1085,99 @@ status_t HttpLiveSource::QueueTsPacketsLocked(
       continue;
     }
 
-    OffsetFrameTimestamp(packet, segment_start_time_us);
+    NormalizeTsFrameTimestampLocked(track, packet, segment_start_time_us);
     track->packet_source->QueueAccessunit(packet);
     ++packet_count;
   }
 }
 
-status_t HttpLiveSource::QueueDemuxedPacketsLocked(
-    MediaType media_type,
-    const std::shared_ptr<media::MediaSource>& source,
-    int64_t segment_start_time_us) NO_THREAD_SAFETY_ANALYSIS {
-  TrackState* track = FindTrackLocked(media_type);
-  if (!track || !track->packet_source || !source) {
-    return UNKNOWN_ERROR;
+void HttpLiveSource::NormalizeTsFrameTimestampLocked(
+    TrackState* track,
+    const std::shared_ptr<media::MediaFrame>& frame,
+    int64_t segment_start_time_us) {
+  if (!track || !frame) {
+    return;
   }
 
-  size_t packet_count = 0;
-  for (;;) {
-    std::shared_ptr<media::MediaFrame> packet;
-    lock_.unlock();
-    status_t err = source->Read(packet, nullptr);
-    lock_.lock();
+  const int64_t input_timestamp_us = frame->pts().us_or(-1);
+  int64_t timestamp_us = input_timestamp_us;
+  // Android's MediaCodec uses zero for an absent timestamp. Some TS PES
+  // packets contain no PTS, and the parser consequently leaves an access
+  // unit at its default zero value. Only the first frame of a segment may
+  // legitimately be zero; subsequent zeros need interpolation.
+  const bool has_stale_zero_timestamp =
+      timestamp_us == 0 && track->next_timestamp_us > segment_start_time_us;
+  if (track->timestamp_segment_start_us != segment_start_time_us) {
+    track->timestamp_segment_start_us = segment_start_time_us;
+    // Each TS segment has its own relative PES time base. Video often starts
+    // at the first IDR (for example +2 s into the segment) while audio starts
+    // near zero. Align every track's first AU with its own preceding AU rather
+    // than creating an artificial gap from that relative offset.
+    if (input_timestamp_us >= 0 && track->next_timestamp_us >= 0) {
+      track->timestamp_offset_us =
+          track->next_timestamp_us - input_timestamp_us;
+    } else {
+      track->timestamp_offset_us = segment_start_time_us;
+    }
+  }
 
-    if (err == media::INFO_FORMAT_CHANGED) {
-      auto format = source->GetFormat();
-      if (format) {
-        err = EnsureTrackStateLocked(media_type, format);
-      } else {
-        err = OK;
-      }
-      if (err != OK) {
-        return err;
-      }
+  if (timestamp_us >= 0 && !has_stale_zero_timestamp) {
+    timestamp_us += track->timestamp_offset_us;
+  } else if (track->next_timestamp_us >= 0) {
+    timestamp_us = track->next_timestamp_us;
+  } else {
+    timestamp_us = segment_start_time_us;
+  }
+
+  frame->SetPts(base::Timestamp::Micros(timestamp_us));
+  if (!frame->dts().IsFinite()) {
+    frame->SetDts(base::Timestamp::Micros(timestamp_us));
+  }
+
+  int64_t frame_duration_us = kDefaultVideoFrameDurationUs;
+  if (track->media_type == MediaType::AUDIO && track->format &&
+      track->format->sample_rate() > 0) {
+    frame_duration_us = 1024LL * 1000000LL / track->format->sample_rate();
+  }
+  track->next_timestamp_us = timestamp_us + frame_duration_us;
+  AVE_LOG_IF(LS_INFO, base::AveConfig::GetInstance().demuxer_logs_enabled())
+      << "HLS TS AU: type=" << static_cast<int32_t>(track->media_type)
+      << " input_pts_us=" << input_timestamp_us
+      << " normalized_pts_us=" << timestamp_us
+      << " next_pts_us=" << track->next_timestamp_us
+      << " size=" << frame->size();
+}
+
+status_t HttpLiveSource::QueueFragmentedMp4SamplesLocked(
+    const std::vector<isobmff::FragmentedMp4Track>& tracks,
+    std::vector<std::shared_ptr<media::MediaFrame>> samples,
+    int64_t segment_start_time_us) {
+  for (const auto& fragmented_track : tracks) {
+    if (!fragmented_track.format) {
       continue;
     }
-    if (err == media::ERROR_END_OF_STREAM) {
-      AVE_LOG(LS_INFO) << "HttpLiveSource queued " << packet_count
-                       << " demuxed packets for "
-                       << (media_type == MediaType::AUDIO ? "audio" : "video")
-                       << " at segment_start_us=" << segment_start_time_us;
-      return OK;
+    const MediaType media_type = fragmented_track.format->stream_type();
+    if (media_type != MediaType::AUDIO && media_type != MediaType::VIDEO) {
+      continue;
     }
+    status_t err = EnsureTrackStateLocked(media_type, fragmented_track.format);
     if (err != OK) {
       return err;
     }
-    if (!packet) {
+  }
+  for (const auto& sample : samples) {
+    if (!sample) {
       continue;
     }
-
-    OffsetFrameTimestamp(packet, segment_start_time_us);
-    track->packet_source->QueueAccessunit(packet);
-    ++packet_count;
+    TrackState* track = FindTrackLocked(sample->stream_type());
+    if (!track || !track->packet_source) {
+      return media::ERROR_MALFORMED;
+    }
+    OffsetFrameTimestamp(sample, segment_start_time_us);
+    track->packet_source->QueueAccessunit(sample);
   }
+  return samples.empty() ? static_cast<status_t>(media::ERROR_UNSUPPORTED)
+                         : static_cast<status_t>(OK);
 }
 
 status_t HttpLiveSource::EnsureTrackStateLocked(
@@ -1146,6 +1194,7 @@ status_t HttpLiveSource::EnsureTrackStateLocked(
     }
     state.packet_source = std::make_shared<PacketSource>(state.format);
     tracks_.push_back(std::move(state));
+    PublishTrackPacketSourceLocked(media_type, tracks_.back().packet_source);
     return OK;
   }
 
@@ -1157,8 +1206,21 @@ status_t HttpLiveSource::EnsureTrackStateLocked(
   }
   if (track->packet_source) {
     track->packet_source->SetFormat(track->format);
+    PublishTrackPacketSourceLocked(media_type, track->packet_source);
   }
   return OK;
+}
+
+void HttpLiveSource::PublishTrackPacketSourceLocked(
+    MediaType media_type,
+    std::shared_ptr<PacketSource> source) {
+  if (media_type == MediaType::AUDIO) {
+    std::atomic_store_explicit(&audio_packet_source_, std::move(source),
+                               std::memory_order_release);
+  } else if (media_type == MediaType::VIDEO) {
+    std::atomic_store_explicit(&video_packet_source_, std::move(source),
+                               std::memory_order_release);
+  }
 }
 
 HttpLiveSource::TrackState* HttpLiveSource::FindTrackLocked(
@@ -1181,6 +1243,37 @@ const HttpLiveSource::TrackState* HttpLiveSource::FindTrackLocked(
   return nullptr;
 }
 
+bool HttpLiveSource::HasSufficientBufferedDataLocked() const {
+  if (tracks_.empty()) {
+    return false;
+  }
+
+  for (const auto& track : tracks_) {
+    if (!track.packet_source) {
+      return false;
+    }
+
+    status_t result = OK;
+    const size_t access_unit_count =
+        track.packet_source->GetAvailableBufferCount(&result);
+    if (result != OK) {
+      return false;
+    }
+
+    int64_t access_unit_duration_us = kDefaultVideoFrameDurationUs;
+    if (track.media_type == MediaType::AUDIO && track.format &&
+        track.format->sample_rate() > 0) {
+      access_unit_duration_us =
+          1024LL * 1000000LL / track.format->sample_rate();
+    }
+    if (std::cmp_less(access_unit_count,
+                      kMinBufferedDurationUs / access_unit_duration_us)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 status_t HttpLiveSource::FinishPrepareLocked() {
   if (tracks_.empty()) {
     return UNKNOWN_ERROR;
@@ -1201,6 +1294,15 @@ void HttpLiveSource::ResetLocked() {
   prepared_ = false;
   started_ = false;
   end_of_stream_ = false;
+  std::atomic_store_explicit(&audio_packet_source_,
+                             std::shared_ptr<PacketSource>(),
+                             std::memory_order_release);
+  std::atomic_store_explicit(&video_packet_source_,
+                             std::shared_ptr<PacketSource>(),
+                             std::memory_order_release);
+  dequeue_ready_.store(false, std::memory_order_release);
+  dequeue_eos_.store(false, std::memory_order_release);
+  segment_load_in_progress_.store(false, std::memory_order_release);
 }
 
 void HttpLiveSource::OffsetFrameTimestamp(

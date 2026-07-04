@@ -52,6 +52,7 @@ if (is_android) {
     deps = [
       ":avpdemo_resources",
       ":okhttp_java",
+      "//base/android:ave_base_java",
       "//sdk/android:avp_java",
     ]
   }

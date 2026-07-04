@@ -42,6 +42,9 @@ constexpr uint32_t FOURCC_mdia = FourCC('m', 'd', 'i', 'a');
 constexpr uint32_t FOURCC_edts = FourCC('e', 'd', 't', 's');
 constexpr uint32_t FOURCC_elst = FourCC('e', 'l', 's', 't');
 constexpr uint32_t FOURCC_traf = FourCC('t', 'r', 'a', 'f');
+constexpr uint32_t FOURCC_tfhd = FourCC('t', 'f', 'h', 'd');
+constexpr uint32_t FOURCC_tfdt = FourCC('t', 'f', 'd', 't');
+constexpr uint32_t FOURCC_trun = FourCC('t', 'r', 'u', 'n');
 
 // Media-level boxes (under mdia)
 constexpr uint32_t FOURCC_mdhd = FourCC('m', 'd', 'h', 'd');

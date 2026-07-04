@@ -175,6 +175,9 @@ class AVPAudioRender : public AVPRender {
       size_t requested_size) REQUIRES(mutex_);
   void UpdateCompressedSyncAnchorLocked(int64_t frame_end_pts_us)
       REQUIRES(mutex_);
+  void UpdatePcmSyncAnchorLocked(int64_t frame_pts_us, int64_t frame_end_pts_us)
+      REQUIRES(mutex_);
+  void MaybeUpdatePcmSyncAnchorOnStallLocked() REQUIRES(mutex_);
   void MaybeScheduleCompressedPositionPollLocked(uint32_t delay_us = 10000)
       REQUIRES(mutex_);
   void OnCompressedPositionPoll(int32_t generation);
@@ -219,6 +222,14 @@ class AVPAudioRender : public AVPRender {
   bool passthrough_position_started_ GUARDED_BY(mutex_){false};
   int32_t passthrough_position_poll_generation_ GUARDED_BY(mutex_){0};
   bool passthrough_position_poll_pending_ GUARDED_BY(mutex_){false};
+
+  // PCM playback position is used only while the sink applies backpressure.
+  // Normal writes sample it once; stalled writes sample it at a low frequency
+  // so the audio master clock continues to advance without polling overhead.
+  int64_t pcm_media_start_pts_us_ GUARDED_BY(mutex_){0};
+  int64_t pcm_last_written_end_pts_us_ GUARDED_BY(mutex_){0};
+  int64_t pcm_last_position_poll_time_us_ GUARDED_BY(mutex_){0};
+  bool pcm_media_start_pts_valid_ GUARDED_BY(mutex_){false};
 };
 
 }  // namespace player

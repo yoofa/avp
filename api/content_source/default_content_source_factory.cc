@@ -59,8 +59,7 @@ std::shared_ptr<ContentSource> DefaultContentSourceFactory::CreateContentSource(
     const char* url,
     const std::unordered_map<std::string, std::string>& headers) {
   if (url && IsHttpUrl(url) && http_live::LooksLikeHlsUrl(url)) {
-    auto source =
-        std::make_shared<HttpLiveSource>(demuxer_factory_, http_provider_);
+    auto source = std::make_shared<HttpLiveSource>(http_provider_);
     if (source->SetDataSource(url, headers) != OK) {
       return nullptr;
     }

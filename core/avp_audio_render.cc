@@ -7,8 +7,10 @@
 
 #include "avp_audio_render.h"
 
+#include <algorithm>
 #include <utility>
 
+#include "base/ave_config.h"
 #include "base/checks.h"
 #include "base/errors.h"
 #include "base/logging.h"
@@ -21,6 +23,7 @@ namespace player {
 
 namespace {
 constexpr int64_t kCompressedStartPrerollUs = 250000;
+constexpr int64_t kPcmPositionPollIntervalUs = 20000;
 }
 
 AVPAudioRender::AVPAudioRender(base::TaskRunnerFactory* task_runner_factory,
@@ -142,6 +145,10 @@ void AVPAudioRender::Start() {
     audio_track_started_ = false;
     last_position_log_time_us_ = 0;
     last_played_frames_ = 0;
+    pcm_media_start_pts_us_ = 0;
+    pcm_last_written_end_pts_us_ = 0;
+    pcm_last_position_poll_time_us_ = 0;
+    pcm_media_start_pts_valid_ = false;
 
     if (audio_sink_ready_ && audio_track_) {
       if (IsCompressedOutputLocked()) {
@@ -232,6 +239,10 @@ void AVPAudioRender::Flush() {
     audio_track_started_ = false;
     last_position_log_time_us_ = 0;
     last_played_frames_ = 0;
+    pcm_media_start_pts_us_ = 0;
+    pcm_last_written_end_pts_us_ = 0;
+    pcm_last_position_poll_time_us_ = 0;
+    pcm_media_start_pts_valid_ = false;
 
     if (audio_track_) {
       audio_track_->Flush();
@@ -372,6 +383,12 @@ uint64_t AVPAudioRender::RenderFrameInternal(
   // Write audio data to track.  Single-shot write with a short timeout so
   // the caller's mutex is not held for a long time.  Partial writes are
   // handled via cached_frame_ and a 0-delay re-schedule.
+  // A blocking Java AudioTrack write can wait for an entire hardware buffer
+  // (roughly 200 ms on the affected device). While it waits, the audio master
+  // clock is capped at the last accepted PCM frame and then jumps forward when
+  // the write returns, making otherwise timely video appear late. Use a
+  // non-blocking write instead; the existing cached-frame path retries a full
+  // sink in 5 ms without holding up clock-anchor updates.
   ssize_t bytes_written = WriteAudioData(frame_to_write);
   if (bytes_written > 0) {
     total_bytes_written_ += bytes_written;
@@ -420,6 +437,12 @@ uint64_t AVPAudioRender::RenderFrameInternal(
       consumed = false;
     }
     // else: cached_frame_ has partial data from a previous write — keep it.
+    // The audio hardware can continue draining while no new PCM is accepted.
+    // Refresh its position at a bounded rate so the video clock does not
+    // remain capped at the previous write's end PTS.
+    if (!is_compressed && master_stream_) {
+      MaybeUpdatePcmSyncAnchorOnStallLocked();
+    }
     AVE_LOG(LS_INFO) << "RenderFrameInternal[AUDIO]: write stalled, "
                      << "consumed_this_call=" << consumed_frame_this_call
                      << ", retry in 5ms";
@@ -750,7 +773,7 @@ ssize_t AVPAudioRender::WriteAudioData(
   }
 
   mutex_.unlock();
-  ssize_t bytes_written = track->Write(data, size, true);
+  ssize_t bytes_written = track->Write(data, size, false);
   mutex_.lock();
 
   AVE_LOG(LS_VERBOSE) << "WriteAudioData: requested=" << size
@@ -794,6 +817,44 @@ void AVPAudioRender::UpdateSyncAnchor(
     return;
   }
 
+  UpdatePcmSyncAnchorLocked(frame_pts_us, frame_end_pts_us);
+}
+
+void AVPAudioRender::UpdatePcmSyncAnchorLocked(int64_t frame_pts_us,
+                                               int64_t frame_end_pts_us) {
+  if (!GetAVSyncController()) {
+    return;
+  }
+
+  if (!pcm_media_start_pts_valid_) {
+    pcm_media_start_pts_us_ = frame_pts_us;
+    pcm_media_start_pts_valid_ = true;
+  }
+  pcm_last_written_end_pts_us_ =
+      std::max(pcm_last_written_end_pts_us_, frame_end_pts_us);
+  pcm_last_position_poll_time_us_ = base::TimeMicros();
+
+  media::AudioTimestamp timestamp{};
+  const bool have_timestamp =
+      audio_track_ && audio_track_->GetTimestamp(&timestamp) == OK &&
+      timestamp.nanos > 0 && current_audio_config_.sample_rate > 0;
+  if (have_timestamp) {
+    const int64_t now_us = base::TimeMicros();
+    uint32_t played_frames = timestamp.position;
+    const int64_t elapsed_ns = now_us * 1000LL - timestamp.nanos;
+    if (elapsed_ns > 0 && current_audio_config_.sample_rate > 0) {
+      played_frames += static_cast<uint32_t>(
+          elapsed_ns * current_audio_config_.sample_rate / 1000000000LL);
+    }
+    int64_t heard_pts_us = pcm_media_start_pts_us_ +
+                           static_cast<int64_t>(played_frames) * 1000000LL /
+                               current_audio_config_.sample_rate;
+    heard_pts_us = std::min(heard_pts_us, pcm_last_written_end_pts_us_);
+    GetAVSyncController()->UpdateAnchor(heard_pts_us, now_us,
+                                        pcm_last_written_end_pts_us_);
+    return;
+  }
+
   int64_t current_sys_time_us = base::TimeMicros();
   int64_t buffer_latency_us =
       audio_track_ ? audio_track_->GetBufferDurationInUs() : 0;
@@ -811,8 +872,28 @@ void AVPAudioRender::UpdateSyncAnchor(
   // writes from jumping the clock backwards between bursts.
   int64_t heard_pts_us = frame_end_pts_us - buffer_latency_us;
 
+  AVE_LOG_IF(LS_INFO, base::AveConfig::GetInstance().render_sync_logs_enabled())
+      << "RenderSync audio: frame_pts_us=" << frame_pts_us
+      << " frame_end_pts_us=" << frame_end_pts_us
+      << " heard_pts_us=" << heard_pts_us
+      << " latency_us=" << buffer_latency_us;
   GetAVSyncController()->UpdateAnchor(heard_pts_us, current_sys_time_us,
-                                      frame_end_pts_us);
+                                      pcm_last_written_end_pts_us_);
+}
+
+void AVPAudioRender::MaybeUpdatePcmSyncAnchorOnStallLocked() {
+  if (!audio_track_ || !pcm_media_start_pts_valid_ ||
+      pcm_last_written_end_pts_us_ <= pcm_media_start_pts_us_) {
+    return;
+  }
+
+  const int64_t now_us = base::TimeMicros();
+  if (now_us - pcm_last_position_poll_time_us_ < kPcmPositionPollIntervalUs) {
+    return;
+  }
+
+  UpdatePcmSyncAnchorLocked(pcm_media_start_pts_us_,
+                            pcm_last_written_end_pts_us_);
 }
 
 void AVPAudioRender::UpdateCompressedSyncAnchorLocked(
@@ -923,8 +1004,8 @@ void AVPAudioRender::ApplyPlaybackRate() {
 }
 
 int64_t AVPAudioRender::CalculateNextAudioFrameDelay() {
-  // Blocking writes in WriteAudioData provide natural pacing, so no
-  // additional delay is needed between frames.
+  // Non-blocking writes are paced by the audio clock and retry path in
+  // RenderFrameInternal().
   return 0;
 }
 

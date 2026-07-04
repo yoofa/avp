@@ -13,6 +13,7 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import io.github.yoofa.AveConfig;
 import io.github.yoofa.avp.AvpPlayer;
 import io.github.yoofa.avp.SeekMode;
 
@@ -24,6 +25,9 @@ public class PlayerActivity extends Activity {
     public static final String EXTRA_AUDIO_ONLY = "audio_only";
     private static final long CONTROL_HIDE_DELAY_MS = 4000;
     private static final long POSITION_UPDATE_INTERVAL_MS = 500;
+    // Temporarily enabled for HLS diagnosis. Disable after collecting a log
+    // to avoid per-access-unit and render-decision log volume in normal use.
+    private static final boolean ENABLE_AVP_DIAGNOSTICS = true;
 
     private SurfaceView surfaceView;
     private View topBar;
@@ -118,6 +122,10 @@ public class PlayerActivity extends Activity {
                             .setAudioPassthroughPolicy(AvpPlayer.PASSTHROUGH_PREFER_PASSTHROUGH)
                             .setAudioOnly(audioOnly)
                             .build();
+            // AvpPlayer's class initialization loads libavp_android. Configure
+            // native diagnostics only after that library is available.
+            AveConfig.setDemuxerLogsEnabled(ENABLE_AVP_DIAGNOSTICS);
+            AveConfig.setRenderSyncLogsEnabled(ENABLE_AVP_DIAGNOSTICS);
             player.setDataSource(filePath);
             if (!audioOnly && holder != null) {
                 player.setSurface(holder.getSurface());

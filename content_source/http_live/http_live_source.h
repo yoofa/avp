@@ -8,16 +8,19 @@
 #ifndef AVP_CONTENT_SOURCE_HTTP_LIVE_HTTP_LIVE_SOURCE_H_
 #define AVP_CONTENT_SOURCE_HTTP_LIVE_HTTP_LIVE_SOURCE_H_
 
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
 #include "api/content_source/content_source.h"
-#include "api/demuxer/demuxer_factory.h"
+#include "base/data_source/data_source.h"
 #include "base/net/http/http_provider.h"
 #include "core/packet_source.h"
+#include "demuxer/isobmff/fragmented_mp4_parser.h"
 #include "media/foundation/media_meta.h"
 #include "media/foundation/media_source.h"
 
@@ -34,12 +37,12 @@ class PacketSource;
 namespace ave {
 namespace player {
 
+using ave::base::DataSource;
 using ave::base::net::HTTPProvider;
 
 class HttpLiveSource : public ContentSource {
  public:
-  explicit HttpLiveSource(std::shared_ptr<DemuxerFactory> demuxer_factory,
-                          std::shared_ptr<HTTPProvider> http_provider);
+  explicit HttpLiveSource(std::shared_ptr<HTTPProvider> http_provider);
   ~HttpLiveSource() override;
 
   status_t SetDataSource(
@@ -73,12 +76,16 @@ class HttpLiveSource : public ContentSource {
     MediaType media_type = MediaType::UNKNOWN;
     std::shared_ptr<media::MediaMeta> format;
     std::shared_ptr<PacketSource> packet_source;
+    int64_t next_timestamp_us = -1;
+    int64_t timestamp_segment_start_us = -1;
+    int64_t timestamp_offset_us = 0;
   };
 
   struct StreamState {
     std::string playlist_url;
     http_live::Playlist playlist;
     std::vector<uint8_t> init_segment_bytes;
+    std::vector<isobmff::FragmentedMp4Track> fragmented_mp4_tracks;
     std::string init_segment_cache_key;
     int32_t next_segment_sequence = 0;
     int64_t next_segment_start_time_us = 0;
@@ -102,9 +109,6 @@ class HttpLiveSource : public ContentSource {
       StreamState& stream,
       const http_live::MediaPlaylistSegment& segment,
       int64_t segment_start_time_us);
-  status_t LoadDemuxedSegmentLocked(
-      const std::shared_ptr<DataSource>& data_source,
-      int64_t segment_start_time_us);
   status_t FetchUrlLocked(const std::string& url, std::vector<uint8_t>& data);
   status_t FetchUrlRangeLocked(const std::string& url,
                                off64_t offset,
@@ -115,15 +119,24 @@ class HttpLiveSource : public ContentSource {
       MediaType media_type,
       const std::shared_ptr<media::mpeg2ts::PacketSource>& source,
       int64_t segment_start_time_us);
-  status_t QueueDemuxedPacketsLocked(
-      MediaType media_type,
-      const std::shared_ptr<media::MediaSource>& source,
+  void NormalizeTsFrameTimestampLocked(
+      TrackState* track,
+      const std::shared_ptr<media::MediaFrame>& frame,
+      int64_t segment_start_time_us);
+  status_t QueueFragmentedMp4SamplesLocked(
+      const std::vector<isobmff::FragmentedMp4Track>& tracks,
+      std::vector<std::shared_ptr<media::MediaFrame>> samples,
       int64_t segment_start_time_us);
   status_t EnsureTrackStateLocked(
       MediaType media_type,
       const std::shared_ptr<media::MediaMeta>& format);
   TrackState* FindTrackLocked(MediaType media_type);
   const TrackState* FindTrackLocked(MediaType media_type) const;
+  bool HasSufficientBufferedDataLocked() const;
+  status_t LoadMoreLocked();
+  void LoadMoreInBackground();
+  void PublishTrackPacketSourceLocked(MediaType media_type,
+                                      std::shared_ptr<PacketSource> source);
   status_t FinishPrepareLocked();
   void ResetLocked();
   static void OffsetFrameTimestamp(
@@ -131,7 +144,6 @@ class HttpLiveSource : public ContentSource {
       int64_t offset_us);
 
   Notify* notify_ = nullptr;
-  std::shared_ptr<DemuxerFactory> demuxer_factory_;
   std::shared_ptr<HTTPProvider> http_provider_;
 
   std::string master_url_;
@@ -147,7 +159,17 @@ class HttpLiveSource : public ContentSource {
   bool started_ = false;
   bool end_of_stream_ = false;
 
+  // Segment downloads and TS parsing can take hundreds of milliseconds. The
+  // decoder hot path must not wait for lock_ while that work is in progress:
+  // PacketSource itself is thread-safe and its lifetime is published here.
+  std::shared_ptr<PacketSource> audio_packet_source_;
+  std::shared_ptr<PacketSource> video_packet_source_;
+  std::atomic_bool dequeue_ready_ = false;
+  std::atomic_bool dequeue_eos_ = false;
+
   mutable std::mutex lock_;
+  std::jthread segment_loader_;
+  std::atomic_bool segment_load_in_progress_ = false;
 };
 
 }  // namespace player

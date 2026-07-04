@@ -7,6 +7,7 @@
 
 #include "avp_render.h"
 
+#include "base/ave_config.h"
 #include "base/logging.h"
 #include "base/task_util/default_task_runner_factory.h"
 
@@ -14,7 +15,11 @@ namespace ave {
 namespace player {
 
 namespace {
-constexpr int64_t kVideoDropThresholdUs = 100000;
+// Android surface codecs commonly return several output buffers together.
+// A 100 ms limit turns that normal callback jitter into visible frame drops
+// after a segment refill. Keep a bounded 150 ms tolerance: longer stalls are
+// still caught up by dropping stale video rather than growing A/V latency.
+constexpr int64_t kVideoDropThresholdUs = 150000;
 }
 
 AVPRender::AVPRender(base::TaskRunnerFactory* task_runner_factory,
@@ -256,18 +261,25 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
     // For video/subtitle, use original logic with drop frame behavior
     // Calculate delay within mutex lock
     int64_t late_us = sync_enabled_ ? CalculateRenderLateUs(frame) : 0;
-    AVE_LOG(LS_VERBOSE) << "OnRenderTask: video frame pts="
-                        << (frame->video_info() ? frame->video_info()->pts.us()
-                                                : -1)
+    const int64_t frame_pts_us =
+        frame->video_info() && frame->video_info()->pts.IsFinite()
+            ? frame->video_info()->pts.us()
+            : -1;
+    const int64_t master_clock_us =
+        frame_pts_us >= 0 ? frame_pts_us + late_us : -1;
+    AVE_LOG(LS_VERBOSE) << "OnRenderTask: video frame pts=" << frame_pts_us
                         << " late_us=" << late_us
                         << " rendered_count=" << frames_rendered_count_;
     if (sync_enabled_ && late_us > kVideoDropThresholdUs &&
         frames_rendered_count_ > 0) {
       // too late, drop the frame (only after at least one frame was rendered)
+      AVE_LOG_IF(LS_INFO,
+                 base::AveConfig::GetInstance().render_sync_logs_enabled())
+          << "RenderSync video: action=drop pts_us=" << frame_pts_us
+          << " master_clock_us=" << master_clock_us << " late_us=" << late_us
+          << " queue_size=" << frame_queue_.size();
       AVE_LOG(LS_VERBOSE) << "OnRenderTask: dropping video frame pts="
-                          << (frame->video_info()
-                                  ? frame->video_info()->pts.us()
-                                  : -1);
+                          << frame_pts_us;
       ReleaseFrame(entry, false);
       frame_queue_.pop();
       queue_cond_.notify_all();
@@ -280,6 +292,11 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
             << "First frame is " << late_us
             << "us late (codec startup latency), rendering anyway";
       }
+      AVE_LOG_IF(LS_INFO,
+                 base::AveConfig::GetInstance().render_sync_logs_enabled())
+          << "RenderSync video: action=render pts_us=" << frame_pts_us
+          << " master_clock_us=" << master_clock_us << " late_us=" << late_us
+          << " queue_size=" << frame_queue_.size();
       RenderFrameInternal(frame, consumed);
       if (consumed) {
         ReleaseFrame(entry, true);
@@ -290,6 +307,12 @@ void AVPRender::OnRenderTask(int64_t update_generation) {
     } else {
       // too early, schedule next frame
       next_render_delay_us = -late_us;
+      AVE_LOG_IF(LS_INFO,
+                 base::AveConfig::GetInstance().render_sync_logs_enabled())
+          << "RenderSync video: action=wait pts_us=" << frame_pts_us
+          << " master_clock_us=" << master_clock_us << " late_us=" << late_us
+          << " delay_us=" << next_render_delay_us
+          << " queue_size=" << frame_queue_.size();
     }
   }
   // Schedule next frame if queue is not empty

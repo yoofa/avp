@@ -91,7 +91,7 @@ class AVPDecoder : public AVPDecoderBase, public CodecCallback {
   void OnShutdown() override;
   bool DoRequestInputBuffers() override;
 
-  void FillCodecBuffer(std::shared_ptr<CodecBuffer>& buffer);
+  status_t FillCodecBuffer(const std::shared_ptr<CodecBuffer>& buffer);
 
   // CodecCallback
   void OnInputBufferAvailable(size_t index) override;
