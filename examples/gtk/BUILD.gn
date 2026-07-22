@@ -30,8 +30,8 @@ group("gtk") {
     # These are allow-listed for WebRTC builds.  Nothing in else should depend
     # on GTK.
     "//:default",
-    "//avp/examples:avplay",
-    "//avp/examples:gtk_window",
+    "../:avplay",
+    "../:gtk_window",
   ]
 
   public_configs = [ ":gtk_internal_config" ]

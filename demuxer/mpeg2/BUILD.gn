@@ -1,4 +1,4 @@
-import("//avp.gni")
+import("../../avp.gni")
 
 source_set("mpeg2_demuxers") {
   sources = [

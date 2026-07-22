@@ -1,4 +1,4 @@
-import("//avp.gni")
+import("../avp.gni")
 
 group("demuxer") {
   deps = [ ":ave_demuxer_factory" ]
