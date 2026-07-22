@@ -17,12 +17,12 @@ ave_executable("avplay") {
   ]
   deps = [
     "../api:player_interface",
-    "../base:logging",
+    "//base:logging",
     "../core:avplayer_builder",
-    "../media/audio:audio_channel_layout",
-    "../media/audio:audio_device_base",
-    "../media/foundation",
-    "../media/video:video_render",
+    "//media/audio:audio_channel_layout",
+    "//media/audio:audio_device_base",
+    "//media/foundation",
+    "//media/video:video_render",
   ]
 
   if (is_linux) {
@@ -42,8 +42,8 @@ ave_library("gtk_window") {
 
   deps = [
     "../api:player_interface",
-    "../base:logging",
-    "../media/foundation",
+    "//base:logging",
+    "//media/foundation",
     "//media/video:video_render",
     "//third_party/libyuv",
   ]

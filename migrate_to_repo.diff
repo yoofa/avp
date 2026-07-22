@@ -1,0 +1,184 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index b7ef711..cb62e43 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -9,9 +9,9 @@ group("default") {
+ 
+   if (ave_include_test) {
+     deps += [
+-      "base:base_unittests",
+-      "media:media_unittests",
+-      "test",
++      "//base:base_unittests",
++      "//media:media_unittests",
++      "//test",
+     ]
+   }
+ 
+diff --git a/api/BUILD.gn b/api/BUILD.gn
+index 9b7cbe8..d673dea 100644
+--- a/api/BUILD.gn
++++ b/api/BUILD.gn
+@@ -25,8 +25,8 @@ ave_library("default_content_source_factory") {
+     ":api_demuxer",
+     "//base/data_source:http_source",
+     "//base/net:http_api",
+-    "//content_source:generic_content_source",
+-    "//content_source:http_live_content_source",
++    "//avp/content_source:generic_content_source",
++    "//avp/content_source:http_live_content_source",
+   ]
+ }
+ 
+diff --git a/content_source/BUILD.gn b/content_source/BUILD.gn
+index 0ac2653..805fa81 100644
+--- a/content_source/BUILD.gn
++++ b/content_source/BUILD.gn
+@@ -7,7 +7,7 @@ ave_library("generic_content_source") {
+   ]
+   deps = [
+     "../core:packet_source",
+-    "//api:api_content_source",
++    "//avp/api:api_content_source",
+     "//base:ave_config",
+     "//base/data_source:file_source",
+     "//media/foundation:handler",
+@@ -24,12 +24,12 @@ ave_library("http_live_content_source") {
+   ]
+   deps = [
+     "../core:packet_source",
+-    "//api:api_content_source",
++    "//avp/api:api_content_source",
+     "//base:logging",
+     "//base:timeutils",
+     "//base/data_source:data_source_base",
+     "//base/net:http_api",
+-    "//demuxer/isobmff:isobmff",
++    "//avp/demuxer/isobmff:isobmff",
+     "//media/foundation:media_meta",
+     "//media/foundation:media_mimes",
+     "//media/foundation:media_source",
+diff --git a/core/BUILD.gn b/core/BUILD.gn
+index 2774645..4d3ad00 100644
+--- a/core/BUILD.gn
++++ b/core/BUILD.gn
+@@ -42,7 +42,7 @@ ave_library("avplayer") {
+     ":avp_video_render",
+     ":avsync_controller",
+     ":message_def",
+-    "//api:player_interface",
++    "//avp/api:player_interface",
+     "//base:byte_utils",
+     "//base:logging",
+     "//base:utils",
+@@ -61,7 +61,7 @@ ave_library("avsync_controller") {
+     "avsync_controller.h",
+   ]
+   deps = [
+-    "//api:player_interface",
++    "//avp/api:player_interface",
+     "//base:timeutils",
+   ]
+ }
+@@ -81,7 +81,7 @@ ave_library("avp_render") {
+     "avp_render.h",
+   ]
+   deps = [
+-    "//api:player_interface",
++    "//avp/api:player_interface",
+     "//base:ave_config",
+     "//base:logging",
+     "//base:task_util",
+diff --git a/examples/BUILD.gn b/examples/BUILD.gn
+index c200b02..95eb844 100644
+--- a/examples/BUILD.gn
++++ b/examples/BUILD.gn
+@@ -17,12 +17,12 @@ ave_executable("avplay") {
+   ]
+   deps = [
+     "../api:player_interface",
+-    "../base:logging",
+     "../core:avplayer_builder",
+-    "../media/audio:audio_channel_layout",
+-    "../media/audio:audio_device_base",
+-    "../media/foundation",
+-    "../media/video:video_render",
++    "//base:logging",
++    "//media/audio:audio_channel_layout",
++    "//media/audio:audio_device_base",
++    "//media/foundation",
++    "//media/video:video_render",
+   ]
+ 
+   if (is_linux) {
+@@ -42,8 +42,8 @@ ave_library("gtk_window") {
+ 
+   deps = [
+     "../api:player_interface",
+-    "../base:logging",
+-    "../media/foundation",
++    "//base:logging",
++    "//media/foundation",
+     "//media/video:video_render",
+     "//third_party/libyuv",
+   ]
+diff --git a/examples/android/BUILD.gn b/examples/android/BUILD.gn
+index dff0acb..c32fbb3 100644
+--- a/examples/android/BUILD.gn
++++ b/examples/android/BUILD.gn
+@@ -30,10 +30,10 @@ if (is_android) {
+     # The merged GEN_JNI.java (Java side) and the C++ registration code
+     # (Release-only, for JNI multiplexing) are both produced by libavp's
+     # jni_registration target, which is auto-created by shared_library_with_jni.
+-    srcjar_deps = [ "//sdk/android:libavp__jni_registration" ]
++    srcjar_deps = [ "//avp/sdk/android:libavp__jni_registration" ]
+ 
+     # Bundle the native player library
+-    shared_libraries = [ "//sdk/android:libavp" ]
++    shared_libraries = [ "//avp/sdk/android:libavp" ]
+   }
+ 
+   ave_android_library("avpdemo_java") {
+@@ -53,7 +53,7 @@ if (is_android) {
+       ":avpdemo_resources",
+       ":okhttp_java",
+       "//base/android:ave_base_java",
+-      "//sdk/android:avp_java",
++      "//avp/sdk/android:avp_java",
+     ]
+   }
+ 
+diff --git a/examples/gtk/BUILD.gn b/examples/gtk/BUILD.gn
+index 142cad4..18324a1 100644
+--- a/examples/gtk/BUILD.gn
++++ b/examples/gtk/BUILD.gn
+@@ -32,6 +32,7 @@ group("gtk") {
+     "//:default",
+     "//examples:avplay",
+     "//examples:gtk_window",
++    "//avp/examples:*",
+   ]
+ 
+   public_configs = [ ":gtk_internal_config" ]
+diff --git a/sdk/android/BUILD.gn b/sdk/android/BUILD.gn
+index e9ced07..8fd048e 100644
+--- a/sdk/android/BUILD.gn
++++ b/sdk/android/BUILD.gn
+@@ -51,7 +51,7 @@ if (is_android) {
+     ]
+     deps = [
+       ":generated_avp_jni",
+-      "//api:player_interface",
++      "//avp/api:player_interface",
+       "//base:logging",
+       "//base/android:ave_jni",
+       "//base/net:http_api",
+@@ -72,7 +72,7 @@ if (is_android) {
+     sources = []
+     deps = [
+       ":generated_avp_jni",
+-      "//core:avplayer_builder",
++      "//avp/core:avplayer_builder",
+       "//media/android:ave_media_jni",
+       "//media/audio:java_audio_device",
+       "//media/codec/android:android_ndk_media_codec",

@@ -42,7 +42,7 @@ ave_library("avplayer") {
     ":avp_video_render",
     ":avsync_controller",
     ":message_def",
-    "//api:player_interface",
+    "//avp/api:player_interface",
     "//base:byte_utils",
     "//base:logging",
     "//base:utils",
@@ -61,7 +61,7 @@ ave_library("avsync_controller") {
     "avsync_controller.h",
   ]
   deps = [
-    "//api:player_interface",
+    "//avp/api:player_interface",
     "//base:timeutils",
   ]
 }
@@ -81,7 +81,7 @@ ave_library("avp_render") {
     "avp_render.h",
   ]
   deps = [
-    "//api:player_interface",
+    "//avp/api:player_interface",
     "//base:ave_config",
     "//base:logging",
     "//base:task_util",

@@ -51,7 +51,7 @@ if (is_android) {
     ]
     deps = [
       ":generated_avp_jni",
-      "//api:player_interface",
+      "//avp/api:player_interface",
       "//base:logging",
       "//base/android:ave_jni",
       "//base/net:http_api",
@@ -102,6 +102,6 @@ if (is_android) {
     # has deps=[], so libavp -> libavp__jni_registration -> (nothing), while
     # the jni_sources_list scanner (a separate generated_file target) references
     # the APK for metadata only and doesn't feed back into libavp's build chain.
-    java_targets = [ "//examples/android:AvpDemo" ]
+    java_targets = [ "//avp/examples/android:AvpDemo" ]
   }
 }

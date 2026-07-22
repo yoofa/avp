@@ -7,7 +7,7 @@ ave_library("generic_content_source") {
   ]
   deps = [
     "../core:packet_source",
-    "//api:api_content_source",
+    "//avp/api:api_content_source",
     "//base:ave_config",
     "//base/data_source:file_source",
     "//media/foundation:handler",
@@ -24,12 +24,12 @@ ave_library("http_live_content_source") {
   ]
   deps = [
     "../core:packet_source",
-    "//api:api_content_source",
+    "//avp/api:api_content_source",
     "//base:logging",
     "//base:timeutils",
     "//base/data_source:data_source_base",
     "//base/net:http_api",
-    "//demuxer/isobmff:isobmff",
+    "//avp/demuxer/isobmff:isobmff",
     "//media/foundation:media_meta",
     "//media/foundation:media_mimes",
     "//media/foundation:media_source",
@@ -44,7 +44,7 @@ ave_library("rtsp_content_source") {
   ]
   deps = [
     "../core:packet_source",
-    "//api:api_content_source",
+    "//avp/api:api_content_source",
     "//base:logging",
     "//base:task_util",
     "//base/net:async_socket",
