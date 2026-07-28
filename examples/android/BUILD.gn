@@ -1,5 +1,5 @@
-import("../../avp.gni")
 import("//base/build/ave.gni")
+import("../../avp.gni")
 
 if (is_android) {
   import("//build/config/android/rules.gni")
@@ -30,10 +30,10 @@ if (is_android) {
     # The merged GEN_JNI.java (Java side) and the C++ registration code
     # (Release-only, for JNI multiplexing) are both produced by libavp's
     # jni_registration target, which is auto-created by shared_library_with_jni.
-    srcjar_deps = [ "//sdk/android:libavp__jni_registration" ]
+    srcjar_deps = [ "../../sdk/android:libavp__jni_registration" ]
 
     # Bundle the native player library
-    shared_libraries = [ "//sdk/android:libavp" ]
+    shared_libraries = [ "../../sdk/android:libavp" ]
   }
 
   ave_android_library("avpdemo_java") {
@@ -52,8 +52,8 @@ if (is_android) {
     deps = [
       ":avpdemo_resources",
       ":okhttp_java",
+      "../../sdk/android:avp_java",
       "//base/android:ave_base_java",
-      "//sdk/android:avp_java",
     ]
   }
 

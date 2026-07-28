@@ -15,8 +15,8 @@
 
 #include "base/android/jni/jvm.h"
 #include "base/logging.h"
-#include "jni_headers/sdk/android/generated_avp_jni/AvpPlayer_jni.h"
-#include "jni_headers/sdk/android/generated_avp_jni/TrackInfo_jni.h"
+#include "jni_headers/avp/sdk/android/generated_avp_jni/AvpPlayer_jni.h"
+#include "jni_headers/avp/sdk/android/generated_avp_jni/TrackInfo_jni.h"
 #include "media/android/jni/video_frame_jni.h"
 #include "media/audio/android/java_audio_device.h"
 #include "media/foundation/media_frame.h"
