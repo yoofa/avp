@@ -29,9 +29,9 @@ group("gtk") {
   visibility = [
     # These are allow-listed for WebRTC builds.  Nothing in else should depend
     # on GTK.
-    "//:default",
     "../:avplay",
     "../:gtk_window",
+    "//:default",
   ]
 
   public_configs = [ ":gtk_internal_config" ]

@@ -37,7 +37,6 @@ if (is_android) {
       "api/io/github/yoofa/avp/TrackInfo.java",
     ]
     namespace = "ave::jni"
-    jni_generator_include = "//base/android/jni/jni_generator_helper.h"
   }
 
   ave_library("avp_jni") {
@@ -94,7 +93,8 @@ if (is_android) {
       "-Wl,-u,Java_org_jni_1zero_GEN_1JNI_io_1github_1yoofa_1AveConfig_1setDemuxerLogsEnabled",
       "-Wl,--whole-archive",
 
-      #rebase_path("$root_out_dir/obj/sdk/android/libavp_jni.a", root_build_dir),
+      # #rebase_path("$root_out_dir/obj/sdk/android/libavp_jni.a",
+      # root_build_dir),
       "-Wl,--no-whole-archive",
     ]
 

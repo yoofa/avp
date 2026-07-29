@@ -69,7 +69,8 @@ public class FileBrowserActivity extends Activity {
             this.path = path;
         }
     }
-    private List<BreadcrumbItem> breadcrumbs = new ArrayList<>();
+
+    private final List<BreadcrumbItem> breadcrumbs = new ArrayList<>();
 
     // ──────────────────────────────────────────────────────────────────────
     // Lifecycle

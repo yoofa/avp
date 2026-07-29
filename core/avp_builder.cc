@@ -5,16 +5,16 @@
  * Distributed under terms of the GPLv2 license.
  */
 
-#include "api/player.h"
+#include "../api/player.h"
 
 #include "avplayer.h"
 
-#include "api/content_source/default_content_source_factory.h"
-#include "api/demuxer/default_demuxer_factory.h"
+#include "../api/content_source/default_content_source_factory.h"
+#include "../api/demuxer/default_demuxer_factory.h"
 #ifdef AVE_FFMPEG_DEMUXER
-#include "demuxer/ffmpeg_demuxer_factory.h"
+#include "../demuxer/ffmpeg_demuxer_factory.h"
 #endif
-#include "demuxer/internal_demuxer_factory.h"
+#include "../demuxer/internal_demuxer_factory.h"
 #include "media/audio/audio_device.h"
 #include "media/codec/default_codec_factory.h"
 

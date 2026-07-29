@@ -20,8 +20,8 @@
 #include "media/foundation/looper.h"
 #include "media/foundation/message.h"
 
-#include "api/content_source/content_source.h"
-#include "api/player.h"
+#include "../api/content_source/content_source.h"
+#include "../api/player.h"
 
 #include "avp_audio_render.h"
 #include "avp_decoder.h"

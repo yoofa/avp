@@ -19,10 +19,10 @@
 #include "media/foundation/media_meta.h"
 #include "media/video/video_render.h"
 
-#include "api/content_source/content_source.h"
-#include "api/content_source/content_source_factory.h"
-#include "api/demuxer/demuxer_factory.h"
-#include "api/player_interface.h"
+#include "content_source/content_source.h"
+#include "content_source/content_source_factory.h"
+#include "demuxer/demuxer_factory.h"
+#include "player_interface.h"
 
 namespace ave {
 namespace player {

@@ -66,6 +66,5 @@ if (is_android) {
       "java/res/layout/item_storage.xml",
       "java/res/values/strings.xml",
     ]
-    android_manifest = "AndroidManifest.xml"
   }
 }

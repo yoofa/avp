@@ -10,7 +10,7 @@
 
 #include "base/net/http/http_provider.h"
 
-#include "api/content_source/content_source_factory.h"
+#include "../../api/content_source/content_source_factory.h"
 
 namespace ave {
 namespace player {

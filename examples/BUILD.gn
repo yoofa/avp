@@ -17,8 +17,8 @@ ave_executable("avplay") {
   ]
   deps = [
     "../api:player_interface",
-    "//base:logging",
     "../core:avplayer_builder",
+    "//base:logging",
     "//media/audio:audio_channel_layout",
     "//media/audio:audio_device_base",
     "//media/foundation",

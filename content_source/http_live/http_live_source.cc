@@ -5,7 +5,7 @@
  * Distributed under terms of the GPLv2 license.
  */
 
-#include "content_source/http_live/http_live_source.h"
+#include "http_live_source.h"
 
 #include <algorithm>
 #include <array>

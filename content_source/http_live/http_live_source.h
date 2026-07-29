@@ -16,15 +16,14 @@
 #include <unordered_map>
 #include <vector>
 
-#include "api/content_source/content_source.h"
 #include "base/data_source/data_source.h"
 #include "base/net/http/http_provider.h"
-#include "core/packet_source.h"
-#include "demuxer/isobmff/fragmented_mp4_parser.h"
 #include "media/foundation/media_meta.h"
-#include "media/foundation/media_source.h"
 
-#include "content_source/http_live/playlist_parser.h"
+#include "../../api/content_source/content_source.h"
+#include "../../content_source/http_live/playlist_parser.h"
+#include "../../core/packet_source.h"
+#include "../../demuxer/isobmff/fragmented_mp4_parser.h"
 
 namespace ave {
 namespace media {

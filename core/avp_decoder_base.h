@@ -8,11 +8,11 @@
 #ifndef AVP_DECODER_BASE_H
 #define AVP_DECODER_BASE_H
 
-#include "avp_render.h"
 #include "media/foundation/handler.h"
 #include "media/video/video_render.h"
 
-#include "api/content_source/content_source.h"
+#include "../api/content_source/content_source.h"
+#include "avp_render.h"
 
 using ::ave::media::Handler;
 using ::ave::media::Looper;

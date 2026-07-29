@@ -11,10 +11,8 @@
 #include <memory>
 
 #include "media/codec/codec_factory.h"
-#include "media/foundation/media_meta.h"
-#include "media/video/video_render.h"
 
-#include "api/content_source/content_source.h"
+#include "../api/content_source/content_source.h"
 
 #include "avp_decoder_base.h"
 #include "avp_render.h"

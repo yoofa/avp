@@ -47,8 +47,8 @@ ave_library("avplayer") {
     "//base:logging",
     "//base:utils",
     "//base/system:ave_export",
-    "//media/audio:audio",
-    "//media/codec:codec",
+    "//media/audio",
+    "//media/codec",
     "//media/video:video_render",
   ]
 
@@ -101,7 +101,7 @@ ave_library("avp_audio_render") {
     "//base:logging",
     "//base:timeutils",
     "//base:utils",
-    "//media/audio:audio",
+    "//media/audio",
   ]
 }
 
@@ -136,7 +136,7 @@ ave_library("avp_decoder") {
     "//base:ave_config",
     "//base:buffers",
     "//base:logging",
-    "//media/audio:audio",
+    "//media/audio",
     "//media/foundation:aac_util",
   ]
 

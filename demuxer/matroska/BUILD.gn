@@ -14,8 +14,8 @@ source_set("matroska") {
     "//media/foundation:media_frame",
     "//media/foundation:media_meta",
     "//media/foundation:media_source",
-    "//third_party/libebml:libebml",
-    "//third_party/libmatroska:libmatroska",
+    "//third_party/libebml",
+    "//third_party/libmatroska",
   ]
 
   # libebml and libmatroska use C++ exceptions and dynamic_cast (RTTI).

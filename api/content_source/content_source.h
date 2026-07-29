@@ -15,7 +15,7 @@
 #include "media/foundation/media_frame.h"
 #include "media/foundation/media_meta.h"
 
-#include "api/player_interface.h"
+#include "../player_interface.h"
 
 namespace ave {
 namespace player {

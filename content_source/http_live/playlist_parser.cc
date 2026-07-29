@@ -5,7 +5,7 @@
  * Distributed under terms of the GPLv2 license.
  */
 
-#include "content_source/http_live/playlist_parser.h"
+#include "playlist_parser.h"
 
 #include <algorithm>
 #include <cctype>

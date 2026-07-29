@@ -8,7 +8,7 @@
 #ifndef DEMUXER_INTERNAL_DEMUXER_FACTORY_H_
 #define DEMUXER_INTERNAL_DEMUXER_FACTORY_H_
 
-#include "api/demuxer/demuxer_factory.h"
+#include "../api/demuxer/demuxer_factory.h"
 
 namespace ave {
 namespace player {

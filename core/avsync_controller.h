@@ -9,7 +9,7 @@
 
 #include <cstdint>
 #include <mutex>
-#include "api/player_interface.h"
+#include "../api/player_interface.h"
 
 namespace ave {
 namespace player {

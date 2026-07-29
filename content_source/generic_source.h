@@ -20,10 +20,9 @@
 #include "media/foundation/media_source.h"
 #include "media/foundation/message.h"
 
-#include "api/content_source/content_source.h"
-#include "api/demuxer/demuxer.h"
-#include "api/demuxer/demuxer_factory.h"
-
+#include "../api/content_source/content_source.h"
+#include "../api/demuxer/demuxer.h"
+#include "../api/demuxer/demuxer_factory.h"
 #include "../core/packet_source.h"
 
 namespace ave {

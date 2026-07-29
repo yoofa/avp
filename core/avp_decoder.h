@@ -16,8 +16,7 @@
 #include "media/foundation/handler.h"
 #include "media/foundation/media_meta.h"
 
-#include "api/content_source/content_source.h"
-
+#include "../api/content_source/content_source.h"
 #include "avp_decoder_base.h"
 #include "avp_render.h"
 

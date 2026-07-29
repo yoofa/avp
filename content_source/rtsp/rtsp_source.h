@@ -15,14 +15,14 @@
 #include <unordered_map>
 #include <vector>
 
-#include "api/content_source/content_source.h"
 #include "base/net/async_packet_socket.h"
 #include "base/net/network_thread.h"
 #include "base/task_util/repeating_task.h"
 #include "base/task_util/task_runner.h"
-#include "core/packet_source.h"
-#include "media/modules/rtp_rtcp/src/video/video_rtp_depacketizer.h"
 #include "media/modules/rtp_rtcp/src/rtp/rtp_packet_received.h"
+
+#include "../../api/content_source/content_source.h"
+#include "../../core/packet_source.h"
 
 namespace ave::player {
 
@@ -60,8 +60,18 @@ class RTSPSource final : public ContentSource,
 
  private:
   enum class Transport { kUdp, kTcpInterleaved };
-  enum class State { kIdle, kConnecting, kOptions, kDescribe, kSetup, kPlay,
-                     kPlaying, kPaused, kStopping, kError };
+  enum class State {
+    kIdle,
+    kConnecting,
+    kOptions,
+    kDescribe,
+    kSetup,
+    kPlay,
+    kPlaying,
+    kPaused,
+    kStopping,
+    kError
+  };
 
   struct Track;
 
@@ -98,8 +108,7 @@ class RTSPSource final : public ContentSource,
   void CheckBuffering();
   void QueueVideo(Track& track,
                   const media::rtp_rtcp::RtpPacketReceived& packet);
-  void QueueAac(Track& track,
-                const media::rtp_rtcp::RtpPacketReceived& packet);
+  void QueueAac(Track& track, const media::rtp_rtcp::RtpPacketReceived& packet);
   void ResetMediaLocked();
   Track* FindTrackBySocket(base::net::AsyncPacketSocket* socket);
   Track* FindTrackByChannel(uint8_t channel);

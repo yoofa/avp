@@ -5,17 +5,17 @@
  * Distributed under terms of the GPLv2 license.
  */
 
-#include "demuxer/mpeg2/mpeg2_ts_demuxer.h"
+#include "mpeg2_ts_demuxer.h"
 
 #include <array>
 #include <utility>
 
 #include "base/ave_config.h"
 #include "base/logging.h"
-#include "demuxer/mpeg2/mpeg2_common.h"
 #include "media/foundation/media_errors.h"
 #include "media/foundation/media_mimes.h"
 #include "media/modules/mpeg2ts/ts_parser.h"
+#include "mpeg2_common.h"
 
 namespace ave {
 namespace player {

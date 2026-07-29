@@ -15,16 +15,15 @@
 #include <array>
 #include <chrono>
 #include <condition_variable>
-#include <cstdio>
 #include <iostream>
 #include <memory>
 #include <mutex>
 #include <string>
 
-#include "api/player.h"
+#include "../../api/player.h"
 #include "base/checks.h"
 #include "base/logging.h"
-#include "examples/avplay/file_sink.h"
+#include "file_sink.h"
 
 using ave::player::Player;
 using ave::player::YuvFileVideoRender;
@@ -182,7 +181,7 @@ int main(int argc, char* argv[]) {
 
   } else {
     // ── GTK display mode ─────────────────────────────────────────────────────
-#if defined(AVE_LINUX)
+#if defined(AVE_LINUX) && !defined(AVE_ANDROID)
     // Late-include GTK only in display mode to avoid compile dependency issues
     // in headless mode. We rely on the gtk_window library being linked.
     extern void gtk_main_avplay(const std::string& url,

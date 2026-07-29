@@ -20,7 +20,7 @@
 #include "media/audio/audio_format.h"
 #include "media/codec/codec_id.h"
 
-#include "content_source/generic_source.h"
+#include "../content_source/generic_source.h"
 
 #include "avp_passthrough_decoder.h"
 #include "message_def.h"

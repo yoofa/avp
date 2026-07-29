@@ -11,12 +11,13 @@
 #include <cctype>
 #include <memory>
 
-#include "api/demuxer/demuxer_factory.h"
 #include "base/data_source/http_source.h"
-#include "content_source/generic_source.h"
-#include "content_source/http_live/http_live_source.h"
-#include "content_source/http_live/playlist_parser.h"
-#include "content_source/rtsp/rtsp_source.h"
+
+#include "../../content_source/generic_source.h"
+#include "../../content_source/http_live/http_live_source.h"
+#include "../../content_source/http_live/playlist_parser.h"
+#include "../../content_source/rtsp/rtsp_source.h"
+#include "../demuxer/demuxer_factory.h"
 
 namespace ave {
 namespace player {

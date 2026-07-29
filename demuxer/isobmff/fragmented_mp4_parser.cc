@@ -5,7 +5,7 @@
  * Distributed under terms of the GPLv2 license.
  */
 
-#include "demuxer/isobmff/fragmented_mp4_parser.h"
+#include "fragmented_mp4_parser.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -15,7 +15,7 @@
 #include <optional>
 #include <utility>
 
-#include "demuxer/isobmff/box_types.h"
+#include "box_types.h"
 #include "media/audio/channel_layout.h"
 #include "media/codec/codec_id.h"
 #include "media/foundation/esds.h"

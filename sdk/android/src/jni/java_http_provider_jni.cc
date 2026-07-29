@@ -4,7 +4,7 @@
  * Distributed under terms of the GPLv2 license.
  */
 
-#include "sdk/android/src/jni/java_http_provider_jni.h"
+#include "java_http_provider_jni.h"
 
 #include <algorithm>
 #include <limits>
@@ -56,7 +56,7 @@ jobjectArray CreateStringArray(JNIEnv* env,
   }
 
   for (size_t i = 0; i < values.size(); ++i) {
-    jni_zero::ScopedJavaLocalRef<jstring> value(
+    auto value = jni_zero::ScopedJavaLocalRef<jstring>::Adopt(
         env, env->NewStringUTF(values[i].c_str()));
     if (!value.obj() || CheckAndClearJavaException(env, "NewStringUTF")) {
       return nullptr;
@@ -88,7 +88,8 @@ status_t ConvertJavaString(JNIEnv* env, jstring j_value, std::string& value) {
 }  // namespace
 
 JavaHttpConnection::JavaHttpConnection(JNIEnv* env, jobject j_connection)
-    : j_connection_(env, j_connection) {
+    : j_connection_(env,
+                    jni_zero::JavaRef<jobject>::CreateLeaky(env, j_connection)) {
   jclass cls = env->GetObjectClass(j_connection);
   connect_method_ = env->GetMethodID(
       cls, "connect",
@@ -119,11 +120,11 @@ bool JavaHttpConnection::Connect(
     header_values.push_back(value);
   }
 
-  jni_zero::ScopedJavaLocalRef<jstring> j_uri(
+  auto j_uri = jni_zero::ScopedJavaLocalRef<jstring>::Adopt(
       env, env->NewStringUTF(uri ? uri : ""));
-  jni_zero::ScopedJavaLocalRef<jobjectArray> j_keys(
+  auto j_keys = jni_zero::ScopedJavaLocalRef<jobjectArray>::Adopt(
       env, CreateStringArray(env, header_keys));
-  jni_zero::ScopedJavaLocalRef<jobjectArray> j_values(
+  auto j_values = jni_zero::ScopedJavaLocalRef<jobjectArray>::Adopt(
       env, CreateStringArray(env, header_values));
   if (!j_uri.obj() || CheckAndClearJavaException(env, "NewStringUTF(uri)")) {
     return false;
@@ -155,7 +156,7 @@ ssize_t JavaHttpConnection::ReadAt(off64_t offset, void* data, size_t size) {
 
   const size_t clamped_size = std::min<size_t>(
       size, static_cast<size_t>(std::numeric_limits<jint>::max()));
-  jni_zero::ScopedJavaLocalRef<jbyteArray> bytes(
+  auto bytes = jni_zero::ScopedJavaLocalRef<jbyteArray>::Adopt(
       env, static_cast<jbyteArray>(env->CallObjectMethod(
                j_connection_.obj(), read_at_method_, static_cast<jlong>(offset),
                static_cast<jint>(clamped_size))));
@@ -193,7 +194,7 @@ status_t JavaHttpConnection::GetMIMEType(std::string& mime_type) {
   if (!env || !j_connection_.obj() || !get_mime_type_method_) {
     return NO_INIT;
   }
-  jni_zero::ScopedJavaLocalRef<jstring> j_mime(
+  auto j_mime = jni_zero::ScopedJavaLocalRef<jstring>::Adopt(
       env, static_cast<jstring>(env->CallObjectMethod(j_connection_.obj(),
                                                       get_mime_type_method_)));
   if (CheckAndClearJavaException(env, "HttpConnection.getMimeType")) {
@@ -207,7 +208,7 @@ status_t JavaHttpConnection::GetUri(std::string& uri) {
   if (!env || !j_connection_.obj() || !get_uri_method_) {
     return NO_INIT;
   }
-  jni_zero::ScopedJavaLocalRef<jstring> j_uri(
+  auto j_uri = jni_zero::ScopedJavaLocalRef<jstring>::Adopt(
       env, static_cast<jstring>(
                env->CallObjectMethod(j_connection_.obj(), get_uri_method_)));
   if (CheckAndClearJavaException(env, "HttpConnection.getUri")) {
@@ -217,7 +218,8 @@ status_t JavaHttpConnection::GetUri(std::string& uri) {
 }
 
 JavaHttpProvider::JavaHttpProvider(JNIEnv* env, jobject j_provider)
-    : j_provider_(env, j_provider) {
+    : j_provider_(env,
+                  jni_zero::JavaRef<jobject>::CreateLeaky(env, j_provider)) {
   jclass cls = env->GetObjectClass(j_provider);
   create_connection_method_ = env->GetMethodID(
       cls, "createConnection", "()Lio/github/yoofa/avp/HttpConnection;");
@@ -232,7 +234,7 @@ std::shared_ptr<HTTPConnection> JavaHttpProvider::CreateConnection() {
     return nullptr;
   }
 
-  jni_zero::ScopedJavaLocalRef<jobject> j_connection(
+  auto j_connection = jni_zero::ScopedJavaLocalRef<jobject>::Adopt(
       env, env->CallObjectMethod(j_provider_.obj(), create_connection_method_));
   if (CheckAndClearJavaException(env, "HttpProvider.createConnection")) {
     return nullptr;
@@ -249,7 +251,7 @@ bool JavaHttpProvider::SupportsScheme(const std::string& scheme) {
     return false;
   }
 
-  jni_zero::ScopedJavaLocalRef<jstring> j_scheme(
+  auto j_scheme = jni_zero::ScopedJavaLocalRef<jstring>::Adopt(
       env, env->NewStringUTF(scheme.c_str()));
   if (!j_scheme.obj() ||
       CheckAndClearJavaException(env, "NewStringUTF(scheme)")) {

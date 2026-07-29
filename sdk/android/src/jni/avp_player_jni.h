@@ -12,7 +12,7 @@
 #include <memory>
 #include <string>
 
-#include "api/player.h"
+#include "../../../../api/player.h"
 #include "media/audio/audio_device.h"
 #include "media/codec/android/android_native_window_render.h"
 #include "media/video/video_render.h"
@@ -41,7 +41,7 @@ class AvpPlayerJni : public player::Player::Listener,
   void SetDataSource(JNIEnv* env, const std::string& path);
   void SetDataSourceFd(JNIEnv* env, jint fd, jlong offset, jlong length);
   void SetVideoRenderer(JNIEnv* env, jboolean has_renderer);
-  void SetSurface(JNIEnv* env, const jni_zero::JavaParamRef<jobject>& surface);
+  void SetSurface(JNIEnv* env, const jni_zero::JavaRef<jobject>& surface);
   void Prepare(JNIEnv* env);
   void Start(JNIEnv* env);
   void Pause(JNIEnv* env);

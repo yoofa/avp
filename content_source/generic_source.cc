@@ -17,7 +17,7 @@
 #include "media/foundation/media_source.h"
 #include "media/foundation/message.h"
 
-#include "api/content_source/content_source.h"
+#include "../api/content_source/content_source.h"
 
 namespace ave {
 namespace player {

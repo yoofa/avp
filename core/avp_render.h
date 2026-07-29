@@ -12,11 +12,12 @@
 #include <memory>
 #include <queue>
 
-#include "api/player_interface.h"
 #include "base/task_util/task_runner.h"
 #include "base/task_util/task_runner_factory.h"
 #include "base/thread_annotation.h"
 #include "media/foundation/media_frame.h"
+
+#include "../api/player_interface.h"
 
 namespace ave {
 namespace player {

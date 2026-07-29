@@ -20,6 +20,6 @@ source_set("mpeg2_demuxers") {
     "//media/foundation:media_meta",
     "//media/foundation:media_mimes",
     "//media/foundation:media_source",
-    "//media/modules/mpeg2ts:mpeg2ts",
+    "//media/modules/mpeg2ts",
   ]
 }

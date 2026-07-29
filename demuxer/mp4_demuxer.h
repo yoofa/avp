@@ -13,12 +13,13 @@
 #include <string>
 #include <vector>
 
-#include "api/demuxer/demuxer.h"
 #include "base/data_source/data_source.h"
-#include "demuxer/isobmff/sample_table.h"
 #include "media/foundation/media_frame.h"
 #include "media/foundation/media_meta.h"
 #include "media/foundation/media_source.h"
+
+#include "../api/demuxer/demuxer.h"
+#include "isobmff/sample_table.h"
 
 namespace ave {
 namespace player {

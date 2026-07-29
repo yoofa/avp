@@ -5,7 +5,7 @@
  * Distributed under terms of the GPLv2 license.
  */
 
-#include "content_source/rtsp/rtsp_source.h"
+#include "rtsp_source.h"
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -13,8 +13,8 @@
 
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <cctype>
+#include <charconv>
 #include <cstring>
 #include <optional>
 #include <ranges>
@@ -75,9 +75,10 @@ std::string Base64Encode(const std::string& value) {
     const uint32_t packed = (first << 16U) | (second << 8U) | third;
     result.push_back(kAlphabet[(packed >> 18U) & 0x3fU]);
     result.push_back(kAlphabet[(packed >> 12U) & 0x3fU]);
-    result.push_back(offset + 1U < value.size() ? kAlphabet[(packed >> 6U) & 0x3fU]
-                                                 : '=');
-    result.push_back(offset + 2U < value.size() ? kAlphabet[packed & 0x3fU] : '=');
+    result.push_back(
+        offset + 1U < value.size() ? kAlphabet[(packed >> 6U) & 0x3fU] : '=');
+    result.push_back(offset + 2U < value.size() ? kAlphabet[packed & 0x3fU]
+                                                : '=');
   }
   return result;
 }
@@ -89,9 +90,11 @@ std::vector<uint8_t> Base64Decode(const std::string& value) {
   uint32_t packed = 0;
   uint32_t bits = 0;
   for (const char character : value) {
-    if (character == '=') break;
+    if (character == '=')
+      break;
     const size_t index = kAlphabet.find(character);
-    if (index == std::string::npos) return {};
+    if (index == std::string::npos)
+      return {};
     packed = (packed << 6U) | static_cast<uint32_t>(index);
     bits += 6U;
     if (bits >= 8U) {
@@ -107,7 +110,8 @@ std::vector<uint8_t> MakeAnnexBConfig(const std::vector<std::string>& values) {
   std::vector<uint8_t> result;
   for (const auto& value : values) {
     const auto nalu = Base64Decode(value);
-    if (nalu.empty()) continue;
+    if (nalu.empty())
+      continue;
     result.insert(result.end(), kStartCode.begin(), kStartCode.end());
     result.insert(result.end(), nalu.begin(), nalu.end());
   }
@@ -123,18 +127,21 @@ uint32_t RotateLeft(uint32_t value, uint32_t bits) {
 std::string Md5Hex(const std::string& input) {
   static constexpr std::array<uint32_t, 64> kShifts = {
       7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
-      5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+      5, 9,  14, 20, 5, 9,  14, 20, 5, 9,  14, 20, 5, 9,  14, 20,
       4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
       6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21};
   static constexpr std::array<uint32_t, 64> kConstants = {
-      0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
-      0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
-      0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
-      0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
-      0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c, 0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
-      0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
-      0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
-      0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391};
+      0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a,
+      0xa8304613, 0xfd469501, 0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be,
+      0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821, 0xf61e2562, 0xc040b340,
+      0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+      0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8,
+      0x676f02d9, 0x8d2a4c8a, 0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c,
+      0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70, 0x289b7ec6, 0xeaa127fa,
+      0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+      0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92,
+      0xffeff47d, 0x85845dd1, 0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1,
+      0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391};
   std::vector<uint8_t> bytes(input.begin(), input.end());
   const uint64_t bit_count = static_cast<uint64_t>(bytes.size()) * 8U;
   bytes.push_back(0x80U);
@@ -151,10 +158,11 @@ std::string Md5Hex(const std::string& input) {
   for (size_t offset = 0; offset < bytes.size(); offset += 64U) {
     std::array<uint32_t, 16> words{};
     for (uint32_t index = 0; index < words.size(); ++index) {
-      words[index] = static_cast<uint32_t>(bytes[offset + index * 4U]) |
-                     (static_cast<uint32_t>(bytes[offset + index * 4U + 1U]) << 8U) |
-                     (static_cast<uint32_t>(bytes[offset + index * 4U + 2U]) << 16U) |
-                     (static_cast<uint32_t>(bytes[offset + index * 4U + 3U]) << 24U);
+      words[index] =
+          static_cast<uint32_t>(bytes[offset + index * 4U]) |
+          (static_cast<uint32_t>(bytes[offset + index * 4U + 1U]) << 8U) |
+          (static_cast<uint32_t>(bytes[offset + index * 4U + 2U]) << 16U) |
+          (static_cast<uint32_t>(bytes[offset + index * 4U + 3U]) << 24U);
     }
     uint32_t a = a0;
     uint32_t b = b0;
@@ -163,23 +171,37 @@ std::string Md5Hex(const std::string& input) {
     for (uint32_t index = 0; index < 64U; ++index) {
       uint32_t function = 0;
       uint32_t word_index = 0;
-      if (index < 16U) { function = (b & c) | (~b & d); word_index = index; }
-      else if (index < 32U) { function = (d & b) | (~d & c); word_index = (5U * index + 1U) % 16U; }
-      else if (index < 48U) { function = b ^ c ^ d; word_index = (3U * index + 5U) % 16U; }
-      else { function = c ^ (b | ~d); word_index = (7U * index) % 16U; }
+      if (index < 16U) {
+        function = (b & c) | (~b & d);
+        word_index = index;
+      } else if (index < 32U) {
+        function = (d & b) | (~d & c);
+        word_index = (5U * index + 1U) % 16U;
+      } else if (index < 48U) {
+        function = b ^ c ^ d;
+        word_index = (3U * index + 5U) % 16U;
+      } else {
+        function = c ^ (b | ~d);
+        word_index = (7U * index) % 16U;
+      }
       const uint32_t next = d;
       d = c;
       c = b;
-      b += RotateLeft(a + function + kConstants[index] + words[word_index], kShifts[index]);
+      b += RotateLeft(a + function + kConstants[index] + words[word_index],
+                      kShifts[index]);
       a = next;
     }
-    a0 += a; b0 += b; c0 += c; d0 += d;
+    a0 += a;
+    b0 += b;
+    c0 += c;
+    d0 += d;
   }
   std::array<uint8_t, 16> digest{};
   const std::array<uint32_t, 4> words = {a0, b0, c0, d0};
   for (uint32_t index = 0; index < words.size(); ++index) {
     for (uint32_t byte = 0; byte < 4U; ++byte) {
-      digest[index * 4U + byte] = static_cast<uint8_t>(words[index] >> (byte * 8U));
+      digest[index * 4U + byte] =
+          static_cast<uint8_t>(words[index] >> (byte * 8U));
     }
   }
   static constexpr std::string_view kHex = "0123456789abcdef";
@@ -198,23 +220,30 @@ std::unordered_map<std::string, std::string> ParseAuthParameters(
   size_t offset = 0;
   while (offset < value.size()) {
     const size_t equal = value.find('=', offset);
-    if (equal == std::string::npos) break;
+    if (equal == std::string::npos)
+      break;
     const std::string key = ToLower(Trim(value.substr(offset, equal - offset)));
     size_t value_begin = equal + 1U;
     size_t value_end = value_begin;
     if (value_begin < value.size() && value[value_begin] == '\"') {
       ++value_begin;
       value_end = value.find('\"', value_begin);
-      if (value_end == std::string::npos) break;
+      if (value_end == std::string::npos)
+        break;
       offset = value_end + 1U;
     } else {
       value_end = value.find(',', value_begin);
-      if (value_end == std::string::npos) value_end = value.size();
+      if (value_end == std::string::npos)
+        value_end = value.size();
       offset = value_end;
     }
-    parameters.emplace(key, Trim(value.substr(value_begin, value_end - value_begin)));
-    if (offset < value.size() && value[offset] == ',') ++offset;
-    while (offset < value.size() && std::isspace(static_cast<unsigned char>(value[offset]))) ++offset;
+    parameters.emplace(
+        key, Trim(value.substr(value_begin, value_end - value_begin)));
+    if (offset < value.size() && value[offset] == ',')
+      ++offset;
+    while (offset < value.size() &&
+           std::isspace(static_cast<unsigned char>(value[offset])))
+      ++offset;
   }
   return parameters;
 }
@@ -257,9 +286,9 @@ std::vector<uint8_t> HexToBytes(const std::string& value) {
   }
   std::vector<uint8_t> bytes(value.size() / 2U);
   for (size_t index = 0; index < bytes.size(); ++index) {
-    const auto [ptr, error] = std::from_chars(value.data() + index * 2U,
-                                              value.data() + index * 2U + 2U,
-                                              bytes[index], 16);
+    const auto [ptr, error] =
+        std::from_chars(value.data() + index * 2U,
+                        value.data() + index * 2U + 2U, bytes[index], 16);
     if (error != std::errc{} || ptr != value.data() + index * 2U + 2U) {
       return {};
     }
@@ -302,9 +331,9 @@ struct RTSPSource::Track {
 
 RTSPSource::RTSPSource() {
   auto factory = base::CreateDefaultTaskRunnerFactory();
-  timer_task_runner_ = std::make_unique<base::TaskRunner>(
-      factory->CreateTaskRunner("RTSPSourceTimer",
-                                base::TaskRunnerFactory::Priority::NORMAL));
+  timer_task_runner_ =
+      std::make_unique<base::TaskRunner>(factory->CreateTaskRunner(
+          "RTSPSourceTimer", base::TaskRunnerFactory::Priority::NORMAL));
 }
 
 RTSPSource::~RTSPSource() {
@@ -424,7 +453,7 @@ status_t RTSPSource::DequeueAccessUnit(
   {
     std::scoped_lock lock(lock_);
     source = track_type == media::MediaType::AUDIO ? audio_packet_source_
-                                                    : video_packet_source_;
+                                                   : video_packet_source_;
   }
   if (!source) {
     return WOULD_BLOCK;
@@ -454,7 +483,8 @@ size_t RTSPSource::GetTrackCount() const {
   return tracks_.size();
 }
 
-std::shared_ptr<media::MediaMeta> RTSPSource::GetTrackInfo(size_t track_index) const {
+std::shared_ptr<media::MediaMeta> RTSPSource::GetTrackInfo(
+    size_t track_index) const {
   std::scoped_lock lock(lock_);
   return track_index < tracks_.size() ? tracks_[track_index].format : nullptr;
 }
@@ -493,7 +523,8 @@ void RTSPSource::ConnectOnNetworkThread(uint64_t /* generation */) {
   hints.ai_socktype = SOCK_STREAM;
   addrinfo* result = nullptr;
   if (getaddrinfo(host_.c_str(), std::to_string(port_).c_str(), &hints,
-                  &result) != 0 || result == nullptr) {
+                  &result) != 0 ||
+      result == nullptr) {
     NotifyError(NAME_NOT_FOUND);
     return;
   }
@@ -575,15 +606,15 @@ void RTSPSource::OnTcpRead(base::net::AsyncPacketSocket* socket,
       if (read_buffer_.size() < 4U) {
         return;
       }
-      const size_t packet_size =
-          (static_cast<uint8_t>(read_buffer_[2]) << 8U) |
-          static_cast<uint8_t>(read_buffer_[3]);
+      const size_t packet_size = (static_cast<uint8_t>(read_buffer_[2]) << 8U) |
+                                 static_cast<uint8_t>(read_buffer_[3]);
       if (read_buffer_.size() < packet_size + 4U) {
         return;
       }
-      HandleInterleavedData(static_cast<uint8_t>(read_buffer_[1]),
-                            reinterpret_cast<const uint8_t*>(read_buffer_.data() + 4U),
-                            packet_size);
+      HandleInterleavedData(
+          static_cast<uint8_t>(read_buffer_[1]),
+          reinterpret_cast<const uint8_t*>(read_buffer_.data() + 4U),
+          packet_size);
       read_buffer_.erase(0, packet_size + 4U);
       continue;
     }
@@ -634,7 +665,8 @@ void RTSPSource::HandleRtspResponse(const std::string& response) {
       return;
     case State::kDescribe: {
       const size_t body_offset = response.find("\r\n\r\n");
-      if (body_offset == std::string::npos || !ParseSdp(response.substr(body_offset + 4U))) {
+      if (body_offset == std::string::npos ||
+          !ParseSdp(response.substr(body_offset + 4U))) {
         NotifyError(BAD_VALUE);
         return;
       }
@@ -661,7 +693,8 @@ void RTSPSource::ContinueSetup() {
   }
   Track& track = tracks_[setup_track_index_];
   if (transport_ == Transport::kUdp) {
-    auto make_socket = [this]() -> std::unique_ptr<base::net::AsyncPacketSocket> {
+    auto make_socket =
+        [this]() -> std::unique_ptr<base::net::AsyncPacketSocket> {
       auto* raw = base::net::AsyncUDPSocket::Create(
           network_thread_.CreateSocket(AF_INET, SOCK_DGRAM),
           base::net::EmptySocketAddressWithFamily(AF_INET));
@@ -699,11 +732,13 @@ void RTSPSource::StartPlayback() {
   state_ = State::kPlay;
   const uint64_t generation = generation_;
   maintenance_task_ = base::RepeatingTaskHandle::Start(
-      timer_task_runner_->Get(), [weak = weak_from_this(), generation]() -> uint64_t {
+      timer_task_runner_->Get(),
+      [weak = weak_from_this(), generation]() -> uint64_t {
         if (const auto self = weak.lock()) {
           self->network_thread_.PostTask([self, generation] {
             std::scoped_lock lock(self->lock_);
-            if (generation == self->generation_ && self->state_ != State::kIdle) {
+            if (generation == self->generation_ &&
+                self->state_ != State::kIdle) {
               self->CheckBuffering();
             }
           });
@@ -756,7 +791,8 @@ void RTSPSource::QueueVideo(Track& track,
   if (!track.depacketizer) {
     return;
   }
-  if (!track.have_frame_timestamp || track.frame_timestamp != packet.Timestamp()) {
+  if (!track.have_frame_timestamp ||
+      track.frame_timestamp != packet.Timestamp()) {
     track.frame_data.clear();
     track.frame_timestamp = packet.Timestamp();
     track.have_frame_timestamp = true;
@@ -774,9 +810,9 @@ void RTSPSource::QueueVideo(Track& track,
     return;
   }
   static constexpr std::array<uint8_t, 4> kStartCode = {0, 0, 0, 1};
-  const bool has_start_code = payload.size() >= kStartCode.size() &&
-                              std::equal(kStartCode.begin(), kStartCode.end(),
-                                         payload.cdata());
+  const bool has_start_code =
+      payload.size() >= kStartCode.size() &&
+      std::equal(kStartCode.begin(), kStartCode.end(), payload.cdata());
   if (!has_start_code) {
     track.frame_data.insert(track.frame_data.end(), kStartCode.begin(),
                             kStartCode.end());
@@ -796,18 +832,25 @@ void RTSPSource::QueueVideo(Track& track,
     return;
   }
   track.waiting_for_keyframe = false;
-  const int64_t pts_us = track.have_rtp_timestamp
-                             ? static_cast<int64_t>((static_cast<uint64_t>(packet.Timestamp() - track.first_rtp_timestamp) * 1'000'000U) / track.clock_rate)
-                             : 0;
+  const int64_t pts_us =
+      track.have_rtp_timestamp
+          ? static_cast<int64_t>(
+                (static_cast<uint64_t>(packet.Timestamp() -
+                                       track.first_rtp_timestamp) *
+                 1'000'000U) /
+                track.clock_rate)
+          : 0;
   if (!track.have_rtp_timestamp) {
     track.have_rtp_timestamp = true;
     track.first_rtp_timestamp = packet.Timestamp();
   }
-  auto frame = media::MediaFrame::CreateShared(track.frame_data.size(), media::MediaType::VIDEO);
+  auto frame = media::MediaFrame::CreateShared(track.frame_data.size(),
+                                               media::MediaType::VIDEO);
   std::memcpy(frame->data(), track.frame_data.data(), track.frame_data.size());
   frame->SetPts(base::Timestamp::Micros(pts_us));
   frame->SetDts(base::Timestamp::Micros(pts_us));
-  frame->SetPictureType(key_frame ? media::PictureType::I : media::PictureType::P);
+  frame->SetPictureType(key_frame ? media::PictureType::I
+                                  : media::PictureType::P);
   track.packet_source->QueueAccessunit(std::move(frame));
   track.last_pts_us = pts_us;
   track.frame_data.clear();
@@ -834,17 +877,20 @@ void RTSPSource::QueueAac(Track& track,
     track.first_rtp_timestamp = packet.Timestamp();
   }
   for (uint32_t index = 0; index < au_count; ++index) {
-    const uint32_t au_size = (static_cast<uint32_t>(payload[header_offset]) << 5U) |
-                             (payload[header_offset + 1U] >> 3U);
+    const uint32_t au_size =
+        (static_cast<uint32_t>(payload[header_offset]) << 5U) |
+        (payload[header_offset + 1U] >> 3U);
     header_offset += 2U;
     if (data_offset + au_size > payload.size()) {
       return;
     }
     const int64_t pts_us = static_cast<int64_t>(
         (static_cast<uint64_t>(packet.Timestamp() - track.first_rtp_timestamp +
-                               index * 1024U) * 1'000'000U) /
+                               index * 1024U) *
+         1'000'000U) /
         track.clock_rate);
-    auto frame = media::MediaFrame::CreateShared(au_size, media::MediaType::AUDIO);
+    auto frame =
+        media::MediaFrame::CreateShared(au_size, media::MediaType::AUDIO);
     std::memcpy(frame->data(), payload.data() + data_offset, au_size);
     frame->SetPts(base::Timestamp::Micros(pts_us));
     frame->SetDts(base::Timestamp::Micros(pts_us));
@@ -859,13 +905,14 @@ void RTSPSource::CheckBuffering() {
   int64_t minimum_buffered_us = INT64_MAX;
   for (const auto& track : tracks_) {
     status_t result = OK;
-    if (!track.packet_source || !track.packet_source->HasBufferAvailable(&result) ||
+    if (!track.packet_source ||
+        !track.packet_source->HasBufferAvailable(&result) ||
         (track.type == media::MediaType::VIDEO && track.waiting_for_keyframe)) {
       minimum_buffered_us = 0;
       break;
     }
-    minimum_buffered_us =
-        std::min(minimum_buffered_us, track.packet_source->GetBufferedDurationUs());
+    minimum_buffered_us = std::min(
+        minimum_buffered_us, track.packet_source->GetBufferedDurationUs());
   }
   if (!prepared_ && minimum_buffered_us >= kInitialBufferUs) {
     prepared_ = true;
@@ -877,7 +924,8 @@ void RTSPSource::CheckBuffering() {
     if (notify_) {
       notify_->OnBufferingEnd();
     }
-  } else if (started_ && !buffering_ && minimum_buffered_us < kUnderflowBufferUs) {
+  } else if (started_ && !buffering_ &&
+             minimum_buffered_us < kUnderflowBufferUs) {
     buffering_ = true;
     dequeue_ready_.store(false, std::memory_order_release);
     if (notify_) {
@@ -906,7 +954,8 @@ void RTSPSource::NotifyPrepared(status_t result) {
   }
   if (result == OK) {
     notify_->OnFlagsChanged(FLAG_CAN_PAUSE | FLAG_DYNAMIC_DURATION);
-    if (auto* track = FindTrackByTypeLocked(media::MediaType::VIDEO); track && track->format) {
+    if (auto* track = FindTrackByTypeLocked(media::MediaType::VIDEO);
+        track && track->format) {
       auto format = track->format;
       notify_->OnVideoSizeChanged(format);
     }
@@ -961,9 +1010,11 @@ bool RTSPSource::ParseUrlLocked() {
   }
   const size_t authority_begin = 7U;
   const size_t path_begin = url_.find('/', authority_begin);
-  const std::string authority = url_.substr(authority_begin, path_begin - authority_begin);
+  const std::string authority =
+      url_.substr(authority_begin, path_begin - authority_begin);
   const size_t at = authority.rfind('@');
-  const std::string host_port = at == std::string::npos ? authority : authority.substr(at + 1U);
+  const std::string host_port =
+      at == std::string::npos ? authority : authority.substr(at + 1U);
   if (at != std::string::npos) {
     const std::string user_info = authority.substr(0, at);
     const size_t colon = user_info.find(':');
@@ -977,9 +1028,9 @@ bool RTSPSource::ParseUrlLocked() {
   }
   if (colon != std::string::npos) {
     uint32_t parsed_port = 0;
-    const auto [ptr, error] = std::from_chars(host_port.data() + colon + 1U,
-                                              host_port.data() + host_port.size(),
-                                              parsed_port);
+    const auto [ptr, error] =
+        std::from_chars(host_port.data() + colon + 1U,
+                        host_port.data() + host_port.size(), parsed_port);
     if (error != std::errc{} || ptr != host_port.data() + host_port.size() ||
         parsed_port == 0 || parsed_port > UINT16_MAX) {
       return false;
@@ -1001,7 +1052,8 @@ bool RTSPSource::BuildAuthenticationLocked(const std::string& challenge) {
   }
   const std::string lower = ToLower(challenge);
   if (lower.starts_with("basic")) {
-    authentication_header_ = "Basic " + Base64Encode(username_ + ":" + password_);
+    authentication_header_ =
+        "Basic " + Base64Encode(username_ + ":" + password_);
     return true;
   }
   if (!lower.starts_with("digest")) {
@@ -1013,27 +1065,32 @@ bool RTSPSource::BuildAuthenticationLocked(const std::string& challenge) {
   if (realm == parameters.end() || nonce == parameters.end()) {
     return false;
   }
-  const std::string qop = parameters.contains("qop") ? ToLower(parameters.at("qop")) : "";
+  const std::string qop =
+      parameters.contains("qop") ? ToLower(parameters.at("qop")) : "";
   if (!qop.empty() && qop.find("auth") == std::string::npos) {
     return false;
   }
   const std::string uri = pending_uri_;
-  const std::string ha1 = Md5Hex(username_ + ":" + realm->second + ":" + password_);
+  const std::string ha1 =
+      Md5Hex(username_ + ":" + realm->second + ":" + password_);
   const std::string ha2 = Md5Hex(pending_method_ + ":" + uri);
   std::ostringstream authorization;
   authorization << "Digest username=\"" << username_ << "\", realm=\""
                 << realm->second << "\", nonce=\"" << nonce->second
                 << "\", uri=\"" << uri << "\", algorithm=MD5";
   if (qop.empty()) {
-    authorization << ", response=\"" << Md5Hex(ha1 + ":" + nonce->second + ":" + ha2)
-                  << "\"";
+    authorization << ", response=\""
+                  << Md5Hex(ha1 + ":" + nonce->second + ":" + ha2) << "\"";
   } else {
     const std::string nonce_count = "00000001";
-    const std::string cnonce = Md5Hex(std::to_string(++digest_nonce_count_)).substr(0, 16U);
-    const std::string response = Md5Hex(ha1 + ":" + nonce->second + ":" + nonce_count +
-                                        ":" + cnonce + ":auth:" + ha2);
-    authorization << ", response=\"" << response << "\", qop=auth, nc="
-                  << nonce_count << ", cnonce=\"" << cnonce << "\"";
+    const std::string cnonce =
+        Md5Hex(std::to_string(++digest_nonce_count_)).substr(0, 16U);
+    const std::string response =
+        Md5Hex(ha1 + ":" + nonce->second + ":" + nonce_count + ":" + cnonce +
+               ":auth:" + ha2);
+    authorization << ", response=\"" << response
+                  << "\", qop=auth, nc=" << nonce_count << ", cnonce=\""
+                  << cnonce << "\"";
   }
   authentication_header_ = authorization.str();
   return true;
@@ -1056,8 +1113,9 @@ bool RTSPSource::ParseSdp(const std::string& sdp) {
           payload_type <= UINT8_MAX) {
         tracks_.emplace_back();
         current = &tracks_.back();
-        current->type = ToLower(media_name) == "video" ? media::MediaType::VIDEO
-                                                         : media::MediaType::AUDIO;
+        current->type = ToLower(media_name) == "video"
+                            ? media::MediaType::VIDEO
+                            : media::MediaType::AUDIO;
         current->payload_type = static_cast<uint8_t>(payload_type);
       } else {
         current = nullptr;
@@ -1077,15 +1135,20 @@ bool RTSPSource::ParseSdp(const std::string& sdp) {
       std::string clock;
       std::getline(value, current->encoding, '/');
       std::getline(value, clock, '/');
-      std::from_chars(clock.data(), clock.data() + clock.size(), current->clock_rate);
+      std::from_chars(clock.data(), clock.data() + clock.size(),
+                      current->clock_rate);
       std::string channels;
       if (std::getline(value, channels, '/')) {
-        std::from_chars(channels.data(), channels.data() + channels.size(), current->channels);
+        std::from_chars(channels.data(), channels.data() + channels.size(),
+                        current->channels);
       }
     } else if (attribute.starts_with("control:")) {
       const std::string control = attribute.substr(8U);
-      current->control_uri = control.starts_with("rtsp://") ? control :
-          (base_uri_.ends_with("/") ? base_uri_ + control : base_uri_ + "/" + control);
+      current->control_uri =
+          control.starts_with("rtsp://")
+              ? control
+              : (base_uri_.ends_with("/") ? base_uri_ + control
+                                          : base_uri_ + "/" + control);
     } else if (attribute.starts_with("fmtp:")) {
       const size_t space = attribute.find(' ');
       if (space == std::string::npos) {
@@ -1101,7 +1164,8 @@ bool RTSPSource::ParseSdp(const std::string& sdp) {
       }
     }
   }
-  std::erase_if(tracks_, [this](Track& track) { return !ConfigureTrackFromSdp(track); });
+  std::erase_if(tracks_,
+                [this](Track& track) { return !ConfigureTrackFromSdp(track); });
   for (auto& track : tracks_) {
     if (track.type == media::MediaType::AUDIO) {
       audio_packet_source_ = track.packet_source;
@@ -1119,37 +1183,45 @@ bool RTSPSource::ConfigureTrackFromSdp(Track& track) {
     return false;
   }
   if (track.type == media::MediaType::VIDEO && encoding == "h264") {
-    track.format = media::MediaMeta::CreatePtr(media::MediaType::VIDEO,
-                                                 media::MediaMeta::FormatType::kTrack);
-    track.format->SetMime(media::MEDIA_MIMETYPE_VIDEO_AVC).SetCodec(media::CodecId::AVE_CODEC_ID_H264);
+    track.format = media::MediaMeta::CreatePtr(
+        media::MediaType::VIDEO, media::MediaMeta::FormatType::kTrack);
+    track.format->SetMime(media::MEDIA_MIMETYPE_VIDEO_AVC)
+        .SetCodec(media::CodecId::AVE_CODEC_ID_H264);
     track.depacketizer =
         std::make_unique<media::rtp_rtcp::VideoRtpDepacketizerH264>();
     if (const auto it = track.fmtp.find("sprop-parameter-sets");
         it != track.fmtp.end()) {
       std::vector<std::string> values;
       std::istringstream stream(it->second);
-      for (std::string value; std::getline(stream, value, ',');) values.push_back(Trim(value));
+      for (std::string value; std::getline(stream, value, ',');)
+        values.push_back(Trim(value));
       const auto config = MakeAnnexBConfig(values);
       if (!config.empty()) {
-        track.format->SetPrivateData(static_cast<uint32_t>(config.size()), config.data());
+        track.format->SetPrivateData(static_cast<uint32_t>(config.size()),
+                                     config.data());
       }
     }
-  } else if (track.type == media::MediaType::VIDEO && (encoding == "h265" || encoding == "hevc")) {
-    track.format = media::MediaMeta::CreatePtr(media::MediaType::VIDEO,
-                                                 media::MediaMeta::FormatType::kTrack);
-    track.format->SetMime(media::MEDIA_MIMETYPE_VIDEO_HEVC).SetCodec(media::CodecId::AVE_CODEC_ID_HEVC);
+  } else if (track.type == media::MediaType::VIDEO &&
+             (encoding == "h265" || encoding == "hevc")) {
+    track.format = media::MediaMeta::CreatePtr(
+        media::MediaType::VIDEO, media::MediaMeta::FormatType::kTrack);
+    track.format->SetMime(media::MEDIA_MIMETYPE_VIDEO_HEVC)
+        .SetCodec(media::CodecId::AVE_CODEC_ID_HEVC);
     track.depacketizer =
         std::make_unique<media::rtp_rtcp::VideoRtpDepacketizerH265>();
     std::vector<std::string> values;
     for (const char* key : {"sprop-vps", "sprop-sps", "sprop-pps"}) {
-      if (const auto it = track.fmtp.find(key); it != track.fmtp.end()) values.push_back(it->second);
+      if (const auto it = track.fmtp.find(key); it != track.fmtp.end())
+        values.push_back(it->second);
     }
     const auto config = MakeAnnexBConfig(values);
     if (!config.empty()) {
-      track.format->SetPrivateData(static_cast<uint32_t>(config.size()), config.data());
+      track.format->SetPrivateData(static_cast<uint32_t>(config.size()),
+                                   config.data());
     }
-  } else if (track.type == media::MediaType::AUDIO && encoding == "mpeg4-generic" &&
-             track.clock_rate > 0U && track.channels > 0U) {
+  } else if (track.type == media::MediaType::AUDIO &&
+             encoding == "mpeg4-generic" && track.clock_rate > 0U &&
+             track.channels > 0U) {
     const auto config = track.fmtp.find("config");
     if (config == track.fmtp.end()) {
       return false;
@@ -1158,13 +1230,14 @@ bool RTSPSource::ConfigureTrackFromSdp(Track& track) {
     if (private_data.empty()) {
       return false;
     }
-    track.format = media::MediaMeta::CreatePtr(media::MediaType::AUDIO,
-                                                 media::MediaMeta::FormatType::kTrack);
+    track.format = media::MediaMeta::CreatePtr(
+        media::MediaType::AUDIO, media::MediaMeta::FormatType::kTrack);
     track.format->SetMime(media::MEDIA_MIMETYPE_AUDIO_AAC)
         .SetCodec(media::CodecId::AVE_CODEC_ID_AAC)
         .SetSampleRate(track.clock_rate)
         .SetChannelLayout(ChannelLayoutForCount(track.channels))
-        .SetPrivateData(static_cast<uint32_t>(private_data.size()), private_data.data());
+        .SetPrivateData(static_cast<uint32_t>(private_data.size()),
+                        private_data.data());
   } else {
     return false;
   }
@@ -1184,7 +1257,8 @@ void RTSPSource::ResetMediaLocked() {
   }
 }
 
-RTSPSource::Track* RTSPSource::FindTrackBySocket(base::net::AsyncPacketSocket* socket) {
+RTSPSource::Track* RTSPSource::FindTrackBySocket(
+    base::net::AsyncPacketSocket* socket) {
   for (auto& track : tracks_) {
     if (track.rtp_socket.get() == socket || track.rtcp_socket.get() == socket) {
       return &track;

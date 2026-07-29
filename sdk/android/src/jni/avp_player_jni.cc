@@ -5,7 +5,7 @@
  * Distributed under terms of the GPLv2 license.
  */
 
-#include "sdk/android/src/jni/avp_player_jni.h"
+#include "avp_player_jni.h"
 
 #include <memory>
 #include <string>
@@ -14,14 +14,15 @@
 #include <android/native_window_jni.h>
 
 #include "base/android/jni/jvm.h"
+#include "base/android/jni/jni_string.h"
 #include "base/logging.h"
+#include "java_http_provider_jni.h"
 #include "jni_headers/avp/sdk/android/generated_avp_jni/AvpPlayer_jni.h"
 #include "jni_headers/avp/sdk/android/generated_avp_jni/TrackInfo_jni.h"
 #include "media/android/jni/video_frame_jni.h"
 #include "media/audio/android/java_audio_device.h"
 #include "media/foundation/media_frame.h"
 #include "media/foundation/media_meta.h"
-#include "sdk/android/src/jni/java_http_provider_jni.h"
 #include "third_party/jni_zero/jni_zero.h"
 
 namespace ave {
@@ -54,14 +55,16 @@ AvpPlayerJni::AvpPlayerJni(JNIEnv* env,
                            jboolean sync_enabled,
                            jint audio_passthrough_policy,
                            jboolean audio_only)
-    : j_player_(env, j_player) {
+    : j_player_(env,
+                jni_zero::JavaRef<jobject>::CreateLeaky(env, j_player)) {
   AVE_LOG(LS_INFO) << "AvpPlayerJni::AvpPlayerJni created";
 
   // Create JavaAudioDevice from the Java AudioDevice object.
   player::Player::Builder builder;
   if (j_audio_device) {
     j_audio_device_ =
-        jni_zero::ScopedJavaGlobalRef<jobject>(env, j_audio_device);
+        jni_zero::ScopedJavaGlobalRef<jobject>(
+            env, jni_zero::JavaRef<jobject>::CreateLeaky(env, j_audio_device));
     java_audio_device_ =
         std::make_shared<media::android::JavaAudioDevice>(j_audio_device_);
     java_audio_device_->Init();
@@ -131,7 +134,7 @@ void AvpPlayerJni::SetVideoRenderer(JNIEnv* env, jboolean has_renderer) {
 }
 
 void AvpPlayerJni::SetSurface(JNIEnv* env,
-                              const jni_zero::JavaParamRef<jobject>& surface) {
+                              const jni_zero::JavaRef<jobject>& surface) {
   AVE_LOG(LS_INFO) << "AvpPlayerJni::SetSurface called";
 
   // Release existing surface render (decrements ANativeWindow ref count).
@@ -398,9 +401,9 @@ void AvpPlayerJni::OnFrame(const std::shared_ptr<media::MediaFrame>& frame) {
 // Called by jni_zero auto-generated JNI_AvpPlayer_Init dispatch
 static jlong JNI_AvpPlayer_Init(
     JNIEnv* env,
-    const jni_zero::JavaParamRef<jobject>& j_caller,
-    const jni_zero::JavaParamRef<jobject>& j_audio_device,
-    const jni_zero::JavaParamRef<jobject>& j_http_provider,
+    const jni_zero::JavaRef<jobject>& j_caller,
+    const jni_zero::JavaRef<jobject>& j_audio_device,
+    const jni_zero::JavaRef<jobject>& j_http_provider,
     jboolean sync_enabled,
     jint audio_passthrough_policy,
     jboolean audio_only) {

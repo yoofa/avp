@@ -5,7 +5,7 @@
  * Distributed under terms of the GPLv2 license.
  */
 
-#include "demuxer/mpeg2/mpeg2_common.h"
+#include "mpeg2_common.h"
 
 #include <array>
 #include <utility>

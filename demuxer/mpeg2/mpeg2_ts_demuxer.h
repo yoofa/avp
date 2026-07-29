@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "api/demuxer/demuxer.h"
+#include "../../api/demuxer/demuxer.h"
 
 namespace ave {
 namespace media {

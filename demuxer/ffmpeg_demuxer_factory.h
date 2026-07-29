@@ -10,8 +10,8 @@
 
 #include <memory>
 
-#include "api/demuxer/demuxer.h"
-#include "api/demuxer/demuxer_factory.h"
+#include "../api/demuxer/demuxer.h"
+#include "../api/demuxer/demuxer_factory.h"
 #include "base/data_source/data_source.h"
 
 namespace ave {
